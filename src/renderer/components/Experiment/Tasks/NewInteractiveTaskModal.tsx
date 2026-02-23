@@ -772,13 +772,19 @@ export default function NewInteractiveTaskModal({
                                         spacing={0.5}
                                         flexWrap="wrap"
                                       >
-                                        <Chip
-                                          size="sm"
-                                          variant="soft"
-                                          color="primary"
-                                        >
-                                          {template.supported_accelerators}
-                                        </Chip>
+                                        {(Array.isArray(template.supported_accelerators)
+                                          ? template.supported_accelerators
+                                          : [template.supported_accelerators]
+                                        ).map((acc: string) => (
+                                          <Chip
+                                            key={acc}
+                                            size="sm"
+                                            variant="soft"
+                                            color="primary"
+                                          >
+                                            {acc}
+                                          </Chip>
+                                        ))}
                                       </Stack>
                                     </Box>
                                   )}
@@ -918,13 +924,19 @@ export default function NewInteractiveTaskModal({
                                             spacing={0.5}
                                             flexWrap="wrap"
                                           >
-                                            <Chip
-                                              size="sm"
-                                              variant="soft"
-                                              color="primary"
-                                            >
-                                              {taskSupportedAccelerators}
-                                            </Chip>
+                                            {(Array.isArray(taskSupportedAccelerators)
+                                              ? taskSupportedAccelerators
+                                              : [taskSupportedAccelerators]
+                                            ).map((acc: string) => (
+                                              <Chip
+                                                key={acc}
+                                                size="sm"
+                                                variant="soft"
+                                                color="primary"
+                                              >
+                                                {acc}
+                                              </Chip>
+                                            ))}
                                           </Stack>
                                         </Box>
                                       )}
