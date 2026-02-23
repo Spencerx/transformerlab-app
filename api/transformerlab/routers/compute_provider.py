@@ -1509,17 +1509,14 @@ async def launch_template_on_provider(
         )
         if gallery_entry:
             environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
-            # Internalize interactive remote setup (sudo/ngrok installs) so it does not live
-            # in interactive-gallery.json or task.setup. Only inject for remote environments.
-            # For remote interactive: prepend SUDO prefix to gallery/task setup so $SUDO
-            # is defined in the launch route; setup content stays in the gallery JSON.
-            if environment == "remote":
-                from transformerlab.shared.interactive_gallery_utils import INTERACTIVE_SUDO_PREFIX
+            # Run gallery/task setup for both local and remote interactive (SUDO prefix so $SUDO is defined).
+            # Ngrok is installed only when tunnel logic runs (remote); setup has no ngrok.
+            from transformerlab.shared.interactive_gallery_utils import INTERACTIVE_SUDO_PREFIX
 
-                raw_setup = (gallery_entry.get("setup") or "").strip() or (request.setup or "").strip()
-                if raw_setup:
-                    setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
-                    interactive_setup_added = True
+            raw_setup = (gallery_entry.get("setup") or "").strip() or (request.setup or "").strip()
+            if raw_setup:
+                setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
+                interactive_setup_added = True
             supported_accelerators = None
             if provider.config and isinstance(provider.config, dict):
                 supported_accelerators = provider.config.get("supported_accelerators")
@@ -1558,17 +1555,10 @@ async def launch_template_on_provider(
                 setup_override_from_gallery = replace_secret_placeholders(setup_override_from_gallery, team_secrets)
 
     # Add user-provided setup if any (replace secrets in setup).
-    # For interactive tasks we already added gallery/task setup above with SUDO prefix when remote.
-    # For interactive local we skip setup so sudo/ngrok install doesn't run on the machine.
+    # For interactive tasks we already added gallery/task setup above (local and remote).
     if request.setup and not interactive_setup_added:
-        is_interactive_local = request.subtype == "interactive" and (
-            provider.type == ProviderType.LOCAL.value or request.local
-        )
-        if not is_interactive_local:
-            setup_with_secrets = (
-                replace_secret_placeholders(request.setup, team_secrets) if team_secrets else request.setup
-            )
-            setup_commands.append(setup_with_secrets)
+        setup_with_secrets = replace_secret_placeholders(request.setup, team_secrets) if team_secrets else request.setup
+        setup_commands.append(setup_with_secrets)
 
     # Join setup commands, stripping trailing semicolons to avoid double semicolons
     if setup_commands:

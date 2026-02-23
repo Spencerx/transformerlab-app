@@ -23,128 +23,55 @@ def test_resolve_legacy_entry_local():
     assert setup is None
 
 
-# ---- resolve_interactive_command: commands.remote / commands.local ----
-def test_resolve_commands_remote_default():
-    """commands.remote.default is used for remote when no accelerator match."""
-    entry = {
-        "command": "legacy",
-        "commands": {
-            "remote": {"default": "ngrok http 8888; jupyter lab"},
-        },
-    }
-    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
-    assert cmd == "ngrok http 8888; jupyter lab"
-    assert setup is None
-
-
-def test_resolve_commands_local_default():
-    """commands.local.default is used for local."""
-    entry = {
-        "command": "legacy",
-        "commands": {
-            "remote": {"default": "ngrok; jupyter"},
-            "local": {"default": "jupyter lab; echo http://localhost:8888"},
-        },
-    }
-    cmd, setup = resolve_interactive_command(entry, "local", None, None)
-    assert cmd == "jupyter lab; echo http://localhost:8888"
-    assert setup is None
-
-
-def test_resolve_commands_local_falls_back_to_remote():
-    """When commands.local is missing, fall back to commands.remote.default."""
-    entry = {
-        "command": "legacy",
-        "commands": {"remote": {"default": "remote-cmd"}},
-    }
-    cmd, _ = resolve_interactive_command(entry, "local", None, None)
-    assert cmd == "remote-cmd"
-
-
-def test_resolve_commands_remote_falls_back_to_legacy():
-    """When commands.remote is missing, use legacy command."""
-    entry = {
-        "command": "legacy-cmd",
-        "setup": "legacy-setup",
-        "commands": {"local": {"default": "local-cmd"}},
-    }
-    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
-    assert cmd == "legacy-cmd"
-    assert setup is None
-
-
-def test_resolve_commands_accelerator_from_supported_list():
-    """When accelerator is None, supported_accelerators list can provide hint."""
-    entry = {
-        "command": "legacy",
-        "commands": {
-            "remote": {"default": "default-cmd", "AMD": "amd-cmd"},
-        },
-    }
-    cmd, _ = resolve_interactive_command(entry, "remote", None, ["AMD"])
-    assert cmd == "amd-cmd"
-
-
-def test_resolve_commands_value_as_object_with_setup():
-    """Value can be { command, setup? }; setup_override is returned when present."""
-    entry = {
-        "command": "legacy",
-        "setup": "global-setup",
-        "commands": {
-            "local": {
-                "default": {"command": "local-cmd", "setup": "local-setup"},
-            },
-        },
-    }
-    cmd, setup = resolve_interactive_command(entry, "local", None, None)
-    assert cmd == "local-cmd"
-    assert setup == "local-setup"
-
-
-def test_resolve_commands_value_as_object_setup_optional():
-    """Value { command } with no setup returns setup_override None."""
-    entry = {
-        "commands": {"remote": {"default": {"command": "run-only"}}},
-    }
-    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
-    assert cmd == "run-only"
-    assert setup is None
-
-
+# ---- resolve_interactive_command: logic (preferred); commands.local/remote no longer supported ----
 def test_resolve_logic_remote_uses_core_tunnel_and_tail():
-    """logic.{core,tunnel,tail_logs} are composed for remote environment."""
+    """logic.{core,tunnel,tail_logs} are composed for remote; tunnel included."""
     entry = {
+        "id": "jupyter",
+        "interactive_type": "jupyter",
         "logic": {
             "core": "start-core",
             "tunnel": "start-tunnel",
             "tail_logs": "tail-logs",
         },
-        # commands/command should be ignored when logic is present for remote
         "command": "legacy",
-        "commands": {"remote": {"default": "remote-cmd"}},
     }
     cmd, setup = resolve_interactive_command(entry, "remote", None, None)
     assert cmd == "start-core; start-tunnel; tail-logs"
     assert setup is None
 
 
-def test_resolve_logic_local_falls_back_to_commands():
-    """logic is currently only used for remote; local still uses commands map."""
+def test_resolve_logic_local_omits_tunnel_adds_echo():
+    """logic is used for local too; tunnel omitted, local URL echo for known types, ngrok stripped from tail."""
     entry = {
+        "id": "jupyter",
+        "interactive_type": "jupyter",
         "logic": {
             "core": "start-core",
             "tunnel": "start-tunnel",
-            "tail_logs": "tail-logs",
-        },
-        "command": "legacy",
-        "commands": {
-            "local": {"default": "local-cmd"},
-            "remote": {"default": "remote-cmd"},
+            "tail_logs": "tail -f /tmp/jupyter.log /tmp/ngrok.log",
         },
     }
     cmd, setup = resolve_interactive_command(entry, "local", None, None)
-    assert cmd == "local-cmd"
+    assert "start-core" in cmd
+    assert "start-tunnel" not in cmd
+    assert "Local URL: http://localhost:8888" in cmd
+    assert "/tmp/ngrok.log" not in cmd
     assert setup is None
+
+
+def test_resolve_legacy_command_when_no_logic():
+    """When entry has no logic, top-level command is used (commands.local/remote ignored)."""
+    entry = {
+        "command": "legacy-cmd",
+        "setup": "legacy-setup",
+        "commands": {"local": {"default": "local-cmd"}, "remote": {"default": "remote-cmd"}},
+    }
+    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
+    assert cmd == "legacy-cmd"
+    assert setup is None
+    cmd2, _ = resolve_interactive_command(entry, "local", None, None)
+    assert cmd2 == "legacy-cmd"
 
 
 # ---- find_interactive_gallery_entry ----
