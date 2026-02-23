@@ -61,6 +61,8 @@ type InteractiveTemplate = {
   env_parameters?: ConfigField[];
   icon?: string;
   supported_accelerators?: string;
+  /** When true, task is hidden when a local compute provider is selected. */
+  remoteOnly?: boolean;
   /** Optional per-environment (local/remote) and per-accelerator command variants; backend resolves at launch. */
   commands?: Record<
     string,
@@ -749,12 +751,18 @@ export default function NewInteractiveTaskModal({
                     {!galleryIsLoading && galleryData && gallery.length > 0 && (
                       <Grid container spacing={2}>
                         {gallery
-                          .filter((template) =>
-                            isProviderCompatible(
+                          .filter((template) => {
+                            if (
+                              selectedProvider?.type === 'local' &&
+                              (template as InteractiveTemplate).remoteOnly
+                            ) {
+                              return false;
+                            }
+                            return isProviderCompatible(
                               selectedProvider,
                               template.supported_accelerators,
-                            ),
-                          )
+                            );
+                          })
                           .map((template) => (
                             <Grid xs={12} sm={6} md={4} key={template.id}>
                               <Card
@@ -874,13 +882,19 @@ export default function NewInteractiveTaskModal({
                       teamGallery.length > 0 && (
                         <Grid container spacing={2}>
                           {teamGallery
-                            .filter((task: any) =>
-                              isProviderCompatible(
+                            .filter((task: any) => {
+                              if (
+                                selectedProvider?.type === 'local' &&
+                                task.remoteOnly
+                              ) {
+                                return false;
+                              }
+                              return isProviderCompatible(
                                 selectedProvider,
                                 task.supported_accelerators ||
                                   task.config?.supported_accelerators,
-                              ),
-                            )
+                              );
+                            })
                             .map((task: any, index: number) => {
                               const taskTitle =
                                 task.title || task.name || 'Untitled Task';

@@ -8,7 +8,8 @@
     "command": "code tunnel --accept-server-license-terms --disable-telemetry",
     "env_parameters": [],
     "icon": "https://lab.cloud/img/icons/vscode.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD"]
+    "supported_accelerators": ["cpu", "NVIDIA", "AMD"],
+    "remoteOnly": true
   },
   {
     "id": "jupyter",

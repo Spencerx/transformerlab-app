@@ -95,6 +95,8 @@ async def get_tasks_gallery():
 #   5. Legacy top-level "command" and "setup".
 # - If "commands" is missing, top-level "command" and "setup" are used as
 #   remote/default behavior.
+# - Optional "remoteOnly" (boolean): when true, the task is hidden in the UI
+#   when a local compute provider is selected (e.g. VS Code tunnel-only tasks).
 # ---------------------------------------------------------------------------
 
 
