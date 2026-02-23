@@ -126,6 +126,54 @@ export default function QueueTaskModal({
     [providerListData],
   );
 
+  // Determine if the selected provider is a local provider (must be before isProviderCompatible)
+  const selectedProvider = React.useMemo(
+    () => providers.find((p: any) => p.id === selectedProviderId),
+    [providers, selectedProviderId],
+  );
+  const isLocalProvider = selectedProvider?.type === 'local';
+
+  // Fetch server info (local machine resources) when modal is open and local provider selected
+  const { data: serverInfoData } = useSWR(
+    open && isLocalProvider ? chatAPI.Endpoints.ServerInfo.Get() : null,
+    fetcher,
+  );
+
+  // Extract task resource requirements from the task object (must be before isProviderCompatible)
+  const taskResources = React.useMemo(() => {
+    if (!task) return null;
+    const cfg =
+      task.config !== undefined
+        ? typeof task.config === 'string'
+          ? JSON.parse(task.config)
+          : task.config
+        : task;
+
+    let accelerators = cfg.accelerators || task.accelerators || null;
+    const cpus = cfg.cpus || task.cpus || null;
+    const memory = cfg.memory || task.memory || null;
+
+    // The YAML resources.compute_provider field can contain an accelerator
+    // spec like "RTX3090:1" — the backend stores it as provider_name.
+    // If there's no explicit accelerators field, check if compute_provider /
+    // provider_name looks like an accelerator spec (e.g. "Name:Count").
+    if (!accelerators) {
+      const computeProvider =
+        cfg.compute_provider ||
+        task.compute_provider ||
+        cfg.provider_name ||
+        task.provider_name ||
+        null;
+      if (computeProvider && /^.+:\d+$/.test(String(computeProvider))) {
+        accelerators = String(computeProvider);
+      }
+    }
+
+    if (!accelerators && !cpus && !memory) return null;
+
+    return { accelerators, cpus, memory };
+  }, [task]);
+
   // Helper to check if a provider supports requested accelerators
   const isProviderCompatible = React.useCallback(
     (provider: any) => {
@@ -195,54 +243,6 @@ export default function QueueTaskModal({
 
   const models = modelsData || [];
   const datasets = datasetsData || [];
-
-  // Determine if the selected provider is a local provider
-  const selectedProvider = React.useMemo(
-    () => providers.find((p: any) => p.id === selectedProviderId),
-    [providers, selectedProviderId],
-  );
-  const isLocalProvider = selectedProvider?.type === 'local';
-
-  // Fetch server info (local machine resources) when modal is open and local provider selected
-  const { data: serverInfoData } = useSWR(
-    open && isLocalProvider ? chatAPI.Endpoints.ServerInfo.Get() : null,
-    fetcher,
-  );
-
-  // Extract task resource requirements from the task object
-  const taskResources = React.useMemo(() => {
-    if (!task) return null;
-    const cfg =
-      task.config !== undefined
-        ? typeof task.config === 'string'
-          ? JSON.parse(task.config)
-          : task.config
-        : task;
-
-    let accelerators = cfg.accelerators || task.accelerators || null;
-    const cpus = cfg.cpus || task.cpus || null;
-    const memory = cfg.memory || task.memory || null;
-
-    // The YAML resources.compute_provider field can contain an accelerator
-    // spec like "RTX3090:1" — the backend stores it as provider_name.
-    // If there's no explicit accelerators field, check if compute_provider /
-    // provider_name looks like an accelerator spec (e.g. "Name:Count").
-    if (!accelerators) {
-      const computeProvider =
-        cfg.compute_provider ||
-        task.compute_provider ||
-        cfg.provider_name ||
-        task.provider_name ||
-        null;
-      if (computeProvider && /^.+:\d+$/.test(String(computeProvider))) {
-        accelerators = String(computeProvider);
-      }
-    }
-
-    if (!accelerators && !cpus && !memory) return null;
-
-    return { accelerators, cpus, memory };
-  }, [task]);
 
   // Validate local provider resources against task requirements
   const resourceValidation = React.useMemo(() => {
