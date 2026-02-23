@@ -916,6 +916,7 @@ export default function Interactive() {
       <ViewOutputModalStreaming
         jobId={viewOutputFromJob}
         setJobId={(jobId: number) => setViewOutputFromJob(jobId)}
+        tabs={['provider']}
       />
       {(() => {
         const job = jobs.find(
