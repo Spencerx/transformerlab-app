@@ -111,6 +111,42 @@ def test_resolve_commands_value_as_object_setup_optional():
     assert setup is None
 
 
+def test_resolve_logic_remote_uses_core_tunnel_and_tail():
+    """logic.{core,tunnel,tail_logs} are composed for remote environment."""
+    entry = {
+        "logic": {
+            "core": "start-core",
+            "tunnel": "start-tunnel",
+            "tail_logs": "tail-logs",
+        },
+        # commands/command should be ignored when logic is present for remote
+        "command": "legacy",
+        "commands": {"remote": {"default": "remote-cmd"}},
+    }
+    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
+    assert cmd == "start-core; start-tunnel; tail-logs"
+    assert setup is None
+
+
+def test_resolve_logic_local_falls_back_to_commands():
+    """logic is currently only used for remote; local still uses commands map."""
+    entry = {
+        "logic": {
+            "core": "start-core",
+            "tunnel": "start-tunnel",
+            "tail_logs": "tail-logs",
+        },
+        "command": "legacy",
+        "commands": {
+            "local": {"default": "local-cmd"},
+            "remote": {"default": "remote-cmd"},
+        },
+    }
+    cmd, setup = resolve_interactive_command(entry, "local", None, None)
+    assert cmd == "local-cmd"
+    assert setup is None
+
+
 # ---- find_interactive_gallery_entry ----
 def test_find_entry_by_id():
     """find_interactive_gallery_entry returns entry matching interactive_gallery_id."""

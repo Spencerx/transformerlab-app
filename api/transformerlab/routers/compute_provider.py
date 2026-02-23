@@ -1466,18 +1466,8 @@ async def launch_template_on_provider(
             # Log error but don't fail the launch - SSH key setup is optional
             print(f"Warning: Failed to set up SSH key for organization {team_id}: {e}")
 
-    # Add user-provided setup if any (replace secrets in setup)
-    if request.setup:
-        setup_with_secrets = replace_secret_placeholders(request.setup, team_secrets) if team_secrets else request.setup
-        setup_commands.append(setup_with_secrets)
-
-    # Join setup commands, stripping trailing semicolons to avoid double semicolons
-    if setup_commands:
-        # Strip trailing semicolons and whitespace from each command, then join with semicolons
-        cleaned_commands = [cmd.rstrip(";").rstrip() for cmd in setup_commands if cmd.strip()]
-        final_setup = ";".join(cleaned_commands) if cleaned_commands else None
-    else:
-        final_setup = None
+    # Note: final_setup is assembled later, after we optionally inject
+    # interactive remote setup based on the gallery entry.
 
     # Add default environment variables
     env_vars["_TFL_JOB_ID"] = str(job_id)
@@ -1509,6 +1499,7 @@ async def launch_template_on_provider(
     # Resolve command (and optional setup override) for interactive sessions from gallery
     base_command = request.command
     setup_override_from_gallery = None
+    interactive_setup_added = False
     if request.subtype == "interactive" and (request.interactive_gallery_id or request.interactive_type):
         gallery_list = await galleries.get_interactive_gallery()
         gallery_entry = find_interactive_gallery_entry(
@@ -1518,6 +1509,17 @@ async def launch_template_on_provider(
         )
         if gallery_entry:
             environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
+            # Internalize interactive remote setup (sudo/ngrok installs) so it does not live
+            # in interactive-gallery.json or task.setup. Only inject for remote environments.
+            # For remote interactive: prepend SUDO prefix to gallery/task setup so $SUDO
+            # is defined in the launch route; setup content stays in the gallery JSON.
+            if environment == "remote":
+                from transformerlab.shared.interactive_gallery_utils import INTERACTIVE_SUDO_PREFIX
+
+                raw_setup = (gallery_entry.get("setup") or "").strip() or (request.setup or "").strip()
+                if raw_setup:
+                    setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
+                    interactive_setup_added = True
             supported_accelerators = None
             if provider.config and isinstance(provider.config, dict):
                 supported_accelerators = provider.config.get("supported_accelerators")
@@ -1554,6 +1556,26 @@ async def launch_template_on_provider(
                 base_command = resolved_cmd
             if setup_override_from_gallery and team_secrets:
                 setup_override_from_gallery = replace_secret_placeholders(setup_override_from_gallery, team_secrets)
+
+    # Add user-provided setup if any (replace secrets in setup).
+    # For interactive tasks we already added gallery/task setup above with SUDO prefix when remote.
+    # For interactive local we skip setup so sudo/ngrok install doesn't run on the machine.
+    if request.setup and not interactive_setup_added:
+        is_interactive_local = request.subtype == "interactive" and (
+            provider.type == ProviderType.LOCAL.value or request.local
+        )
+        if not is_interactive_local:
+            setup_with_secrets = (
+                replace_secret_placeholders(request.setup, team_secrets) if team_secrets else request.setup
+            )
+            setup_commands.append(setup_with_secrets)
+
+    # Join setup commands, stripping trailing semicolons to avoid double semicolons
+    if setup_commands:
+        cleaned_commands = [cmd.rstrip(";").rstrip() for cmd in setup_commands if cmd.strip()]
+        final_setup = ";".join(cleaned_commands) if cleaned_commands else None
+    else:
+        final_setup = None
 
     if setup_override_from_gallery is not None:
         final_setup = setup_override_from_gallery

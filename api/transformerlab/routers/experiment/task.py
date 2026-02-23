@@ -600,7 +600,9 @@ async def import_task_from_gallery(
             "plugin": "remote_orchestrator",
             "experiment_id": experimentId,
             "cluster_name": task_name,
-            "command": gallery_entry.get("command", ""),
+            # Command is resolved at launch from gallery logic. Setup is stored so the
+            # launch route can prepend SUDO prefix for remote; no full command in task.
+            "command": "",
             "setup": gallery_entry.get("setup", ""),
             "interactive_type": interactive_type,
             "subtype": "interactive",

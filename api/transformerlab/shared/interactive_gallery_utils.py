@@ -26,6 +26,92 @@ _ACCELERATOR_ALIASES = {
     "m3": "AppleSilicon",
 }
 
+# Prepended to interactive remote setup in the launch route so $SUDO is defined
+# without putting that logic in the gallery JSON. Setup content stays in the gallery.
+INTERACTIVE_SUDO_PREFIX = (
+    'SUDO=""; if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; fi; export DEBIAN_FRONTEND=noninteractive;'
+)
+
+
+def _compose_command_from_logic(
+    logic: dict,
+    interactive_type: str,
+    environment: str,
+) -> Optional[str]:
+    """
+    Compose a command from the logic block:
+      - core: required
+      - tunnel: optional
+      - tail_logs: optional
+
+    The caller chooses environment:
+      - local: tunnel is omitted
+      - remote: tunnel is included if present
+    """
+    core = logic.get("core")
+    if not isinstance(core, str) or not core.strip():
+        return None
+
+    tunnel = logic.get("tunnel")
+    tail_logs = logic.get("tail_logs")
+
+    parts: list[str] = []
+
+    def _clean(fragment: Optional[str]) -> Optional[str]:
+        if not isinstance(fragment, str):
+            return None
+        cleaned = fragment.strip().rstrip(";").strip()
+        return cleaned or None
+
+    def _local_url_echo(t: str) -> Optional[str]:
+        # These echoed lines are parsed by tunnel_parser for local provider UX.
+        if t == "jupyter":
+            return "echo 'Local URL: http://localhost:8888'"
+        if t == "vllm":
+            return "echo 'Local vLLM API: http://localhost:8000'; echo 'Local Open WebUI: http://localhost:8080'"
+        if t == "ollama":
+            return "echo 'Local Ollama API: http://localhost:11434'; echo 'Local Open WebUI: http://localhost:8080'"
+        return None
+
+    def _strip_ngrok_log_from_tail(cmd: str) -> str:
+        # Best-effort: if tail command includes /tmp/ngrok.log, remove it for local runs.
+        stripped = cmd
+        if stripped.startswith("tail -f ") or stripped.startswith("tail -F "):
+            tokens = stripped.split()
+            # tokens like: ["tail","-f","/tmp/a.log","/tmp/ngrok.log"]
+            kept = [tok for tok in tokens if tok != "/tmp/ngrok.log"]
+            stripped = " ".join(kept)
+        return stripped
+
+    core_clean = _clean(core)
+    if not core_clean:
+        return None
+    parts.append(core_clean)
+
+    if environment == "local":
+        echo_cmd = _local_url_echo(interactive_type)
+        if echo_cmd:
+            parts.append(echo_cmd)
+
+    # Only include tunnel logic for remote environments
+    if environment == "remote":
+        tunnel_clean = _clean(tunnel)
+        if tunnel_clean:
+            parts.append(tunnel_clean)
+
+    tail_clean = _clean(tail_logs)
+    if tail_clean:
+        if environment == "local":
+            tail_clean = _strip_ngrok_log_from_tail(tail_clean)
+            if tail_clean.strip() in {"tail", "tail -f", "tail -F"}:
+                tail_clean = ""
+        parts.append(tail_clean)
+
+    parts = [p for p in parts if isinstance(p, str) and p.strip()]
+    if not parts:
+        return None
+    return "; ".join(parts)
+
 
 def _normalize_accelerator(
     accelerator: Optional[str],
@@ -107,37 +193,27 @@ def resolve_interactive_command(
     """
     env = "local" if environment == "local" else "remote"
     acc = _normalize_accelerator(accelerator, supported_accelerators, environment=env)
+    interactive_type = str(template_entry.get("interactive_type") or template_entry.get("id") or "").strip()
 
+    # Prefer per-accelerator logic overrides via commands[accelerator_type].logic
     commands = template_entry.get("commands")
+    if isinstance(commands, dict):
+        # Legacy commands.local/commands.remote are no longer supported.
+        if "local" not in commands and "remote" not in commands:
+            candidate = commands.get(acc) or commands.get("default")
+            if isinstance(candidate, dict) and isinstance(candidate.get("logic"), dict):
+                composed = _compose_command_from_logic(candidate["logic"], interactive_type, env)
+                if composed:
+                    return (composed, None)
+
+    logic = template_entry.get("logic")
+    if isinstance(logic, dict):
+        composed = _compose_command_from_logic(logic, interactive_type, env)
+        if composed:
+            return (composed, None)
+
+    # Final fallback: legacy top-level command only (no setup override)
     legacy_command = template_entry.get("command", "")
-    legacy_setup = template_entry.get("setup")
-
-    if not isinstance(commands, dict):
-        return (legacy_command or "", None)
-
-    # 1) commands[environment][accelerator]
-    env_map = commands.get(env)
-    if isinstance(env_map, dict):
-        val = env_map.get(acc)
-        if val is not None:
-            cmd, setup = _extract_command_and_setup(val, legacy_setup)
-            if cmd:
-                return (cmd, setup)
-        val = env_map.get("default")
-        if val is not None:
-            cmd, setup = _extract_command_and_setup(val, legacy_setup)
-            if cmd:
-                return (cmd, setup)
-
-    # 2) commands.remote[accelerator] then commands.remote.default
-    remote_map = commands.get("remote")
-    if isinstance(remote_map, dict):
-        val = remote_map.get(acc) or remote_map.get("default")
-        if val is not None:
-            cmd, setup = _extract_command_and_setup(val, legacy_setup)
-            if cmd:
-                return (cmd, setup)
-
     return (legacy_command or "", None)
 
 
