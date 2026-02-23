@@ -19,6 +19,7 @@ dependencies = [
   "s3fs",
   "aiofiles",
   "gcsfs",
+  "requests",
 ]
 
 [project.urls]
