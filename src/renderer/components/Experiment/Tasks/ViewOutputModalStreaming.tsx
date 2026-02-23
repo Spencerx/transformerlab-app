@@ -98,21 +98,39 @@ const ProviderLogsTerminal: React.FC<ProviderLogsTerminalProps> = ({
   );
 };
 
+const TAB_OPTIONS: { value: 'output' | 'provider'; label: string }[] = [
+  { value: 'output', label: 'Task Output' },
+  { value: 'provider', label: 'Provider Logs' },
+];
+
 interface ViewOutputModalStreamingProps {
   jobId: number;
   setJobId: (jobId: number) => void;
+  /** Which tabs to show, in order. e.g. ['output', 'provider'] or ['provider'] for interactive tasks. */
+  tabs?: ('output' | 'provider')[];
 }
 
-export default function ViewOutputModalStreaming({
+function ViewOutputModalStreaming({
   jobId,
   setJobId,
+  tabs: tabsProp = ['output', 'provider'],
 }: ViewOutputModalStreamingProps) {
   const { experimentInfo } = useExperimentInfo();
   const [activeTab, setActiveTab] = useState<'output' | 'provider'>('output');
 
+  const tabs = tabsProp.length > 0 ? tabsProp : ['output', 'provider'];
+  const showTabList = tabs.length > 1;
+  const tabsKey = tabs.join(',');
+
   useEffect(() => {
-    setActiveTab('output');
-  }, [jobId]);
+    setActiveTab((current) =>
+      tabs.includes(current)
+        ? current
+        : ((tabs[0] ?? 'output') as 'output' | 'provider'),
+    );
+    // tabsKey is a stable serialization of tabs to avoid array reference churn
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId, tabsKey]);
 
   const providerLogsUrl = useMemo(() => {
     if (jobId === -1 || !experimentInfo?.id) {
@@ -161,21 +179,37 @@ export default function ViewOutputModalStreaming({
       >
         <ModalClose />
         <Typography level="title-lg" sx={{ mb: 1 }}>
-          Output from job: {jobId}
+          {`${
+            showTabList
+              ? 'Output from job'
+              : (TAB_OPTIONS.find((t) => t.value === tabs[0])?.label ??
+                'Output')
+          }: ${jobId}`}
         </Typography>
-        <Tabs
-          value={activeTab}
-          onChange={(_event, value) => {
-            if (typeof value === 'string') {
-              setActiveTab(value as 'output' | 'provider');
-            }
-          }}
-        >
-          <TabList>
-            <Tab value="output">Task Output</Tab>
-            <Tab value="provider">Provider Logs</Tab>
-          </TabList>
-        </Tabs>
+        {showTabList && (
+          <Tabs
+            value={activeTab}
+            onChange={(_event, value) => {
+              if (
+                typeof value === 'string' &&
+                (value === 'output' || value === 'provider')
+              ) {
+                setActiveTab(value);
+              }
+            }}
+          >
+            <TabList>
+              {tabs.map((tabValue) => {
+                const option = TAB_OPTIONS.find((t) => t.value === tabValue);
+                return option ? (
+                  <Tab key={tabValue} value={tabValue}>
+                    {option.label}
+                  </Tab>
+                ) : null;
+              })}
+            </TabList>
+          </Tabs>
+        )}
         <Box
           sx={{
             mt: 1,
@@ -188,7 +222,7 @@ export default function ViewOutputModalStreaming({
             borderRadius: '8px',
           }}
         >
-          {activeTab === 'output' ? (
+          {tabs.includes('output') && activeTab === 'output' ? (
             <Box
               sx={{
                 padding: `0`,
@@ -275,3 +309,9 @@ export default function ViewOutputModalStreaming({
     </Modal>
   );
 }
+
+ViewOutputModalStreaming.defaultProps = {
+  tabs: ['output', 'provider'],
+};
+
+export default ViewOutputModalStreaming;

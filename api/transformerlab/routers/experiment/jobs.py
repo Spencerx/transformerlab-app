@@ -374,10 +374,12 @@ async def get_tunnel_info_for_job(
     session: AsyncSession = Depends(get_async_session),
 ):
     """
-    Parse provider logs for a REMOTE job and extract tunnel information based on job type.
+    Parse provider logs and extract tunnel or local URLs based on job type.
 
-    This route automatically determines the tunnel type from job_data.interactive_type
-    and uses the appropriate parser. Supports: 'vscode', 'jupyter', 'vllm', 'ssh'
+    For remote jobs with a tunnel (e.g. ngrok), parses tunnel URLs from logs.
+    For local provider jobs (no tunnel), parses local URLs (e.g. Local Ollama API:
+    http://localhost:11434) from stdout/stderr. Uses job_data.interactive_type to
+    choose the parser. Supports: 'vscode', 'jupyter', 'vllm', 'ollama', 'ssh'.
     """
 
     job = await job_service.job_get(job_id)
@@ -440,6 +442,11 @@ async def get_tunnel_info_for_job(
 
     if provider_job_id is None:
         raise HTTPException(status_code=404, detail="Unable to determine provider job id for this job")
+
+    # For local provider, set workspace_dir (job dir) so LocalProvider can read logs.
+    if getattr(provider, "type", None) == ProviderType.LOCAL.value and hasattr(provider_instance, "extra_config"):
+        job_dir = get_local_provider_job_dir(job_id, org_id=user_and_team["team_id"])
+        provider_instance.extra_config["workspace_dir"] = job_dir
 
     try:
         if provider.type == ProviderType.RUNPOD.value:
