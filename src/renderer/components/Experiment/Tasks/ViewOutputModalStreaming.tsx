@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Box,
+  Checkbox,
   CircularProgress,
   Modal,
   ModalClose,
@@ -109,9 +110,12 @@ export default function ViewOutputModalStreaming({
 }: ViewOutputModalStreamingProps) {
   const { experimentInfo } = useExperimentInfo();
   const [activeTab, setActiveTab] = useState<'output' | 'provider'>('output');
+  const [viewLiveProviderLogs, setViewLiveProviderLogs] =
+    useState<boolean>(false);
 
   useEffect(() => {
     setActiveTab('output');
+    setViewLiveProviderLogs(false);
   }, [jobId]);
 
   const providerLogsUrl = useMemo(() => {
@@ -121,8 +125,10 @@ export default function ViewOutputModalStreaming({
     return chatAPI.Endpoints.Experiment.GetProviderLogs(
       experimentInfo.id,
       String(jobId),
+      400,
+      viewLiveProviderLogs,
     );
-  }, [experimentInfo?.id, jobId]);
+  }, [experimentInfo?.id, jobId, viewLiveProviderLogs]);
 
   const {
     data: providerLogsData,
@@ -176,22 +182,45 @@ export default function ViewOutputModalStreaming({
             <Tab value="provider">Provider Logs</Tab>
           </TabList>
         </Tabs>
+        {activeTab === 'provider' && (
+          <Box
+            sx={{
+              mt: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+            }}
+          >
+            <Checkbox
+              size="sm"
+              checked={viewLiveProviderLogs}
+              onChange={(event) =>
+                setViewLiveProviderLogs(!!event.target.checked)
+              }
+              label="View live provider logs"
+            />
+            {viewLiveProviderLogs && (
+              <Typography level="body-xs" color="warning">
+                Live logs are fetched directly from the remote machine and may
+                disappear once the machine stops running.
+              </Typography>
+            )}
+          </Box>
+        )}
         <Box
           sx={{
-            mt: 1,
+            mt: activeTab === 'provider' ? 0.5 : 1,
             flex: 1,
             minHeight: 0,
             width: '100%',
             display: 'flex',
-            padding: '8px 0px 8px 11px',
-            backgroundColor: '#000',
-            borderRadius: '8px',
+            flexDirection: 'column',
           }}
         >
           {activeTab === 'output' ? (
             <Box
               sx={{
-                padding: `0`,
+                padding: 0,
                 backgroundColor: '#000',
                 width: '100%',
                 flex: 1,
@@ -199,6 +228,7 @@ export default function ViewOutputModalStreaming({
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
+                borderRadius: '8px',
               }}
             >
               <PollingOutputTerminal
@@ -210,7 +240,19 @@ export default function ViewOutputModalStreaming({
               />
             </Box>
           ) : (
-            <>
+            <Box
+              sx={{
+                flex: 1,
+                minHeight: 0,
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                backgroundColor: '#000',
+                borderRadius: '8px',
+                padding: '8px 11px',
+                gap: 1,
+              }}
+            >
               {providerLogsLoading && (
                 <Box
                   sx={{
@@ -268,7 +310,7 @@ export default function ViewOutputModalStreaming({
               {!providerLogsLoading && !providerLogsError && (
                 <ProviderLogsTerminal logsText={providerLogText} />
               )}
-            </>
+            </Box>
           )}
         </Box>
       </ModalDialog>
