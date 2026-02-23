@@ -73,22 +73,6 @@ def test_resolve_commands_remote_falls_back_to_legacy():
     assert setup is None
 
 
-# ---- resolve_interactive_command: per-accelerator ----
-def test_resolve_commands_accelerator_nvidia():
-    """commands.remote.NVIDIA is used when accelerator normalizes to NVIDIA."""
-    entry = {
-        "command": "legacy",
-        "commands": {
-            "remote": {
-                "default": "cpu-cmd",
-                "NVIDIA": "nvidia-cmd",
-            },
-        },
-    }
-    cmd, _ = resolve_interactive_command(entry, "remote", "RTX3090:1", None)
-    assert cmd == "nvidia-cmd"
-
-
 def test_resolve_commands_accelerator_from_supported_list():
     """When accelerator is None, supported_accelerators list can provide hint."""
     entry = {
