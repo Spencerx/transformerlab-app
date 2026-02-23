@@ -246,6 +246,11 @@ async def get_provider_job_logs(
 ):
     """
     Fetch the raw job logs directly from the underlying compute provider for a REMOTE job.
+
+    Preferred order:
+      1. If `provider_logs.txt` exists in the job directory (written by the SDK wrapper),
+         read and return that.
+      2. Otherwise, fall back to provider-native log retrieval (existing behavior).
     """
 
     job = await job_service.job_get(job_id)
@@ -266,6 +271,34 @@ async def get_provider_job_logs(
             status_code=400, detail="Job does not contain provider metadata (provider_id/cluster_name missing)"
         )
 
+    # 1) First, try to read provider logs from the job directory via the SDK's job_dir helper.
+    #    This file is written by tfl-remote-trap inside the remote environment.
+    try:
+        from lab.dirs import get_job_dir
+
+        job_dir = await get_job_dir(job_id)
+        provider_logs_path = storage.join(job_dir, "provider_logs.txt")
+        if await storage.exists(provider_logs_path):
+            async with await storage.open(provider_logs_path, "r", encoding="utf-8") as f:
+                logs_text = await f.read()
+            if tail_lines is not None:
+                lines = logs_text.splitlines()
+                logs_text = "\n".join(lines[-tail_lines:])
+
+            return {
+                "cluster_name": cluster_name,
+                "provider_id": provider_id,
+                "provider_job_id": None,
+                "provider_name": job_data.get("provider_name"),
+                "tail_lines": tail_lines,
+                "logs": logs_text,
+                "job_candidates": [],
+            }
+    except Exception:
+        # If anything goes wrong with the file-based path, fall back to provider-native logs.
+        pass
+
+    # 2) Fall back to existing provider-native log retrieval.
     provider = await get_team_provider(session, user_and_team["team_id"], provider_id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
