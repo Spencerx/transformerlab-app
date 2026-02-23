@@ -251,6 +251,12 @@ export default function NewInteractiveTaskModal({
     [providers, selectedProviderId],
   );
 
+  React.useEffect(() => {
+    if (selectedProvider?.type === 'local') {
+      setIsLocal(true);
+    }
+  }, [selectedProvider]);
+
   const handleTemplateSelect = (template: InteractiveTemplate) => {
     setSelectedTemplate(template);
     setStep('config');
@@ -548,16 +554,20 @@ export default function NewInteractiveTaskModal({
                   </Alert>
                 )}
 
-                <Checkbox
-                  label="Enable direct web access (no tunnel)"
-                  checked={isLocal}
-                  onChange={(e) => setIsLocal(e.target.checked)}
-                />
-                <FormHelperText sx={{ mt: -2 }}>
-                  When enabled, the session will be accessible directly via a
-                  local address (e.g. http://localhost:8888). Recommended for
-                  local providers only.
-                </FormHelperText>
+                {selectedProvider?.type !== 'local' && (
+                  <>
+                    <Checkbox
+                      label="Enable direct web access (no tunnel)"
+                      checked={isLocal}
+                      onChange={(e) => setIsLocal(e.target.checked)}
+                    />
+                    <FormHelperText sx={{ mt: -2 }}>
+                      When enabled, the session will be accessible directly via a
+                      local address (e.g. http://localhost:8888). Recommended for
+                      local providers only.
+                    </FormHelperText>
+                  </>
+                )}
 
                 {selectedTemplate?.env_parameters &&
                   selectedTemplate.env_parameters.length > 0 && (
