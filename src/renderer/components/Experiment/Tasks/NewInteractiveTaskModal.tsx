@@ -34,6 +34,7 @@ import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
 import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
 import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
 import { useNotification } from 'renderer/components/Shared/NotificationSystem';
+import { generateFriendlyName } from 'renderer/lib/utils';
 
 type ProviderOption = {
   id: string;
@@ -112,7 +113,7 @@ export default function NewInteractiveTaskModal({
   );
   const [selectedTemplate, setSelectedTemplate] =
     React.useState<InteractiveTemplate | null>(null);
-  const [title, setTitle] = React.useState('');
+  const [title, setTitle] = React.useState(generateFriendlyName());
   const [cpus, setCpus] = React.useState('');
   const [memory, setMemory] = React.useState('');
   const [accelerators, setAccelerators] = React.useState('');
@@ -220,7 +221,7 @@ export default function NewInteractiveTaskModal({
     if (!open) {
       setStep('provider');
       setSelectedTemplate(null);
-      setTitle('');
+      setTitle(generateFriendlyName());
       setCpus('');
       setMemory('');
       setAccelerators('');
