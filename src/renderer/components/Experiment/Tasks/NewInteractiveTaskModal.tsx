@@ -262,10 +262,7 @@ export default function NewInteractiveTaskModal({
       }
     });
     setConfigFieldValues(initialValues);
-    // Initialize accelerators from template if available
-    if (template.supported_accelerators) {
-      setAccelerators(template.supported_accelerators);
-    }
+
   };
 
   const handleBack = () => {
@@ -960,15 +957,17 @@ export default function NewInteractiveTaskModal({
               spacing={2}
               sx={{ width: '100%', justifyContent: 'space-between' }}
             >
-              <Button
-                variant="plain"
-                color="neutral"
-                onClick={step === 'gallery' ? onClose : handleBack}
-                disabled={isSubmitting}
-                startDecorator={<ArrowLeftIcon size={16} />}
-              >
-                {step === 'gallery' ? 'Cancel' : 'Back'}
-              </Button>
+              {step !== 'provider' && (
+                <Button
+                  variant="plain"
+                  color="neutral"
+                  onClick={handleBack}
+                  disabled={isSubmitting}
+                  startDecorator={<ArrowLeftIcon size={16} />}
+                >
+                  Back
+                </Button>
+              )}
               {step === 'config' && (
                 <Stack direction="row" spacing={2}>
                   <Button
