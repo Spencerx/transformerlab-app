@@ -325,6 +325,7 @@ export default function Interactive() {
       // Fetch interactive gallery to get setup and command templates
       let defaultSetup: string;
       let defaultCommand: string;
+      let templateId: string | undefined;
 
       try {
         const galleryResponse = await chatAPI.authenticatedFetch(
@@ -351,6 +352,7 @@ export default function Interactive() {
 
           defaultSetup = template.setup || '';
           defaultCommand = template.command || '';
+          templateId = template.id;
         } else {
           throw new Error('Failed to fetch interactive gallery');
         }
@@ -375,6 +377,7 @@ export default function Interactive() {
         setup: defaultSetup,
         subtype: 'interactive',
         interactive_type: interactiveType,
+        interactive_gallery_id: templateId,
         provider_id: providerMeta.id,
         provider_name: providerMeta.name,
         env_vars: Object.keys(envVars).length > 0 ? envVars : undefined,
@@ -503,6 +506,11 @@ export default function Interactive() {
         command: cfg.command || task.command,
         subtype: cfg.subtype || task.subtype,
         interactive_type: cfg.interactive_type || task.interactive_type,
+        interactive_gallery_id:
+          cfg.interactive_gallery_id ??
+          task?.interactive_gallery_id ??
+          config?.interactive_gallery_id ??
+          undefined,
         cpus: cfg.cpus || task.cpus,
         memory: cfg.memory || task.memory,
         disk_space: cfg.disk_space || task.disk_space,

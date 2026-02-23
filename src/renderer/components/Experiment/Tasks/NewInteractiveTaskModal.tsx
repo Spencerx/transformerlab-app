@@ -61,6 +61,11 @@ type InteractiveTemplate = {
   env_parameters?: ConfigField[];
   icon?: string;
   supported_accelerators?: string;
+  /** Optional per-environment (local/remote) and per-accelerator command variants; backend resolves at launch. */
+  commands?: Record<
+    string,
+    Record<string, string | { setup?: string; command: string }>
+  >;
 };
 
 type ImportedTask = {
@@ -563,9 +568,9 @@ export default function NewInteractiveTaskModal({
                       onChange={(e) => setIsLocal(e.target.checked)}
                     />
                     <FormHelperText sx={{ mt: -2 }}>
-                      When enabled, the session will be accessible directly via a
-                      local address (e.g. http://localhost:8888). Recommended for
-                      local providers only.
+                      When enabled, the session will be accessible directly via
+                      a local address (e.g. http://localhost:8888). Recommended
+                      for local providers only.
                     </FormHelperText>
                   </>
                 )}

@@ -446,6 +446,12 @@ async def add_task(
                 if "name" in new_task:
                     new_task["name"] = secure_filename(new_task["name"])
 
+                # Persist interactive_gallery_id for launch-time command resolution (from template_id or interactive_gallery_id)
+                if new_task.get("subtype") == "interactive" or new_task.get("interactive_type"):
+                    gid = new_task.get("interactive_gallery_id") or new_task.get("template_id")
+                    if gid:
+                        new_task["interactive_gallery_id"] = gid
+
                 # All fields are stored directly in the JSON (not nested in inputs/outputs/config)
                 task_id = await task_service.add_task(new_task)
 
@@ -582,9 +588,10 @@ async def import_task_from_gallery(
             if not gallery_entry:
                 raise HTTPException(status_code=404, detail="Gallery entry not found")
 
-        # Create interactive task template
+        # Create interactive task template (store interactive_gallery_id for launch-time command resolution)
         task_name = gallery_entry.get("name", "Interactive Task")
         interactive_type = gallery_entry.get("interactive_type", "vscode")
+        interactive_gallery_id = gallery_entry.get("id")
 
         # Resolve provider
         task_data = {
@@ -597,6 +604,7 @@ async def import_task_from_gallery(
             "setup": gallery_entry.get("setup", ""),
             "interactive_type": interactive_type,
             "subtype": "interactive",
+            "interactive_gallery_id": interactive_gallery_id,
         }
 
         await _resolve_provider(task_data, user_and_team, session)

@@ -107,6 +107,10 @@ class ProviderTemplateLaunchRequest(BaseModel):
     command: str = Field(..., description="Command to execute on the cluster")
     subtype: Optional[str] = Field(None, description="Optional subtype for filtering")
     interactive_type: Optional[str] = Field(None, description="Interactive task type (e.g. vscode)")
+    interactive_gallery_id: Optional[str] = Field(
+        None,
+        description="Interactive gallery entry id (e.g. jupyter, ollama-macos) for launch-time command resolution.",
+    )
     cpus: Optional[str] = None
     memory: Optional[str] = None
     disk_space: Optional[str] = None

@@ -39,6 +39,7 @@ from transformerlab.compute_providers.models import (
     JobInfo,
     JobState,
 )
+from transformerlab.compute_providers.local import _check_nvidia_gpu, _check_amd_gpu
 from transformerlab.services import job_service
 from transformerlab.services import quota_service
 from transformerlab.services.local_provider_queue import enqueue_local_launch
@@ -50,6 +51,11 @@ from transformerlab.shared.github_utils import (
     generate_github_clone_setup,
 )
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
+from transformerlab.shared import galleries
+from transformerlab.shared.interactive_gallery_utils import (
+    resolve_interactive_command,
+    find_interactive_gallery_entry,
+)
 from typing import Any
 
 router = APIRouter(prefix="/compute_provider", tags=["compute_provider"])
@@ -1500,27 +1506,60 @@ async def launch_template_on_provider(
         # env_vars["AWS_ACCESS_KEY_ID"] = aws_access_key_id
         # env_vars["AWS_SECRET_ACCESS_KEY"] = aws_secret_access_key
 
-    # Replace secrets in command
-    command_with_secrets = (
-        replace_secret_placeholders(request.command, team_secrets) if team_secrets else request.command
-    )
+    # Resolve command (and optional setup override) for interactive sessions from gallery
+    base_command = request.command
+    setup_override_from_gallery = None
+    if request.subtype == "interactive" and (request.interactive_gallery_id or request.interactive_type):
+        gallery_list = await galleries.get_interactive_gallery()
+        gallery_entry = find_interactive_gallery_entry(
+            gallery_list,
+            interactive_gallery_id=request.interactive_gallery_id,
+            interactive_type=request.interactive_type,
+        )
+        if gallery_entry:
+            environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
+            supported_accelerators = None
+            if provider.config and isinstance(provider.config, dict):
+                supported_accelerators = provider.config.get("supported_accelerators")
 
-    # If local=True and it's an interactive session, we bypass the tunnel-starting command
-    # and instead start the service directly on its default port and print the local address.
-    # right now we are bypassing the interactive gallery and hardcoding commands
-    if request.local and request.subtype == "interactive":
-        if request.interactive_type == "vscode":
-            # For VS Code, we use the serve-web command if available, or stick to tunnel but it's less ideal for local
-            # Actually, for VS Code 'local' might just mean we don't need the tunnel.
-            # But the 'code tunnel' command is what's in the gallery.
-            # For now, let's support jupyter and others which are easier.
-            pass
-        elif request.interactive_type == "jupyter":
-            command_with_secrets = "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' --notebook-dir=~; echo 'Local URL: http://localhost:8888'"
-        elif request.interactive_type == "vllm":
-            command_with_secrets = "~/vllm-venv/bin/python -u -m vllm.entrypoints.openai.api_server --model $MODEL_NAME --tensor-parallel-size $TP_SIZE --host 0.0.0.0 --port 8000 --gpu-memory-utilization 0.9 > /tmp/vllm.log 2>&1 & sleep 10 && OPENAI_API_BASE_URL=http://127.0.0.1:8000/v1 OPENAI_API_KEY=dummy ~/vllm-venv/bin/open-webui serve --host 0.0.0.0 --port 8080 > /tmp/openwebui.log 2>&1 & echo 'Local vLLM API: http://localhost:8000'; echo 'Local Open WebUI: http://localhost:8080'; tail -f /tmp/vllm.log /tmp/openwebui.log"
-        elif request.interactive_type == "ollama":
-            command_with_secrets = "export OLLAMA_HOST=0.0.0.0:11434 && ollama serve > /tmp/ollama.log 2>&1 & sleep 3 && ollama pull $MODEL_NAME > /tmp/ollama-pull.log 2>&1 & sleep 5 && OLLAMA_BASE_URL=http://127.0.0.1:11434 ~/ollama-venv/bin/open-webui serve --host 0.0.0.0 --port 8080 > /tmp/openwebui.log 2>&1 & echo 'Local Ollama API: http://localhost:11434'; echo 'Local Open WebUI: http://localhost:8080'; tail -f /tmp/ollama.log /tmp/ollama-pull.log /tmp/openwebui.log"
+            # For LOCAL providers with no explicit accelerators, infer from the actual machine:
+            # prefer NVIDIA, then AMD, then Apple Silicon, finally CPU.
+            if environment == "local" and provider.type == ProviderType.LOCAL.value and not request.accelerators:
+                inferred = None
+                if _check_nvidia_gpu():
+                    inferred = "NVIDIA"
+                elif _check_amd_gpu():
+                    inferred = "AMD"
+                else:
+                    # Simple Apple Silicon detection
+                    import platform
+
+                    if platform.system().lower() == "darwin" and platform.machine().lower().startswith("arm"):
+                        inferred = "AppleSilicon"
+                    else:
+                        inferred = "cpu"
+                if inferred:
+                    supported_accelerators = [inferred]
+
+            print(f"supported_accelerators: {supported_accelerators}")
+
+            resolved_cmd, setup_override_from_gallery = resolve_interactive_command(
+                gallery_entry,
+                environment,
+                accelerator=request.accelerators,
+                supported_accelerators=supported_accelerators,
+            )
+            print(f"resolved_cmd: {resolved_cmd}")
+            if resolved_cmd:
+                base_command = resolved_cmd
+            if setup_override_from_gallery and team_secrets:
+                setup_override_from_gallery = replace_secret_placeholders(setup_override_from_gallery, team_secrets)
+
+    if setup_override_from_gallery is not None:
+        final_setup = setup_override_from_gallery
+
+    # Replace secrets in command
+    command_with_secrets = replace_secret_placeholders(base_command, team_secrets) if team_secrets else base_command
 
     # Replace secrets in parameters if present
     # Merge parameters (defaults) with config (user's custom values for this run)
