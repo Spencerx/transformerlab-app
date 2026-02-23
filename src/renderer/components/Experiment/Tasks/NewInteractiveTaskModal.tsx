@@ -772,7 +772,9 @@ export default function NewInteractiveTaskModal({
                                         spacing={0.5}
                                         flexWrap="wrap"
                                       >
-                                        {(Array.isArray(template.supported_accelerators)
+                                        {(Array.isArray(
+                                          template.supported_accelerators,
+                                        )
                                           ? template.supported_accelerators
                                           : [template.supported_accelerators]
                                         ).map((acc: string) => (
@@ -924,7 +926,9 @@ export default function NewInteractiveTaskModal({
                                             spacing={0.5}
                                             flexWrap="wrap"
                                           >
-                                            {(Array.isArray(taskSupportedAccelerators)
+                                            {(Array.isArray(
+                                              taskSupportedAccelerators,
+                                            )
                                               ? taskSupportedAccelerators
                                               : [taskSupportedAccelerators]
                                             ).map((acc: string) => (
