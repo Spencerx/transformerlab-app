@@ -39,6 +39,7 @@ from transformerlab.compute_providers.models import (
     JobInfo,
     JobState,
 )
+from transformerlab.compute_providers.local import _check_nvidia_gpu, _check_amd_gpu
 from transformerlab.services import job_service
 from transformerlab.services import quota_service
 from transformerlab.services.local_provider_queue import enqueue_local_launch
@@ -50,6 +51,11 @@ from transformerlab.shared.github_utils import (
     generate_github_clone_setup,
 )
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
+from transformerlab.shared import galleries
+from transformerlab.shared.interactive_gallery_utils import (
+    resolve_interactive_command,
+    find_interactive_gallery_entry,
+)
 from typing import Any
 
 router = APIRouter(prefix="/compute_provider", tags=["compute_provider"])
@@ -1500,10 +1506,60 @@ async def launch_template_on_provider(
         # env_vars["AWS_ACCESS_KEY_ID"] = aws_access_key_id
         # env_vars["AWS_SECRET_ACCESS_KEY"] = aws_secret_access_key
 
+    # Resolve command (and optional setup override) for interactive sessions from gallery
+    base_command = request.command
+    setup_override_from_gallery = None
+    if request.subtype == "interactive" and (request.interactive_gallery_id or request.interactive_type):
+        gallery_list = await galleries.get_interactive_gallery()
+        gallery_entry = find_interactive_gallery_entry(
+            gallery_list,
+            interactive_gallery_id=request.interactive_gallery_id,
+            interactive_type=request.interactive_type,
+        )
+        if gallery_entry:
+            environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
+            supported_accelerators = None
+            if provider.config and isinstance(provider.config, dict):
+                supported_accelerators = provider.config.get("supported_accelerators")
+
+            # For LOCAL providers with no explicit accelerators, infer from the actual machine:
+            # prefer NVIDIA, then AMD, then Apple Silicon, finally CPU.
+            if environment == "local" and provider.type == ProviderType.LOCAL.value and not request.accelerators:
+                inferred = None
+                if _check_nvidia_gpu():
+                    inferred = "NVIDIA"
+                elif _check_amd_gpu():
+                    inferred = "AMD"
+                else:
+                    # Simple Apple Silicon detection
+                    import platform
+
+                    if platform.system().lower() == "darwin" and platform.machine().lower().startswith("arm"):
+                        inferred = "AppleSilicon"
+                    else:
+                        inferred = "cpu"
+                if inferred:
+                    supported_accelerators = [inferred]
+
+            print(f"supported_accelerators: {supported_accelerators}")
+
+            resolved_cmd, setup_override_from_gallery = resolve_interactive_command(
+                gallery_entry,
+                environment,
+                accelerator=request.accelerators,
+                supported_accelerators=supported_accelerators,
+            )
+            print(f"resolved_cmd: {resolved_cmd}")
+            if resolved_cmd:
+                base_command = resolved_cmd
+            if setup_override_from_gallery and team_secrets:
+                setup_override_from_gallery = replace_secret_placeholders(setup_override_from_gallery, team_secrets)
+
+    if setup_override_from_gallery is not None:
+        final_setup = setup_override_from_gallery
+
     # Replace secrets in command
-    command_with_secrets = (
-        replace_secret_placeholders(request.command, team_secrets) if team_secrets else request.command
-    )
+    command_with_secrets = replace_secret_placeholders(base_command, team_secrets) if team_secrets else base_command
 
     # Replace secrets in parameters if present
     # Merge parameters (defaults) with config (user's custom values for this run)
@@ -1535,6 +1591,7 @@ async def launch_template_on_provider(
         "cluster_name": formatted_cluster_name,
         "subtype": request.subtype,
         "interactive_type": request.interactive_type,
+        "local": request.local,
         "cpus": request.cpus,
         "memory": request.memory,
         "disk_space": request.disk_space,
