@@ -262,7 +262,6 @@ export default function NewInteractiveTaskModal({
       }
     });
     setConfigFieldValues(initialValues);
-
   };
 
   const handleBack = () => {

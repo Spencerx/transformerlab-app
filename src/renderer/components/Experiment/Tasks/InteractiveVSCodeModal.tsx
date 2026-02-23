@@ -92,7 +92,8 @@ export default function InteractiveVSCodeModal({
             VS Code Interactive Session (Job {jobId})
           </Typography>
           <Typography level="body-sm" color="neutral">
-            Follow the steps below to authenticate and open your VS Code session.
+            Follow the steps below to authenticate and open your VS Code
+            session.
           </Typography>
         </Stack>
         <Divider />
@@ -121,8 +122,8 @@ export default function InteractiveVSCodeModal({
           <Box>
             <Typography level="title-md">Step 1: Authorize VS Code</Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              When the VS Code service starts, it may print an authorization code.
-              Copy the code below (when available), go to{' '}
+              When the VS Code service starts, it may print an authorization
+              code. Copy the code below (when available), go to{' '}
               <Link
                 href="https://github.com/login/device"
                 target="_blank"
@@ -170,13 +171,10 @@ export default function InteractiveVSCodeModal({
           <Divider />
 
           <Box>
-            <Typography level="title-md">
-              Step 2: Open VS Code
-            </Typography>
+            <Typography level="title-md">Step 2: Open VS Code</Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              After you finish authorization, the URL will appear here.
-              Use it to open the remote environment in your browser-based VS
-              Code.
+              After you finish authorization, the URL will appear here. Use it
+              to open the remote environment in your browser-based VS Code.
             </Typography>
 
             <Box
@@ -214,8 +212,7 @@ export default function InteractiveVSCodeModal({
                 </>
               ) : (
                 <Typography level="body-sm">
-                  Waiting for VS Code to print a URL in the provider
-                  logs...
+                  Waiting for VS Code to print a URL in the provider logs...
                 </Typography>
               )}
             </Box>

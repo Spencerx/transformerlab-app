@@ -172,7 +172,10 @@ export default function QueueTaskModal({
 
       // If it's just a number, we assume it's NVIDIA/CUDA unless it's a local provider on Mac
       if (/^\d+$/.test(reqAcc)) {
-        if (provider.type === 'local' && serverInfoData?.device_type === 'mps') {
+        if (
+          provider.type === 'local' &&
+          serverInfoData?.device_type === 'mps'
+        ) {
           return supported.includes('AppleSilicon');
         }
         return supported.includes('NVIDIA');

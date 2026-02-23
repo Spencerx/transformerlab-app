@@ -121,9 +121,8 @@ export default function InteractiveVllmModal({
           <Box>
             <Typography level="title-md">Access vLLM API Server</Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              Once ready, use the URL below to access your vLLM
-              server. The vLLM server provides an OpenAI-compatible API
-              endpoint.
+              Once ready, use the URL below to access your vLLM server. The vLLM
+              server provides an OpenAI-compatible API endpoint.
             </Typography>
 
             <Box
@@ -212,9 +211,9 @@ export default function InteractiveVllmModal({
               Access Open WebUI
             </Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              Use the URL below to open Open
-              WebUI connected to this vLLM server. This provides a browser-based
-              chat UI backed by the same vLLM API.
+              Use the URL below to open Open WebUI connected to this vLLM
+              server. This provides a browser-based chat UI backed by the same
+              vLLM API.
             </Typography>
 
             <Box

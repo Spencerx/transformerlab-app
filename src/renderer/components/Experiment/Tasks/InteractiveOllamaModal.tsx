@@ -121,9 +121,8 @@ export default function InteractiveOllamaModal({
           <Box>
             <Typography level="title-md">Access Ollama API Server</Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              Once ready, use the URL below to access your Ollama
-              server. The Ollama server provides an OpenAI-compatible API
-              endpoint.
+              Once ready, use the URL below to access your Ollama server. The
+              Ollama server provides an OpenAI-compatible API endpoint.
             </Typography>
 
             <Box
@@ -210,9 +209,9 @@ export default function InteractiveOllamaModal({
               Access Open WebUI
             </Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              Use the URL below to open Open
-              WebUI connected to this Ollama server. This gives you a convenient
-              browser chat UI backed by the same Ollama API.
+              Use the URL below to open Open WebUI connected to this Ollama
+              server. This gives you a convenient browser chat UI backed by the
+              same Ollama API.
             </Typography>
 
             <Box

@@ -122,8 +122,8 @@ export default function InteractiveJupyterModal({
           <Box>
             <Typography level="title-md">Access Jupyter Notebook</Typography>
             <Typography level="body-sm" sx={{ mt: 0.5 }}>
-              Once ready, click the link below to open your
-              Jupyter notebook in your browser.
+              Once ready, click the link below to open your Jupyter notebook in
+              your browser.
             </Typography>
 
             <Box
