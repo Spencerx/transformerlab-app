@@ -599,38 +599,40 @@ export default function NewInteractiveTaskModal({
                     </>
                   )}
 
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{ flexWrap: 'wrap', rowGap: 2 }}
-                >
-                  <FormControl sx={{ minWidth: '160px', flex: 1 }}>
-                    <FormLabel>CPUs</FormLabel>
-                    <Input
-                      value={cpus}
-                      onChange={(e) => setCpus(e.target.value)}
-                      placeholder="e.g. 4"
-                    />
-                  </FormControl>
+                {selectedProvider?.type !== 'local' && (
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{ flexWrap: 'wrap', rowGap: 2 }}
+                  >
+                    <FormControl sx={{ minWidth: '160px', flex: 1 }}>
+                      <FormLabel>CPUs</FormLabel>
+                      <Input
+                        value={cpus}
+                        onChange={(e) => setCpus(e.target.value)}
+                        placeholder="e.g. 4"
+                      />
+                    </FormControl>
 
-                  <FormControl sx={{ minWidth: '160px', flex: 1 }}>
-                    <FormLabel>Memory (GB)</FormLabel>
-                    <Input
-                      value={memory}
-                      onChange={(e) => setMemory(e.target.value)}
-                      placeholder="e.g. 16"
-                    />
-                  </FormControl>
+                    <FormControl sx={{ minWidth: '160px', flex: 1 }}>
+                      <FormLabel>Memory (GB)</FormLabel>
+                      <Input
+                        value={memory}
+                        onChange={(e) => setMemory(e.target.value)}
+                        placeholder="e.g. 16"
+                      />
+                    </FormControl>
 
-                  <FormControl sx={{ minWidth: '200px', flex: 2 }}>
-                    <FormLabel>Accelerators</FormLabel>
-                    <Input
-                      value={accelerators}
-                      onChange={(e) => setAccelerators(e.target.value)}
-                      placeholder="e.g. RTX3090:1 or H100:8"
-                    />
-                  </FormControl>
-                </Stack>
+                    <FormControl sx={{ minWidth: '200px', flex: 2 }}>
+                      <FormLabel>Accelerators</FormLabel>
+                      <Input
+                        value={accelerators}
+                        onChange={(e) => setAccelerators(e.target.value)}
+                        placeholder="e.g. RTX3090:1 or H100:8"
+                      />
+                    </FormControl>
+                  </Stack>
+                )}
 
                 <FormHelperText>
                   Setup and command are pre-populated based on the selected
