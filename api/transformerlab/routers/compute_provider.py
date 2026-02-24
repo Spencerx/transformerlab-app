@@ -44,12 +44,17 @@ from transformerlab.services import quota_service
 from transformerlab.services.local_provider_queue import enqueue_local_launch
 from lab import storage
 from lab.storage import STORAGE_PROVIDER
-from lab.dirs import get_workspace_dir, get_local_provider_job_dir
+from lab.dirs import get_workspace_dir, get_local_provider_job_dir, set_organization_id
 from transformerlab.shared.github_utils import (
     read_github_pat_from_workspace,
     generate_github_clone_setup,
 )
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
+from transformerlab.shared import galleries
+from transformerlab.shared.interactive_gallery_utils import (
+    resolve_interactive_command,
+    find_interactive_gallery_entry,
+)
 from typing import Any
 
 router = APIRouter(prefix="/compute_provider", tags=["compute_provider"])
@@ -1060,6 +1065,16 @@ async def _launch_sweep_jobs(
                 if tfl_storage_uri:
                     env_vars["TFL_STORAGE_URI"] = tfl_storage_uri
 
+                # For local provider, set TFL_WORKSPACE_DIR so the lab SDK in the subprocess finds the job dir
+                if provider.type == ProviderType.LOCAL.value and team_id:
+                    set_organization_id(team_id)
+                    try:
+                        workspace_dir = await get_workspace_dir()
+                        if workspace_dir and not storage.is_remote_path(workspace_dir):
+                            env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
+                    finally:
+                        set_organization_id(None)
+
                 # Build setup script (add copy_file_mounts when file_mounts is True, after cloud credentials)
                 setup_commands = []
 
@@ -1460,18 +1475,8 @@ async def launch_template_on_provider(
             # Log error but don't fail the launch - SSH key setup is optional
             print(f"Warning: Failed to set up SSH key for organization {team_id}: {e}")
 
-    # Add user-provided setup if any (replace secrets in setup)
-    if request.setup:
-        setup_with_secrets = replace_secret_placeholders(request.setup, team_secrets) if team_secrets else request.setup
-        setup_commands.append(setup_with_secrets)
-
-    # Join setup commands, stripping trailing semicolons to avoid double semicolons
-    if setup_commands:
-        # Strip trailing semicolons and whitespace from each command, then join with semicolons
-        cleaned_commands = [cmd.rstrip(";").rstrip() for cmd in setup_commands if cmd.strip()]
-        final_setup = ";".join(cleaned_commands) if cleaned_commands else None
-    else:
-        final_setup = None
+    # Note: final_setup is assembled later, after we optionally inject
+    # interactive remote setup based on the gallery entry.
 
     # Add default environment variables
     env_vars["_TFL_JOB_ID"] = str(job_id)
@@ -1500,10 +1505,64 @@ async def launch_template_on_provider(
         # env_vars["AWS_ACCESS_KEY_ID"] = aws_access_key_id
         # env_vars["AWS_SECRET_ACCESS_KEY"] = aws_secret_access_key
 
+    # For local provider, set TFL_WORKSPACE_DIR so the lab SDK in the subprocess can find
+    # the job directory (workspace/jobs/<job_id>). Without this, Job.get(id) looks under
+    # ~/.transformerlab/workspace and fails with "Directory for Job with id '...' not found".
+    if provider.type == ProviderType.LOCAL.value and team_id:
+        set_organization_id(team_id)
+        try:
+            workspace_dir = await get_workspace_dir()
+            if workspace_dir and not storage.is_remote_path(workspace_dir):
+                env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
+        finally:
+            set_organization_id(None)
+
+    # Resolve command (and optional setup override) for interactive sessions from gallery
+    base_command = request.command
+    setup_override_from_gallery = None
+    interactive_setup_added = False
+    if request.subtype == "interactive" and (request.interactive_gallery_id or request.interactive_type):
+        gallery_list = await galleries.get_interactive_gallery()
+        gallery_entry = find_interactive_gallery_entry(
+            gallery_list,
+            interactive_gallery_id=request.interactive_gallery_id,
+            interactive_type=request.interactive_type,
+        )
+        if gallery_entry:
+            environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
+            # Run gallery/task setup for both local and remote interactive (SUDO prefix so $SUDO is defined).
+            # Ngrok is installed only when tunnel logic runs (remote); setup has no ngrok.
+            from transformerlab.shared.interactive_gallery_utils import INTERACTIVE_SUDO_PREFIX
+
+            raw_setup = (gallery_entry.get("setup") or "").strip() or (request.setup or "").strip()
+            if raw_setup:
+                setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
+                interactive_setup_added = True
+
+            resolved_cmd, setup_override_from_gallery = resolve_interactive_command(gallery_entry, environment)
+            if resolved_cmd:
+                base_command = INTERACTIVE_SUDO_PREFIX + " " + resolved_cmd
+            if setup_override_from_gallery and team_secrets:
+                setup_override_from_gallery = replace_secret_placeholders(setup_override_from_gallery, team_secrets)
+
+    # Add user-provided setup if any (replace secrets in setup).
+    # For interactive tasks we already added gallery/task setup above (local and remote).
+    if request.setup and not interactive_setup_added:
+        setup_with_secrets = replace_secret_placeholders(request.setup, team_secrets) if team_secrets else request.setup
+        setup_commands.append(setup_with_secrets)
+
+    # Join setup commands, stripping trailing semicolons to avoid double semicolons
+    if setup_commands:
+        cleaned_commands = [cmd.rstrip(";").rstrip() for cmd in setup_commands if cmd.strip()]
+        final_setup = ";".join(cleaned_commands) if cleaned_commands else None
+    else:
+        final_setup = None
+
+    if setup_override_from_gallery is not None:
+        final_setup = setup_override_from_gallery
+
     # Replace secrets in command
-    command_with_secrets = (
-        replace_secret_placeholders(request.command, team_secrets) if team_secrets else request.command
-    )
+    command_with_secrets = replace_secret_placeholders(base_command, team_secrets) if team_secrets else base_command
 
     # Replace secrets in parameters if present
     # Merge parameters (defaults) with config (user's custom values for this run)
@@ -1535,6 +1594,7 @@ async def launch_template_on_provider(
         "cluster_name": formatted_cluster_name,
         "subtype": request.subtype,
         "interactive_type": request.interactive_type,
+        "local": request.local,
         "cpus": request.cpus,
         "memory": request.memory,
         "disk_space": request.disk_space,
@@ -2435,6 +2495,16 @@ async def resume_from_checkpoint(
 
     if tfl_storage_uri:
         env_vars["TFL_STORAGE_URI"] = tfl_storage_uri
+
+    # For local provider, set TFL_WORKSPACE_DIR so the lab SDK in the subprocess finds the job dir
+    if provider.type == ProviderType.LOCAL.value and team_id:
+        set_organization_id(team_id)
+        try:
+            workspace_dir = await get_workspace_dir()
+            if workspace_dir and not storage.is_remote_path(workspace_dir):
+                env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
+        finally:
+            set_organization_id(None)
 
     # Build setup script
     setup_commands = []

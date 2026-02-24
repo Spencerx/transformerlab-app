@@ -104,6 +104,12 @@ function ExperimentMenuItems({
   const disableExport = !experimentReady || !hasFoundation;
 
   useEffect(() => {
+    if (!isLocalMode) {
+      setIsValidDiffusionModel(false);
+      setPipelineTag(null);
+      return;
+    }
+
     if (!experimentInfo?.id || !hasFoundation) {
       setIsValidDiffusionModel(false);
       setPipelineTag(null);
@@ -171,7 +177,12 @@ function ExperimentMenuItems({
     return function cleanup() {
       isMounted = false;
     };
-  }, [experimentInfo?.id, experimentInfo?.config?.foundation, hasFoundation]);
+  }, [
+    experimentInfo?.id,
+    experimentInfo?.config?.foundation,
+    hasFoundation,
+    isLocalMode,
+  ]);
 
   return (
     <List

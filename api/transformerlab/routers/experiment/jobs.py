@@ -88,52 +88,6 @@ async def job_update(job_id: str, status: str, experimentId: str):
     return {"message": "OK"}
 
 
-async def start_next_job():
-    # Count running jobs across all organizations
-    num_running_jobs = await job_service.job_count_running_across_all_orgs()
-    if num_running_jobs > 0:
-        return {"message": "A job is already running"}
-
-    # Get next queued job across all organizations
-    nextjob, org_id = await job_service.jobs_get_next_queued_job_across_all_orgs()
-
-    if nextjob:
-        print(f"Starting Next Job in Queue: {nextjob}")
-        print(f"Job belongs to organization: {org_id}")
-        print("Starting job: " + str(nextjob["id"]))
-
-        # Set organization context before running the job
-        # Note: This is safe because:
-        # 1. This function runs in a background task with its own async context (isolated from request handlers)
-        # 2. Request handlers have their own middleware that sets/clears org context per request
-        # 3. The try/finally block ensures cleanup even if run_job() raises an exception
-        if org_id:
-            from lab.dirs import set_organization_id
-
-            set_organization_id(org_id)
-            print(f"Set organization context to: {org_id}")
-
-        try:
-            nextjob_data = nextjob["job_data"]
-            if not isinstance(nextjob_data, dict):
-                job_config = json.loads(nextjob["job_data"])
-            else:
-                job_config = nextjob_data
-            experiment_name = nextjob["experiment_id"]  # Note: experiment_id and experiment_name are the same
-            await shared.run_job(
-                job_id=nextjob["id"], job_config=job_config, experiment_name=experiment_name, job_details=nextjob
-            )
-            return nextjob
-        finally:
-            # Clear organization context after running job
-            if org_id:
-                from lab.dirs import set_organization_id
-
-                set_organization_id(None)
-    else:
-        return {"message": "No jobs in queue"}
-
-
 @router.get("/{job_id}/stop")
 async def stop_job(job_id: str, experimentId: str):
     # The way a job is stopped is simply by adding "stop: true" to the job_data
@@ -241,11 +195,22 @@ async def get_provider_job_logs(
     experimentId: str,
     job_id: str,
     tail_lines: int = Query(400, ge=100, le=2000),
+    live: bool = Query(
+        False,
+        description=(
+            "If true, bypass cached provider_logs.txt and fetch logs directly from the underlying compute provider."
+        ),
+    ),
     user_and_team=Depends(get_user_and_team),
     session: AsyncSession = Depends(get_async_session),
 ):
     """
     Fetch the raw job logs directly from the underlying compute provider for a REMOTE job.
+
+    Preferred order:
+      1. If `provider_logs.txt` exists in the job directory (written by the SDK wrapper),
+         read and return that.
+      2. Otherwise, fall back to provider-native log retrieval (existing behavior).
     """
 
     job = await job_service.job_get(job_id)
@@ -266,6 +231,36 @@ async def get_provider_job_logs(
             status_code=400, detail="Job does not contain provider metadata (provider_id/cluster_name missing)"
         )
 
+    # 1) If live=False (default), first try to read provider logs from the job directory
+    #    via the SDK's job_dir helper. This file is written by tfl-remote-trap inside
+    #    the remote environment.
+    if not live:
+        try:
+            from lab.dirs import get_job_dir
+
+            job_dir = await get_job_dir(job_id)
+            provider_logs_path = storage.join(job_dir, "provider_logs.txt")
+            if await storage.exists(provider_logs_path):
+                async with await storage.open(provider_logs_path, "r", encoding="utf-8") as f:
+                    logs_text = await f.read()
+                if tail_lines is not None:
+                    lines = logs_text.splitlines()
+                    logs_text = "\n".join(lines[-tail_lines:])
+
+                return {
+                    "cluster_name": cluster_name,
+                    "provider_id": provider_id,
+                    "provider_job_id": None,
+                    "provider_name": job_data.get("provider_name"),
+                    "tail_lines": tail_lines,
+                    "logs": logs_text,
+                    "job_candidates": [],
+                }
+        except Exception:
+            # If anything goes wrong with the file-based path, fall back to provider-native logs.
+            pass
+
+    # 2) Fall back to existing provider-native log retrieval.
     provider = await get_team_provider(session, user_and_team["team_id"], provider_id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
@@ -374,10 +369,12 @@ async def get_tunnel_info_for_job(
     session: AsyncSession = Depends(get_async_session),
 ):
     """
-    Parse provider logs for a REMOTE job and extract tunnel information based on job type.
+    Parse provider logs and extract tunnel or local URLs based on job type.
 
-    This route automatically determines the tunnel type from job_data.interactive_type
-    and uses the appropriate parser. Supports: 'vscode', 'jupyter', 'vllm', 'ssh'
+    For remote jobs with a tunnel (e.g. ngrok), parses tunnel URLs from logs.
+    For local provider jobs (no tunnel), parses local URLs (e.g. Local Ollama API:
+    http://localhost:11434) from stdout/stderr. Uses job_data.interactive_type to
+    choose the parser. Supports: 'vscode', 'jupyter', 'vllm', 'ollama', 'ssh'.
     """
 
     job = await job_service.job_get(job_id)
@@ -440,6 +437,11 @@ async def get_tunnel_info_for_job(
 
     if provider_job_id is None:
         raise HTTPException(status_code=404, detail="Unable to determine provider job id for this job")
+
+    # For local provider, set workspace_dir (job dir) so LocalProvider can read logs.
+    if getattr(provider, "type", None) == ProviderType.LOCAL.value and hasattr(provider_instance, "extra_config"):
+        job_dir = get_local_provider_job_dir(job_id, org_id=user_and_team["team_id"])
+        provider_instance.extra_config["workspace_dir"] = job_dir
 
     try:
         if provider.type == ProviderType.RUNPOD.value:
