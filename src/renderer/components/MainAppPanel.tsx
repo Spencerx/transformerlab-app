@@ -36,7 +36,6 @@ import AudioSTT from './Experiment/Audio/AudioSTT';
 import ExperimentNotes from './Experiment/ExperimentNotes';
 import UserSettings from './User/UserSettings';
 import TransformerLabSettings from './Settings/TransformerLabSettings';
-import Logs from './Logs';
 import FoundationHome from './Experiment/Foundation';
 import SelectEmbeddingModel from './Experiment/Foundation/SelectEmbeddingModel';
 import { useAnalytics } from './Shared/analytics/AnalyticsContext';
@@ -396,7 +395,6 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
         <Route path="/computer" element={<Computer />} />
         <Route path="/compute" element={<Compute />} />
         <Route path="/settings" element={<TransformerLabSettings />} />
-        <Route path="/logs" element={<Logs />} />
         <Route path="/user" element={<UserSettings />} />
         <Route path="/team" element={<Team />} />
         <Route path="/team/usage-report" element={<UsageReport />} />

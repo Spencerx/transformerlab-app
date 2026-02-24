@@ -13,7 +13,6 @@ import {
   SettingsIcon,
   GithubIcon,
   PlugIcon,
-  TextIcon,
   FileIcon,
   ChartColumnIncreasingIcon,
   AudioLinesIcon,
@@ -309,9 +308,7 @@ function GlobalMenuItems({
           disabled={!experimentInfo?.name}
         />
       )}
-      {isLocalMode && (
-        <SubNavItem title="Logs" path="/logs" icon={<TextIcon />} />
-      )}
+
       {isLocalMode && (
         <SubNavItem
           title="Plugins"
