@@ -20,12 +20,10 @@ import Welcome from './Welcome/Welcome';
 import ModelZoo from './ModelZoo/ModelZoo';
 import Plugins from './Plugins/Plugins';
 import PluginDetails from './Plugins/PluginDetails';
-
 import Computer from './Computer';
 import Compute from './Compute/Compute';
 import Eval from './Experiment/Eval/Eval';
 import Generate from './Experiment/Generate/Generate';
-import Export from './Experiment/Export/Export';
 import Api from './Experiment/Api';
 import Settings from './Experiment/Settings';
 import TrainLoRA from './Experiment/Train/TrainLoRA';
@@ -402,7 +400,6 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
           path="/experiment/rag"
           element={<Rag setRagEngine={setRagEngine} />}
         />
-        <Route path="/experiment/export" element={<Export />} />
         <Route path="/experiment/diffusion" element={<Diffusion />} />
         <Route path="/experiment/audio" element={<Audio />} />
         <Route path="/experiment/audio-stt" element={<AudioSTT />} />

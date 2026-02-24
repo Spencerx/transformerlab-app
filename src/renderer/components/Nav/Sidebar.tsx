@@ -12,7 +12,6 @@ import {
   FlaskConicalIcon,
   SettingsIcon,
   GithubIcon,
-  ArrowRightFromLineIcon,
   PlugIcon,
   TextIcon,
   SquareStackIcon,
@@ -101,7 +100,6 @@ function ExperimentMenuItems({
 
   const disableInteract = !experimentReady || isActiveModelDifferent;
   const disableEval = !experimentReady || isDiffusionModel;
-  const disableExport = !experimentReady || !hasFoundation;
 
   useEffect(() => {
     if (!experimentInfo?.id || !hasFoundation) {
@@ -267,14 +265,7 @@ function ExperimentMenuItems({
           icon={<FileIcon />}
           disabled={!experimentReady}
         />
-        {isLocalMode && (
-          <SubNavItem
-            title="Export"
-            path="/experiment/export"
-            icon={<ArrowRightFromLineIcon />}
-            disabled={disableExport}
-          />
-        )}
+
         <SubNavItem
           title="Notes"
           path="/experiment/notes"
