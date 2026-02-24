@@ -68,8 +68,8 @@ def test_is_wsl_false(monkeypatch):
     assert serverinfo.is_wsl() is False
 
 
-def test_healthz_local_mode(client, monkeypatch):
-    """Test healthz endpoint in local mode"""
+def test_healthz_multiuser_mode(client, monkeypatch):
+    """Test healthz endpoint in multiuser mode"""
     # Explicitly disable multiuser mode
     monkeypatch.setenv("MULTIUSER", "false")
 
@@ -77,20 +77,20 @@ def test_healthz_local_mode(client, monkeypatch):
     assert response.status_code == 200
     data = response.json()
     assert data["message"] == "OK"
-    assert data["mode"] == "local"
+    assert data["mode"] == "multiuser"
 
 
-def test_healthz_s3_mode(client, monkeypatch):
+def test_healthz_local_mode(client, monkeypatch):
     """Test healthz endpoint in multiuser mode"""
     # Set MULTIUSER to enable multiuser mode
-    monkeypatch.setenv("MULTIUSER", "true")
+    monkeypatch.setenv("MULTIUSER", "false")
 
     # The healthz endpoint reads env vars at request time, so monkeypatch should work
     response = client.get("/healthz")
     assert response.status_code == 200
     data = response.json()
     assert data["message"] == "OK"
-    assert data["mode"] == "multiuser"
+    assert data["mode"] == "local"
 
 
 def test_healthz_localfs_mode(client, monkeypatch, tmp_path):
