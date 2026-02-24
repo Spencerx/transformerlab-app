@@ -1,30 +1,9 @@
 """
-Utilities for resolving interactive gallery commands by environment (local/remote)
-and accelerator. See galleries.py for the interactive gallery schema documentation.
+Utilities for resolving interactive gallery commands by environment (local/remote).
+See galleries.py for the interactive gallery schema documentation.
 """
 
 from typing import Optional, Tuple
-
-# Canonical accelerator keys used in interactive-gallery.json "commands" map
-INTERACTIVE_ACCELERATOR_KEYS = ("default", "cpu", "NVIDIA", "AMD", "AppleSilicon")
-
-# Normalize request/provider accelerator strings to gallery keys
-_ACCELERATOR_ALIASES = {
-    "cuda": "NVIDIA",
-    "nvidia": "NVIDIA",
-    "rtx": "NVIDIA",
-    "a100": "NVIDIA",
-    "h100": "NVIDIA",
-    "v100": "NVIDIA",
-    "rocm": "AMD",
-    "amd": "AMD",
-    "apple": "AppleSilicon",
-    "applesilicon": "AppleSilicon",
-    "mps": "AppleSilicon",
-    "m1": "AppleSilicon",
-    "m2": "AppleSilicon",
-    "m3": "AppleSilicon",
-}
 
 # Prepended to interactive remote setup in the launch route so $SUDO is defined
 # without putting that logic in the gallery JSON. Setup content stays in the gallery.
@@ -113,87 +92,24 @@ def _compose_command_from_logic(
     return "; ".join(parts)
 
 
-def _normalize_accelerator(
-    accelerator: Optional[str],
-    supported_list: Optional[list] = None,
-    environment: Optional[str] = None,
-) -> str:
-    """
-    Map provider/request accelerator to a gallery key: default, cpu, NVIDIA, AMD, AppleSilicon.
-
-    For local environments we prefer the provider's supported_accelerators (actual machine
-    capabilities) over any string parsed from request.accelerators.
-    """
-    # Prefer explicit capabilities for local environments
-    if environment == "local" and supported_list:
-        # supported_list usually comes from ProviderConfigBase.supported_accelerators
-        if "AppleSilicon" in supported_list:
-            return "AppleSilicon"
-        if "NVIDIA" in supported_list:
-            return "NVIDIA"
-        if "AMD" in supported_list:
-            return "AMD"
-        if "cpu" in supported_list:
-            return "cpu"
-        return "default"
-
-    if supported_list and len(supported_list) > 0:
-        # Use first supported as hint if we can't parse request.accelerators
-        first = supported_list[0]
-        if isinstance(first, str):
-            key = first.strip()
-            if key in INTERACTIVE_ACCELERATOR_KEYS:
-                return key
-            lower = key.lower()
-            return _ACCELERATOR_ALIASES.get(lower, "default")
-
-    if not accelerator or not str(accelerator).strip():
-        return "default"
-
-    raw = str(accelerator).strip().lower()
-    # e.g. "RTX3090:1" -> take part before ":"
-    if ":" in raw:
-        raw = raw.split(":")[0].strip()
-    if not raw:
-        return "default"
-
-    return _ACCELERATOR_ALIASES.get(raw, "default")
-
-
 def resolve_interactive_command(
     template_entry: dict,
     environment: str,
-    accelerator: Optional[str] = None,
-    supported_accelerators: Optional[list] = None,
 ) -> Tuple[str, Optional[str]]:
     """
     Resolve the run command and optional setup override for an interactive template
-    based on environment (local/remote) and accelerator.
+    based on environment (local/remote).
 
     Args:
         template_entry: One entry from the interactive gallery (e.g. from get_interactive_gallery).
         environment: "local" or "remote".
-        accelerator: Optional accelerator string from the request (e.g. "RTX3090:1").
-        supported_accelerators: Optional list from provider config (e.g. ["NVIDIA", "cpu"]).
 
     Returns:
         (command, setup_override). setup_override is None if the entry-level "setup"
         should be used; otherwise the caller should use setup_override for this run.
     """
     env = "local" if environment == "local" else "remote"
-    acc = _normalize_accelerator(accelerator, supported_accelerators, environment=env)
     interactive_type = str(template_entry.get("interactive_type") or template_entry.get("id") or "").strip()
-
-    # Prefer per-accelerator logic overrides via commands[accelerator_type].logic
-    commands = template_entry.get("commands")
-    if isinstance(commands, dict):
-        # Legacy commands.local/commands.remote are no longer supported.
-        if "local" not in commands and "remote" not in commands:
-            candidate = commands.get(acc) or commands.get("default")
-            if isinstance(candidate, dict) and isinstance(candidate.get("logic"), dict):
-                composed = _compose_command_from_logic(candidate["logic"], interactive_type, env)
-                if composed:
-                    return (composed, None)
 
     logic = template_entry.get("logic")
     if isinstance(logic, dict):

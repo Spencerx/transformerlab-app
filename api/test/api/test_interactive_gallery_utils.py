@@ -10,7 +10,7 @@ from transformerlab.shared.interactive_gallery_utils import (
 def test_resolve_legacy_entry_remote():
     """Legacy entry without 'commands' uses top-level command and no setup override."""
     entry = {"id": "jupyter", "command": "jupyter lab --port=8888", "setup": "pip install jupyter"}
-    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
+    cmd, setup = resolve_interactive_command(entry, "remote")
     assert cmd == "jupyter lab --port=8888"
     assert setup is None
 
@@ -18,7 +18,7 @@ def test_resolve_legacy_entry_remote():
 def test_resolve_legacy_entry_local():
     """Legacy entry: local environment still gets legacy command when no commands.local."""
     entry = {"id": "jupyter", "command": "jupyter lab --port=8888"}
-    cmd, setup = resolve_interactive_command(entry, "local", None, None)
+    cmd, setup = resolve_interactive_command(entry, "local")
     assert cmd == "jupyter lab --port=8888"
     assert setup is None
 
@@ -36,7 +36,7 @@ def test_resolve_logic_remote_uses_core_tunnel_and_tail():
         },
         "command": "legacy",
     }
-    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
+    cmd, setup = resolve_interactive_command(entry, "remote")
     assert cmd == "start-core; start-tunnel; tail-logs"
     assert setup is None
 
@@ -52,7 +52,7 @@ def test_resolve_logic_local_omits_tunnel_adds_echo():
             "tail_logs": "tail -f /tmp/jupyter.log /tmp/ngrok.log",
         },
     }
-    cmd, setup = resolve_interactive_command(entry, "local", None, None)
+    cmd, setup = resolve_interactive_command(entry, "local")
     assert "start-core" in cmd
     assert "start-tunnel" not in cmd
     assert "Local URL: http://localhost:8888" in cmd
@@ -67,10 +67,10 @@ def test_resolve_legacy_command_when_no_logic():
         "setup": "legacy-setup",
         "commands": {"local": {"default": "local-cmd"}, "remote": {"default": "remote-cmd"}},
     }
-    cmd, setup = resolve_interactive_command(entry, "remote", None, None)
+    cmd, setup = resolve_interactive_command(entry, "remote")
     assert cmd == "legacy-cmd"
     assert setup is None
-    cmd2, _ = resolve_interactive_command(entry, "local", None, None)
+    cmd2, _ = resolve_interactive_command(entry, "local")
     assert cmd2 == "legacy-cmd"
 
 

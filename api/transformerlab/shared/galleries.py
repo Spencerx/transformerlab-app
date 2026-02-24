@@ -70,41 +70,11 @@ async def get_tasks_gallery():
     return await get_gallery_file(TASKS_GALLERY_FILE)
 
 
-# ---------------------------------------------------------------------------
-# Interactive gallery schema (per-accelerator / local vs remote commands)
-# ---------------------------------------------------------------------------
-# Each entry may include an optional "commands" field for environment- and
-# accelerator-specific run commands, while remaining backward compatible with
-# top-level "command" and "setup".
-#
-# Shape:
-#   commands: {
-#     [environment: "local" | "remote"]: {
-#       [accelerator: "default" | "cpu" | "NVIDIA" | "AMD" | "AppleSilicon"]: string | { setup?: string; command: string }
-#     }
-#   }
-#
-# - Value can be a string (the command; use entry-level "setup" if present)
-#   or an object { setup?: string; command: string } for overrides that need
-#   a specific setup sequence.
-# - Fallback order when resolving (see resolve_interactive_command):
-#   1. commands[environment][accelerator]
-#   2. commands[environment].default
-#   3. commands.remote[accelerator]
-#   4. commands.remote.default
-#   5. Legacy top-level "command" and "setup".
-# - If "commands" is missing, top-level "command" and "setup" are used as
-#   remote/default behavior.
-# - Optional "remoteOnly" (boolean): when true, the task is hidden in the UI
-#   when a local compute provider is selected (e.g. VS Code tunnel-only tasks).
-# ---------------------------------------------------------------------------
-
-
 async def get_interactive_gallery():
     """
     Get the interactive tasks gallery.
     This contains templates for interactive task types (vscode, jupyter, vllm, ssh).
-    Schema supports optional "commands" for per-environment and per-accelerator variants.
+    Resolution is by environment (local/remote) only; see resolve_interactive_command.
     """
     return await get_gallery_file(INTERACTIVE_GALLERY_FILE)
 

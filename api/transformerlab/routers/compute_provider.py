@@ -39,7 +39,6 @@ from transformerlab.compute_providers.models import (
     JobInfo,
     JobState,
 )
-from transformerlab.compute_providers.local import _check_nvidia_gpu, _check_amd_gpu
 from transformerlab.services import job_service
 from transformerlab.services import quota_service
 from transformerlab.services.local_provider_queue import enqueue_local_launch
@@ -1539,38 +1538,8 @@ async def launch_template_on_provider(
             if raw_setup:
                 setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
                 interactive_setup_added = True
-            supported_accelerators = None
-            if provider.config and isinstance(provider.config, dict):
-                supported_accelerators = provider.config.get("supported_accelerators")
 
-            # For LOCAL providers with no explicit accelerators, infer from the actual machine:
-            # prefer NVIDIA, then AMD, then Apple Silicon, finally CPU.
-            if environment == "local" and provider.type == ProviderType.LOCAL.value and not request.accelerators:
-                inferred = None
-                if _check_nvidia_gpu():
-                    inferred = "NVIDIA"
-                elif _check_amd_gpu():
-                    inferred = "AMD"
-                else:
-                    # Simple Apple Silicon detection
-                    import platform
-
-                    if platform.system().lower() == "darwin" and platform.machine().lower().startswith("arm"):
-                        inferred = "AppleSilicon"
-                    else:
-                        inferred = "cpu"
-                if inferred:
-                    supported_accelerators = [inferred]
-
-            print(f"supported_accelerators: {supported_accelerators}")
-
-            resolved_cmd, setup_override_from_gallery = resolve_interactive_command(
-                gallery_entry,
-                environment,
-                accelerator=request.accelerators,
-                supported_accelerators=supported_accelerators,
-            )
-            print(f"resolved_cmd: {resolved_cmd}")
+            resolved_cmd, setup_override_from_gallery = resolve_interactive_command(gallery_entry, environment)
             if resolved_cmd:
                 base_command = resolved_cmd
             if setup_override_from_gallery and team_secrets:
