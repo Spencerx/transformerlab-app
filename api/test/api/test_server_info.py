@@ -1,4 +1,6 @@
 def test_server_info(client):
+    # Set MULTIUSER to false
+    client.environ_base["MULTIUSER"] = "false"
     response = client.get("/server/info")
     assert response.status_code == 200
     data = response.json()
@@ -16,6 +18,8 @@ def test_server_info(client):
 
 
 def test_server_info_keys(client):
+    # Set MULTIUSER to false
+    client.environ_base["MULTIUSER"] = "false"
     response = client.get("/server/info")
     assert response.status_code == 200
     data = response.json()

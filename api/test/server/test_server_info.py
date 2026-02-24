@@ -4,6 +4,8 @@ import requests
 
 @pytest.mark.live_server
 def test_server_info(live_server):
+    # Set MULTIUSER to false
+    live_server.environ_base["MULTIUSER"] = "false"
     # Get admin token for authentication
     login_response = requests.post(
         f"{live_server}/auth/jwt/login", data={"username": "admin@example.com", "password": "admin123"}
