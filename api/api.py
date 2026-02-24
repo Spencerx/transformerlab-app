@@ -28,10 +28,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-# Global MULTIUSER flag: default to true unless explicitly set to 'false'
-IS_MULTIUSER = os.getenv("MULTIUSER", "true").lower() == "true"
-
-
 # Optional Datadog APM (does nothing unless enabled + installed)
 def _enable_datadog_if_setup():
     if not os.getenv("DD_SERVICE"):
@@ -601,7 +597,9 @@ async def healthz():
     """
     Health check endpoint to verify server status and mode.
     """
-    # Determine mode: multiuser or local (default to multiuser unless explicitly disabled)
+    # MULTIUSER flag: default to true unless explicitly set to 'false'
+    IS_MULTIUSER = os.getenv("MULTIUSER", "true").lower() == "true"
+    # Determine mode: multiuser or local
     mode = "multiuser" if IS_MULTIUSER else "local"
 
     return {
