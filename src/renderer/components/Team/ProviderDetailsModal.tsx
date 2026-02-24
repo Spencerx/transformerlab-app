@@ -226,14 +226,6 @@ export default function ProviderDetailsModal({
       if (type === 'slurm') {
         const configObj = buildSlurmConfig();
         setConfig(JSON.stringify(configObj, null, 2));
-      } else if (type && type in DEFAULT_CONFIGS) {
-        try {
-          const configObj = JSON.parse(config);
-          configObj.supported_accelerators = supportedAccelerators;
-          setConfig(JSON.stringify(configObj, null, 2));
-        } catch (e) {
-          // If JSON is invalid (e.g. while typing), don't update
-        }
       }
     }
   }, [
@@ -282,6 +274,12 @@ export default function ProviderDetailsModal({
       let parsedConfig: any;
       if (type === 'slurm') {
         parsedConfig = buildSlurmConfig();
+      } else if (type === 'local') {
+        // Local providers are configured via supported accelerators only
+        parsedConfig = {};
+        if (supportedAccelerators.length > 0) {
+          parsedConfig.supported_accelerators = supportedAccelerators;
+        }
       } else {
         // The API expects an object for config, not a JSON string
         parsedConfig = typeof config === 'string' ? JSON.parse(config) : config;
@@ -542,7 +540,7 @@ export default function ProviderDetailsModal({
               )}
 
               {/* Generic JSON config for non-SLURM providers or advanced editing */}
-              {type !== 'slurm' && (
+              {type !== 'slurm' && type !== 'local' && (
                 <FormControl sx={{ mt: 1 }}>
                   <FormLabel>Configuration</FormLabel>
                   <Textarea
