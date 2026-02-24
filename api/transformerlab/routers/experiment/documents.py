@@ -246,8 +246,8 @@ async def document_upload(experimentId: str, folder: str, files: list[UploadFile
                 raise HTTPException(status_code=403, detail="There was a problem uploading the file")
 
         # reindex the vector store on every file upload
-        if folder == "rag":
-            await rag.reindex(experimentId)
+        # if folder == "rag":
+        #     await rag.reindex(experimentId)
 
     return {"status": "success", "filename": fileNames}
 
@@ -325,8 +325,8 @@ async def document_upload_links(experimentId: str, folder: str = None, data: dic
             async with aiofiles.open(filename_md, "w", encoding="utf-8") as out_file:
                 await out_file.write(result.markdown)
         # reindex the vector store on every file upload
-        if folder == "rag":
-            await rag.reindex(experimentId)
+        # if folder == "rag":
+        #     await rag.reindex(experimentId)
     return {"status": "success", "filename": urls}
 
 
