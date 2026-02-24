@@ -23,7 +23,6 @@ import PluginDetails from './Plugins/PluginDetails';
 import Computer from './Computer';
 import Compute from './Compute/Compute';
 import Eval from './Experiment/Eval/Eval';
-import Generate from './Experiment/Generate/Generate';
 import Api from './Experiment/Api';
 import Settings from './Experiment/Settings';
 import TrainLoRA from './Experiment/Train/TrainLoRA';
@@ -276,23 +275,6 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
     [experimentInfo, experimentInfoMutate],
   );
 
-  const experimentAddGeneration = useCallback(
-    async (
-      pluginName: string,
-      localName: string,
-      script_template_parameters: any = {},
-    ) => {
-      await chatAPI.EXPERIMENT_ADD_GENERATION(
-        experimentInfo?.id,
-        localName,
-        pluginName,
-        script_template_parameters,
-      );
-      experimentInfoMutate();
-    },
-    [experimentInfo, experimentInfoMutate],
-  );
-
   const setRagEngine = useCallback(
     async (name: string, rag_settings: any = {}) => {
       await chatAPI.authenticatedFetch(
@@ -390,10 +372,6 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
         <Route
           path="/experiment/eval"
           element={<Eval addEvaluation={experimentAddEvaluation} />}
-        />
-        <Route
-          path="/experiment/generate"
-          element={<Generate addGeneration={experimentAddGeneration} />}
         />
         <Route path="/experiment/documents" element={<Documents />} />
         <Route

@@ -14,7 +14,6 @@ import {
   GithubIcon,
   PlugIcon,
   TextIcon,
-  SquareStackIcon,
   FileIcon,
   ChartColumnIncreasingIcon,
   AudioLinesIcon,
@@ -243,14 +242,7 @@ function ExperimentMenuItems({
             disabled={!experimentReady}
           />
         )}
-        {isLocalMode && (
-          <SubNavItem
-            title="Generate"
-            path="/experiment/generate"
-            icon={<SquareStackIcon />}
-            disabled={!experimentReady}
-          />
-        )}
+
         {isLocalMode && (
           <SubNavItem
             title="Evaluate"
