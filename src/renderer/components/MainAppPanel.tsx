@@ -38,7 +38,6 @@ import UserSettings from './User/UserSettings';
 import TransformerLabSettings from './Settings/TransformerLabSettings';
 import Logs from './Logs';
 import FoundationHome from './Experiment/Foundation';
-import Workflows from './Experiment/Workflows';
 import SelectEmbeddingModel from './Experiment/Foundation/SelectEmbeddingModel';
 import { useAnalytics } from './Shared/analytics/AnalyticsContext';
 import SafeJSONParse from './Shared/SafeJSONParse';
@@ -327,7 +326,6 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
             />
           }
         />
-        <Route path="/experiment/workflows" element={<Workflows />} />
         <Route
           path="/experiment/prompt"
           element={
