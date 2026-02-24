@@ -81,7 +81,7 @@ def test_healthz_multiuser_mode(client, monkeypatch):
 
 
 def test_healthz_local_mode(client, monkeypatch):
-    """Test healthz endpoint in multiuser mode"""
+    """Test healthz endpoint in local mode"""
     # Set MULTIUSER to enable multiuser mode
     monkeypatch.setenv("MULTIUSER", "false")
 
