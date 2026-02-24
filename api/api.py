@@ -28,6 +28,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# Global MULTIUSER flag: default to true unless explicitly set to 'false'
+IS_MULTIUSER = os.getenv("MULTIUSER", "true").lower() == "true"
+
+
 # Optional Datadog APM (does nothing unless enabled + installed)
 def _enable_datadog_if_setup():
     if not os.getenv("DD_SERVICE"):
@@ -172,7 +176,7 @@ async def lifespan(app: FastAPI):
     if "--reload" in sys.argv:
         await install_all_plugins()
 
-    if os.getenv("MULTIUSER", "").lower() != "true":
+    if not IS_MULTIUSER:
         asyncio.create_task(run_over_and_over())
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
@@ -609,13 +613,8 @@ async def healthz():
     """
     Health check endpoint to verify server status and mode.
     """
-    tfl_remote_storage_enabled = os.getenv("MULTIUSER", "").lower() == "true"
-
-    # Determine mode: multiuser or local
-    if tfl_remote_storage_enabled:
-        mode = "multiuser"
-    else:
-        mode = "local"
+    # Determine mode: multiuser or local (default to multiuser unless explicitly disabled)
+    mode = "multiuser" if IS_MULTIUSER else "local"
 
     return {
         "message": "OK",
