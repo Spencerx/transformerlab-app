@@ -24,9 +24,6 @@ ALLOWED_JOB_TYPES = [
     "SWEEP",
 ]
 
-# Centralized set of job types that can trigger workflows on completion
-SUPPORTED_WORKFLOW_TRIGGERS = ["TRAIN", "LOAD_MODEL", "EXPORT", "EVAL", "GENERATE", "DOWNLOAD_MODEL"]
-
 
 async def job_create(type, status, experiment_id, job_data="{}"):
     # check if type is allowed
@@ -405,42 +402,6 @@ async def _record_quota_usage_internal(
         await session.rollback()
 
 
-async def _trigger_workflows_on_job_completion(job_id: str):
-    """
-    Trigger workflows when a job completes if the job type is in supported triggers.
-    """
-    try:
-        # Get the job details
-        job = await job_get(job_id)
-        if not job:
-            return
-
-        job_type = job.get("type")
-        experiment_id = job.get("experiment_id")
-
-        # Define supported triggers based on centralized configuration
-        supported_triggers = SUPPORTED_WORKFLOW_TRIGGERS
-
-        # Check if job type is in supported triggers
-        if job_type not in supported_triggers:
-            return
-
-        # Import here to avoid circular imports
-        from transformerlab.routers.experiment.workflows import workflows_get_by_trigger_type
-
-        # Get workflows that should be triggered
-        triggered_workflow_ids = await workflows_get_by_trigger_type(experiment_id, job_type)
-
-        # Start each workflow
-        if triggered_workflow_ids:
-            from transformerlab.db.workflows import workflow_queue
-
-            for workflow_id in triggered_workflow_ids:
-                await workflow_queue(workflow_id)
-    except Exception as e:
-        print(f"Error triggering workflows for job {job_id}: {e}")
-
-
 async def job_update_status(
     job_id: str,
     status: str,
@@ -449,7 +410,7 @@ async def job_update_status(
     session: Optional[object] = None,  # AsyncSession type but using object to avoid circular imports
 ):
     """
-    Update job status and trigger workflows if job is completed.
+    Update job status.
     Also handles quota tracking for REMOTE jobs.
 
     Args:
@@ -460,24 +421,11 @@ async def job_update_status(
         session: Optional database session for quota tracking. If not provided, quota tracking will use a background task.
     """
     # Get old status before updating for queue management
-    old_status = None
-    org_id = None
     try:
         job = await Job.get(job_id)
         exp_id = await job.get_experiment_id()
         if experiment_id is not None and exp_id != experiment_id:
             return
-        old_status = await job.get_status()
-
-        # Get org_id for queue management
-        try:
-            from lab.dirs import get_workspace_dir
-
-            workspace_dir = await get_workspace_dir()
-            if "/orgs/" in workspace_dir:
-                org_id = workspace_dir.split("/orgs/")[-1].split("/")[0]
-        except Exception:
-            org_id = await _find_org_id_for_job(job_id)
 
         await job.update_status(status)
         if error_msg:
@@ -506,14 +454,10 @@ async def job_update_status(
         except Exception as e:
             print(f"Error initiating quota tracking for job {job_id}: {e}")
 
-    # # Trigger workflows if job status is COMPLETE
-    # if status == "COMPLETE":
-    #     await _trigger_workflows_on_job_completion(job_id)
-
 
 async def job_update(job_id: str, type: str, status: str, experiment_id: Optional[str] = None):
     """
-    Update job type and status and trigger workflows if job is completed.
+    Update job type and status.
 
     Args:
         job_id: The ID of the job to update
@@ -521,35 +465,17 @@ async def job_update(job_id: str, type: str, status: str, experiment_id: Optiona
         status: The new status to set
         experiment_id: The experiment ID (required for most operations, optional for backward compatibility)
     """
-    # Get old status before updating for queue management
-    old_status = None
-    org_id = None
     try:
         job = await Job.get(job_id)
         exp_id = await job.get_experiment_id()
         if experiment_id is not None and exp_id != experiment_id:
             return
-        old_status = await job.get_status()
-
-        # Get org_id for queue management
-        try:
-            from lab.dirs import get_workspace_dir
-
-            workspace_dir = await get_workspace_dir()
-            if "/orgs/" in workspace_dir:
-                org_id = workspace_dir.split("/orgs/")[-1].split("/")[0]
-        except Exception:
-            org_id = await _find_org_id_for_job(job_id)
 
         await job.set_type(type)
         await job.update_status(status)
     except Exception as e:
         print(f"Error updating job {job_id}: {e}")
         pass
-
-    # # Trigger workflows if job status is COMPLETE
-    # if status == "COMPLETE":
-    #     await _trigger_workflows_on_job_completion(job_id)
 
 
 def job_update_status_sync(job_id: str, org_id: str, status: str, error_msg: Optional[str] = None):
@@ -606,10 +532,6 @@ def job_update_sync(job_id: str, status: str, experiment_id: Optional[str] = Non
         print(f"Error updating job {job_id}: {e}")
         pass
 
-    # # Trigger workflows if job status is COMPLETE
-    # if status == "COMPLETE":
-    #     _trigger_workflows_on_job_completion_sync(job_id)
-
 
 def job_update_type_and_status_sync(job_id: str, job_type: str, status: str, experiment_id: Optional[str] = None):
     """
@@ -628,77 +550,13 @@ def job_update_type_and_status_sync(job_id: str, job_type: str, status: str, exp
             return
         asyncio.run(job.set_type(job_type))
         asyncio.run(job.update_status(status))
-
-        # Trigger workflows if job status is COMPLETE
-        # if status == "COMPLETE":
-        # _trigger_workflows_on_job_completion_sync(job_id)
     except Exception as e:
         print(f"Error updating job {job_id}: {e}")
         pass
 
 
-def _trigger_workflows_on_job_completion_sync(job_id: str):
-    """
-    Sync version of workflow triggering for use in sync contexts
-    Note: This function cannot be truly sync since it needs to use async database operations.
-    It should be called from an async context or we should use a sync database session.
-    For now, we'll leave it as-is but it may need to be refactored.
-    """
-    try:
-        # 1. Get job details using SDK
-        job = asyncio.run(Job.get(job_id))
-        job_type = asyncio.run(job.get_type())
-        # Get experiment_id from job data to match the type expected by workflow functions
-        experiment_id = asyncio.run(job.get_experiment_id())
-
-        if not experiment_id:
-            return
-
-        # 2. Check if job type is supported
-        supported_triggers = SUPPORTED_WORKFLOW_TRIGGERS
-        if job_type not in supported_triggers:
-            return
-
-        # 3. Get workflows with matching trigger using async database operations
-        # Note: This is a limitation - we can't easily do async operations in a sync context
-        # For now, we'll import the async function and call it
-
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # We're already in an async context, create a task
-                asyncio.create_task(_trigger_workflows_async(job_id, job_type, experiment_id))
-            else:
-                # We're not in an async context, run it
-                asyncio.run(_trigger_workflows_async(job_id, job_type, experiment_id))
-        except RuntimeError:
-            # No event loop, create one
-            asyncio.run(_trigger_workflows_async(job_id, job_type, experiment_id))
-
-    except Exception as e:
-        print(f"Error triggering workflows for job {job_id}: {e}")
-
-
-async def _trigger_workflows_async(job_id: str, job_type: str, experiment_id: str):
-    """Helper async function to trigger workflows"""
-    try:
-        from transformerlab.routers.experiment.workflows import workflows_get_by_trigger_type
-
-        # Get workflows with matching trigger
-        triggered_workflow_ids = await workflows_get_by_trigger_type(experiment_id, job_type)
-
-        # Queue workflows
-        if triggered_workflow_ids:
-            from transformerlab.db.workflows import workflow_queue
-
-            for workflow_id in triggered_workflow_ids:
-                await workflow_queue(workflow_id)
-    except Exception as e:
-        print(f"Error in async workflow triggering for job {job_id}: {e}")
-
-
 def job_mark_as_complete_if_running(job_id: int, org_id: str) -> None:
-    """Service wrapper: mark job as complete if running and then trigger workflows."""
+    """Service wrapper: mark job as complete if running."""
     try:
         # Set org context before accessing the job
         if org_id:
