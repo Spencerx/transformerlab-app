@@ -70,9 +70,6 @@ def test_is_wsl_false(monkeypatch):
 
 def test_healthz_multiuser_mode(client, monkeypatch):
     """Test healthz endpoint in multiuser mode"""
-    # Explicitly disable multiuser mode
-    monkeypatch.setenv("MULTIUSER", "false")
-
     response = client.get("/healthz")
     assert response.status_code == 200
     data = response.json()
