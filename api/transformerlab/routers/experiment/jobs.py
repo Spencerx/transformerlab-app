@@ -244,8 +244,7 @@ async def get_provider_job_logs(
     live: bool = Query(
         False,
         description=(
-            "If true, bypass cached provider_logs.txt and fetch logs directly "
-            "from the underlying compute provider."
+            "If true, bypass cached provider_logs.txt and fetch logs directly from the underlying compute provider."
         ),
     ),
     user_and_team=Depends(get_user_and_team),
