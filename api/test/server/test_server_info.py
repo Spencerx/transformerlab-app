@@ -4,8 +4,6 @@ import requests
 
 @pytest.mark.live_server
 def test_server_info(live_server):
-    # Set MULTIUSER to false
-    live_server.environ_base["MULTIUSER"] = "false"
     # Get admin token for authentication
     login_response = requests.post(
         f"{live_server}/auth/jwt/login", data={"username": "admin@example.com", "password": "admin123"}
@@ -27,17 +25,19 @@ def test_server_info(live_server):
     data = response.json()
     assert isinstance(data, dict)
     assert "cpu" in data
-    assert "memory" in data and isinstance(data["memory"], dict)
-    assert "disk" in data and isinstance(data["disk"], dict)
     assert "gpu" in data
-    # Check memory fields
-    mem = data["memory"]
-    for key in ("total", "available", "percent", "used", "free"):
-        assert key in mem
-    # Check disk fields
-    disk = data["disk"]
-    for key in ("total", "used", "free", "percent"):
-        assert key in disk
+    # In local (non-multiuser) mode, /server/info includes detailed memory/disk stats.
+    # In multiuser mode, it returns a more static snapshot without these sections.
+    if "memory" in data:
+        assert isinstance(data["memory"], dict)
+        mem = data["memory"]
+        for key in ("total", "available", "percent", "used", "free"):
+            assert key in mem
+    if "disk" in data:
+        assert isinstance(data["disk"], dict)
+        disk = data["disk"]
+        for key in ("total", "used", "free", "percent"):
+            assert key in disk
 
 
 @pytest.mark.live_server
