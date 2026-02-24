@@ -35,31 +35,6 @@ import RecipesModal from '../Experiment/Recipes';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
 
-function recommendedModel(cpu, os, device) {
-  if (!cpu || !os || !device) return '';
-
-  if (cpu == 'arm64' && os == 'Darwin') {
-    return 'Llama-3.2-1B-Instruct-4bit (MLX)';
-  }
-
-  if (device == 'cuda') {
-    return 'Tiny Llama';
-  }
-
-  return 'GGUF models';
-  // return `${cpu}, ${os}, ${device}`;
-}
-
-function typeOfComputer(cpu, os, device) {
-  if (!cpu || !os || !device) return '';
-
-  if (cpu == 'arm64' && os == 'Darwin') {
-    return 'Apple Silicon Mac';
-  }
-
-  return `${cpu} based ${os} computer with ${device} support`;
-}
-
 export default function Welcome() {
   // For now disable ModelDownloadModal
   const [modelDownloadModalOpen, setModelDownloadModalOpen] =
@@ -68,7 +43,6 @@ export default function Welcome() {
   const [recipesModalOpen, setRecipesModalOpen] = useState<boolean>(false);
   const [hasInitiallyConnected, setHasInitiallyConnected] =
     useState<boolean>(false);
-  const { server, isLoading, isError } = chatAPI.useServerStats();
   const { setExperimentId } = useExperimentInfo();
   const { team } = useAuth();
 
@@ -104,19 +78,13 @@ export default function Welcome() {
     }
 
     // Track when we first get a successful connection
-    if (server && !isLoading && !isError && isConnected) {
+    if (isConnected && !hasInitiallyConnected) {
       setHasInitiallyConnected(true);
     }
 
     // Check if there's a stored experiment for this connection
     const checkStoredExperiment = async () => {
-      if (
-        !hasInitiallyConnected ||
-        !server ||
-        isLoading ||
-        isError ||
-        !isConnected
-      ) {
+      if (!hasInitiallyConnected || !isConnected) {
         return;
       }
 
@@ -138,10 +106,6 @@ export default function Welcome() {
 
     checkStoredExperiment();
   }, [isLoading, server, isError, hasInitiallyConnected]);
-
-  const cpu = server?.cpu;
-  const os = server?.os;
-  const device = server?.device;
 
   // Create experiment creation callback
   const createNewExperiment = async (name: string, fromRecipeId = null) => {
@@ -266,10 +230,8 @@ export default function Welcome() {
               <>
                 <Typography level="body-lg" sx={{ fontSize: '24px' }} mb={2}>
                   Get started by downloading a small model from the{' '}
-                  <BoxesIcon /> <b>{recommendedModel(cpu, os, device)}</b> could
-                  great great starting point for your{' '}
-                  {typeOfComputer(cpu, os, device)}. After downloading a model,
-                  you can:
+                  <BoxesIcon /> <b>Model Registry</b>. After downloading a
+                  model, you can:
                 </Typography>
                 <Stack
                   direction="column"
