@@ -3,7 +3,7 @@ Utilities for resolving interactive gallery commands by environment (local/remot
 and accelerator. See galleries.py for the interactive gallery schema documentation.
 """
 
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 # Canonical accelerator keys used in interactive-gallery.json "commands" map
 INTERACTIVE_ACCELERATOR_KEYS = ("default", "cpu", "NVIDIA", "AMD", "AppleSilicon")
@@ -158,17 +158,6 @@ def _normalize_accelerator(
         return "default"
 
     return _ACCELERATOR_ALIASES.get(raw, "default")
-
-
-def _extract_command_and_setup(value: Any, legacy_setup: Optional[str]) -> Tuple[str, Optional[str]]:
-    """Return (command, setup_override). setup_override is None to use legacy_setup."""
-    if isinstance(value, str):
-        return (value, None)
-    if isinstance(value, dict):
-        cmd = value.get("command")
-        if cmd is not None:
-            return (str(cmd), value.get("setup"))
-    return ("", None)
 
 
 def resolve_interactive_command(
