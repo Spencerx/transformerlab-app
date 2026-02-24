@@ -12,10 +12,7 @@ import {
   FlaskConicalIcon,
   SettingsIcon,
   GithubIcon,
-  ArrowRightFromLineIcon,
   PlugIcon,
-  TextIcon,
-  SquareStackIcon,
   FileIcon,
   ChartColumnIncreasingIcon,
   AudioLinesIcon,
@@ -101,7 +98,6 @@ function ExperimentMenuItems({
 
   const disableInteract = !experimentReady || isActiveModelDifferent;
   const disableEval = !experimentReady || isDiffusionModel;
-  const disableExport = !experimentReady || !hasFoundation;
 
   useEffect(() => {
     if (!isLocalMode) {
@@ -256,14 +252,7 @@ function ExperimentMenuItems({
             disabled={!experimentReady}
           />
         )}
-        {isLocalMode && (
-          <SubNavItem
-            title="Generate"
-            path="/experiment/generate"
-            icon={<SquareStackIcon />}
-            disabled={!experimentReady}
-          />
-        )}
+
         {isLocalMode && (
           <SubNavItem
             title="Evaluate"
@@ -278,14 +267,7 @@ function ExperimentMenuItems({
           icon={<FileIcon />}
           disabled={!experimentReady}
         />
-        {isLocalMode && (
-          <SubNavItem
-            title="Export"
-            path="/experiment/export"
-            icon={<ArrowRightFromLineIcon />}
-            disabled={disableExport}
-          />
-        )}
+
         <SubNavItem
           title="Notes"
           path="/experiment/notes"
@@ -337,9 +319,7 @@ function GlobalMenuItems({
           disabled={!experimentInfo?.name}
         />
       )}
-      {isLocalMode && (
-        <SubNavItem title="Logs" path="/logs" icon={<TextIcon />} />
-      )}
+
       {isLocalMode && (
         <SubNavItem
           title="Plugins"
