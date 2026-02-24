@@ -26,7 +26,9 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y curl git build-essential && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl git build-essential && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install uv for faster package management
 RUN pip install uv
@@ -45,8 +47,10 @@ RUN uv pip install --system ".[cpu]" uvicorn
 
 # Generate JWT secrets for the API
 RUN mkdir -p /root/.transformerlab && \
-    echo "TRANSFORMERLAB_JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" > /root/.transformerlab/.env && \
-    echo "TRANSFORMERLAB_REFRESH_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" >> /root/.transformerlab/.env
+    JWT_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" && \
+    REFRESH_SECRET="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')" && \
+    printf "TRANSFORMERLAB_JWT_SECRET=%s\nTRANSFORMERLAB_REFRESH_SECRET=%s\n" "$JWT_SECRET" "$REFRESH_SECRET" > /root/.transformerlab/.env && \
+    cp /root/.transformerlab/.env /app/api/.env
 
 # Copy built frontend from Stage 1 to the static files directory
 # Based on api/transformerlab/shared/dirs.py, the default STATIC_FILES_DIR is ~/.transformerlab/webapp
