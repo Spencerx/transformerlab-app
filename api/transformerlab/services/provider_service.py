@@ -17,6 +17,7 @@ from transformerlab.compute_providers.base import ComputeProvider
 from transformerlab.compute_providers.local import _check_nvidia_gpu, _check_amd_gpu
 import sys
 import platform
+import asyncio
 
 
 async def validate_team_exists(session: AsyncSession, team_id: str) -> None:
@@ -352,8 +353,8 @@ async def ensure_default_local_provider_for_team(
         if provider.type == ProviderType.LOCAL.value and provider.name == provider_name:
             return None
 
-    # Detect accelerators for this machine
-    supported_accelerators = detect_local_supported_accelerators()
+    # Detect accelerators for this machine without blocking the event loop
+    supported_accelerators = await asyncio.to_thread(detect_local_supported_accelerators)
     config: dict = {"supported_accelerators": supported_accelerators}
 
     provider = await create_team_provider(
