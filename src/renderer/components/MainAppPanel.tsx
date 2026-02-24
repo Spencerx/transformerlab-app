@@ -28,7 +28,6 @@ import Settings from './Experiment/Settings';
 import TrainLoRA from './Experiment/Train/TrainLoRA';
 import Prompt from './Experiment/Prompt';
 import Documents from './Experiment/Documents';
-import Rag from './Experiment/Rag';
 import Tokenize from './Experiment/Interact/Tokenize';
 import Diffusion from './Experiment/Diffusion/Diffusion';
 import Audio from './Experiment/Audio/Audio';
@@ -371,10 +370,7 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
           element={<Eval addEvaluation={experimentAddEvaluation} />}
         />
         <Route path="/experiment/documents" element={<Documents />} />
-        <Route
-          path="/experiment/rag"
-          element={<Rag setRagEngine={setRagEngine} />}
-        />
+
         <Route path="/experiment/diffusion" element={<Diffusion />} />
         <Route path="/experiment/audio" element={<Audio />} />
         <Route path="/experiment/audio-stt" element={<AudioSTT />} />
