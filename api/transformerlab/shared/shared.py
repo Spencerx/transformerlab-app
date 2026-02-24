@@ -18,8 +18,6 @@ from collections import deque
 from transformerlab.services.experiment_service import experiment_get
 from transformerlab.services.job_service import job_update_status_sync, job_update_status
 import transformerlab.services.job_service as job_service
-from transformerlab.routers.experiment.evals import run_evaluation_script
-from transformerlab.routers.experiment.generations import run_generation_script
 from lab.dirs import get_global_log_path
 from lab import dirs as lab_dirs, Job, Experiment
 from lab import storage
@@ -511,9 +509,9 @@ async def run_job(job_id: str, job_config, experiment_name: str = "default", job
                 await f.write("")
         # Pass user_id extracted from job_details if available
         user_id_from_job = _get_user_id_for_subprocess(job_details)
-        await run_evaluation_script(
-            experiment_name, plugin_name, eval_name, job_id, org_id=org_id, user_id=user_id_from_job
-        )
+        # await run_evaluation_script(
+        #     experiment_name, plugin_name, eval_name, job_id, org_id=org_id, user_id=user_id_from_job
+        # )
         # Check if stop button was clicked and update status accordingly
         job_row = await job_service.job_get(job_id)
         job_data = job_row.get("job_data", None) if job_row else None

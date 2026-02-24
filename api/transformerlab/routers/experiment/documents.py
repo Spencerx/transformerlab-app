@@ -11,7 +11,6 @@ from markitdown import MarkItDown
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 
-from transformerlab.routers.experiment import rag
 from transformerlab.shared.shared import slugify
 
 from lab import Experiment, storage
@@ -366,10 +365,10 @@ async def document_download_zip(experimentId: str, data: dict = Body(...)):
         # Clean up
         os.remove(temp_zip_path)
 
-        # Reindex RAG if any files were extracted to a 'rag' folder
-        rag_files = [f for f in extracted_files if f.startswith("rag/")]
-        if rag_files:
-            await rag.reindex(experimentId)
+        # # Reindex RAG if any files were extracted to a 'rag' folder
+        # rag_files = [f for f in extracted_files if f.startswith("rag/")]
+        # if rag_files:
+        #     await rag.reindex(experimentId)
 
         return {"status": "success", "extracted_files": extracted_files, "total_files": len(extracted_files)}
 
