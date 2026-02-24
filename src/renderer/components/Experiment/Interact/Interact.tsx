@@ -26,7 +26,6 @@ import MainGenerationConfigKnobs from './MainGenerationConfigKnobs';
 import Rag from '../Rag';
 import TemplatedCompletion from './TemplatedCompletion';
 import Tokenize from './Tokenize';
-import Embeddings from '../Embeddings';
 import { ChevronDownIcon } from 'lucide-react';
 
 import { scrollChatToBottom, focusChatInput } from './interactUtils';
@@ -990,9 +989,6 @@ export default function Chat({
             conversationId={conversationId}
             experimentInfoMutate={experimentInfoMutate}
           />
-        )}
-        {mode === 'embeddings' && (
-          <Embeddings experimentInfo={experimentInfo}></Embeddings>
         )}
         {mode === 'tokenize' && (
           <Tokenize experimentInfo={experimentInfo}></Tokenize>

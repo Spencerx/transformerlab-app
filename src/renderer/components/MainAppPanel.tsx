@@ -16,7 +16,6 @@ import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import Data from './Data/Data';
 import Interact from './Experiment/Interact/Interact';
-import Embeddings from './Experiment/Embeddings';
 import Welcome from './Welcome/Welcome';
 import ModelZoo from './ModelZoo/ModelZoo';
 import Plugins from './Plugins/Plugins';
@@ -385,7 +384,6 @@ export default function MainAppPanel({ setLogsDrawerOpen = null }) {
             />
           }
         />
-        <Route path="/experiment/embeddings" element={<Embeddings />} />
         <Route path="/experiment/tokenize" element={<Tokenize />} />
         <Route path="/experiment/training" element={<TrainLoRA />} />
         <Route path="/experiment/tasks" element={<Tasks />} />
