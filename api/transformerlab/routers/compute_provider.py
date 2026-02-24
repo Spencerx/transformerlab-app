@@ -45,7 +45,7 @@ from transformerlab.services import quota_service
 from transformerlab.services.local_provider_queue import enqueue_local_launch
 from lab import storage
 from lab.storage import STORAGE_PROVIDER
-from lab.dirs import get_workspace_dir, get_local_provider_job_dir
+from lab.dirs import get_workspace_dir, get_local_provider_job_dir, set_organization_id
 from transformerlab.shared.github_utils import (
     read_github_pat_from_workspace,
     generate_github_clone_setup,
@@ -1066,6 +1066,16 @@ async def _launch_sweep_jobs(
                 if tfl_storage_uri:
                     env_vars["TFL_STORAGE_URI"] = tfl_storage_uri
 
+                # For local provider, set TFL_WORKSPACE_DIR so the lab SDK in the subprocess finds the job dir
+                if provider.type == ProviderType.LOCAL.value and team_id:
+                    set_organization_id(team_id)
+                    try:
+                        workspace_dir = await get_workspace_dir()
+                        if workspace_dir and not storage.is_remote_path(workspace_dir):
+                            env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
+                    finally:
+                        set_organization_id(None)
+
                 # Build setup script (add copy_file_mounts when file_mounts is True, after cloud credentials)
                 setup_commands = []
 
@@ -1495,6 +1505,18 @@ async def launch_template_on_provider(
             env_vars["AWS_PROFILE"] = aws_profile
         # env_vars["AWS_ACCESS_KEY_ID"] = aws_access_key_id
         # env_vars["AWS_SECRET_ACCESS_KEY"] = aws_secret_access_key
+
+    # For local provider, set TFL_WORKSPACE_DIR so the lab SDK in the subprocess can find
+    # the job directory (workspace/jobs/<job_id>). Without this, Job.get(id) looks under
+    # ~/.transformerlab/workspace and fails with "Directory for Job with id '...' not found".
+    if provider.type == ProviderType.LOCAL.value and team_id:
+        set_organization_id(team_id)
+        try:
+            workspace_dir = await get_workspace_dir()
+            if workspace_dir and not storage.is_remote_path(workspace_dir):
+                env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
+        finally:
+            set_organization_id(None)
 
     # Resolve command (and optional setup override) for interactive sessions from gallery
     base_command = request.command
@@ -2504,6 +2526,16 @@ async def resume_from_checkpoint(
 
     if tfl_storage_uri:
         env_vars["TFL_STORAGE_URI"] = tfl_storage_uri
+
+    # For local provider, set TFL_WORKSPACE_DIR so the lab SDK in the subprocess finds the job dir
+    if provider.type == ProviderType.LOCAL.value and team_id:
+        set_organization_id(team_id)
+        try:
+            workspace_dir = await get_workspace_dir()
+            if workspace_dir and not storage.is_remote_path(workspace_dir):
+                env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
+        finally:
+            set_organization_id(None)
 
     # Build setup script
     setup_commands = []
