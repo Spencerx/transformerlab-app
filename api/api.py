@@ -171,9 +171,6 @@ async def lifespan(app: FastAPI):
 
     if "--reload" in sys.argv:
         await install_all_plugins()
-
-    if os.getenv("MULTIUSER", "").lower() != "true":
-        asyncio.create_task(run_over_and_over())
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
@@ -181,14 +178,6 @@ async def lifespan(app: FastAPI):
     # Run the clean up function
     cleanup_at_exit()
     print("FastAPI LIFESPAN: Complete")
-
-
-async def run_over_and_over():
-    """Every three seconds, check for new jobs to run."""
-    while True:
-        await asyncio.sleep(3)
-        await jobs.start_next_job()
-        await workflows.start_next_step_in_workflow()
 
 
 description = "Transformerlab API helps you do awesome stuff. 🚀"
