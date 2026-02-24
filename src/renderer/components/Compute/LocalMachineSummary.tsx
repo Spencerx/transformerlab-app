@@ -128,7 +128,9 @@ export default function LocalMachineSummary() {
             Operating system
           </Typography>
           <Stack direction="row" spacing={0.5} alignItems="center">
-            {server.platform?.includes('microsoft') && <FaWindows />}
+            {server.platform?.toLowerCase().includes('microsoft') && (
+              <FaWindows />
+            )}
             {server.platform?.toLowerCase().includes('mac') && <FaApple />}
             {server.platform?.toLowerCase().includes('linux') && <FaLinux />}
             <Chip size="sm" variant="soft">
