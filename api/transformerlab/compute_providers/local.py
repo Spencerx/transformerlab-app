@@ -1,6 +1,8 @@
 """Local compute provider: runs tasks in a uv venv synced with the base environment."""
 
+import contextlib
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -83,6 +85,48 @@ def _get_uv_pip_install_flags() -> str:
     if not sys.platform == "darwin":
         return "--index https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match"
     return ""
+
+
+def _terminate_process_tree(pid: int, sig: int = signal.SIGTERM) -> None:
+    """
+    Best-effort termination of a process and all of its descendants.
+
+    Uses psutil when available to walk the full process tree and then force-kill
+    any survivors; otherwise falls back to killing the process group (if possible)
+    and then the single pid.
+    """
+    try:
+        import psutil  # type: ignore[import-not-found]
+    except Exception:
+        psutil = None  # type: ignore[assignment]
+
+    if psutil is not None:
+        try:
+            parent = psutil.Process(pid)
+        except psutil.NoSuchProcess:
+            parent = None
+
+        if parent is not None:
+            procs = [parent] + parent.children(recursive=True)
+
+            # First try graceful termination
+            for proc in procs:
+                with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+                    proc.send_signal(sig)
+
+            # Give processes a short window to exit, then force kill survivors
+            gone, alive = psutil.wait_procs(procs, timeout=3)  # type: ignore[assignment]
+            for proc in alive:
+                with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied, psutil.Error):
+                    proc.kill()
+            return
+
+    # Fallback path when psutil is unavailable or parent no longer exists
+    try:
+        pgid = os.getpgid(pid)
+        os.killpg(pgid, sig)
+    except Exception:
+        os.kill(pid, sig)
 
 
 def _is_process_zombie(pid: int) -> bool:
@@ -226,7 +270,7 @@ class LocalProvider(ComputeProvider):
         }
 
     def stop_cluster(self, cluster_name: str) -> Dict[str, Any]:
-        """Stop the local process for this cluster (SIGTERM)."""
+        """Stop the local process tree for this cluster (SIGTERM)."""
         job_dir = self.extra_config.get("workspace_dir")
         if not job_dir:
             return {
@@ -243,8 +287,8 @@ class LocalProvider(ComputeProvider):
             }
         try:
             pid = int(pid_file.read_text().strip())
-            os.kill(pid, 15)
-            return {"cluster_name": cluster_name, "status": "stopped", "message": "Sent SIGTERM"}
+            _terminate_process_tree(pid, signal.SIGTERM)
+            return {"cluster_name": cluster_name, "status": "stopped", "message": "Sent SIGTERM to process tree"}
         except (ValueError, ProcessLookupError, OSError) as e:
             return {"cluster_name": cluster_name, "status": "stopped", "message": str(e)}
 
