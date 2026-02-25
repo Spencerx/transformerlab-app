@@ -21,10 +21,7 @@ import {
   StretchHorizontalIcon,
 } from 'lucide-react';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
-import {
-  getAPIFullPath,
-  apiHealthz,
-} from 'renderer/lib/transformerlab-api-sdk';
+import { getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { API_URL } from 'renderer/lib/api-client/urls';
 
 import { Link, Link as ReactRouterLink, useNavigate } from 'react-router-dom';
@@ -61,12 +58,14 @@ export default function Welcome() {
   const hasProviders = providers.length > 0;
   const isLocalMode = window?.platform?.multiuser !== true;
   const shouldShowTasksText = !isLocalMode;
+  const server = undefined as any;
+  const connection = API_URL();
 
   // Automatically open recipes modal when no experiment is selected AND API is connected
   // BUT NOT when the connection modal is open (when there's no connection)
   useEffect(() => {
     // Check if we're disconnected (API_URL is null means no connection)
-    const isConnected = API_URL() !== null;
+    const isConnected = connection !== null;
 
     // If disconnected, reset our tracking and don't open modal
     if (!isConnected) {
@@ -88,7 +87,6 @@ export default function Welcome() {
         return;
       }
 
-      const connection = API_URL();
       if (!connection) return;
 
       const connectionWithoutDots = connection.replace(/\./g, '-');
@@ -105,7 +103,7 @@ export default function Welcome() {
     };
 
     checkStoredExperiment();
-  }, [isLoading, server, isError, hasInitiallyConnected]);
+  }, [connection, hasInitiallyConnected]);
 
   // Create experiment creation callback
   const createNewExperiment = async (name: string, fromRecipeId = null) => {
