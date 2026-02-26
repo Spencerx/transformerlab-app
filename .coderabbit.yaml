@@ -29,6 +29,6 @@ reviews:
     - '!dist/**'
     - '!build/**'
 
-tools:
-  ruff:
-    enabled: false # we already run this
+  tools:
+    ruff:
+      enabled: false # we already run this
