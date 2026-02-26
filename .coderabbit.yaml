@@ -1,0 +1,19 @@
+reviews:
+  profile: 'chill' # less aggressive than default
+
+  request_changes_workflow: false # don't auto-block PRs
+
+  high_level_summary: true
+  poem: false
+
+  auto_review:
+    enabled: true
+    drafts: false # don't review draft PRs
+
+  path_filters:
+    - '!**/*.md'
+    - '!docs/**'
+    - '!**/*.json'
+    - '!**/*.lock'
+    - '!dist/**'
+    - '!build/**'
