@@ -39,6 +39,28 @@ async function fetchHealthz(baseUrl: string): Promise<unknown | null> {
   }
 }
 
+function buildPortFallback(baseUrl: string): string | null {
+  try {
+    const url = new URL(baseUrl);
+    const { protocol, hostname, port } = url;
+
+    // Only apply this fallback for non-localhost hosts
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return null;
+    }
+
+    // If we're already explicitly on port 8338, no fallback needed
+    if (port === '8338') {
+      return null;
+    }
+
+    // Try same host on port 8338
+    return `${protocol}//${hostname}:8338/`;
+  } catch {
+    return null;
+  }
+}
+
 export default function ConnectionLostModal({
   connection,
   setConnection,
@@ -46,6 +68,7 @@ export default function ConnectionLostModal({
   const [isChecking, setIsChecking] = useState(false);
   const [checkCount, setCheckCount] = useState(0);
   const checkCountRef = useRef(0);
+  const fallbackTriedRef = useRef(false);
 
   useEffect(() => {
     if (!connection || connection === '') return () => {};
@@ -66,6 +89,24 @@ export default function ConnectionLostModal({
           setIsChecking(false);
           if (interval) clearInterval(interval);
           return;
+        }
+
+        // Primary URL failed; try a one-time fallback on port 8338 for non-localhost hosts.
+        if (!fallbackTriedRef.current) {
+          fallbackTriedRef.current = true;
+          const fallbackBase = buildPortFallback(connection);
+          if (fallbackBase) {
+            const fallbackHealthz = await fetchHealthz(fallbackBase);
+            if (fallbackHealthz !== null) {
+              if (typeof window !== 'undefined' && (window as any).TransformerLab) {
+                (window as any).TransformerLab.API_URL = fallbackBase;
+              }
+              setConnection(fallbackBase);
+              setIsChecking(false);
+              if (interval) clearInterval(interval);
+              return;
+            }
+          }
         }
       } catch {
         // ignore
