@@ -17,3 +17,7 @@ reviews:
     - '!**/*.lock'
     - '!dist/**'
     - '!build/**'
+
+tools:
+  ruff:
+    enabled: false # we already run this
