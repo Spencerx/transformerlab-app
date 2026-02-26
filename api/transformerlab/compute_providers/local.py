@@ -216,17 +216,18 @@ class LocalProvider(ComputeProvider):
         if not job_dir or not os.path.isdir(job_dir):
             raise ValueError("Local provider requires workspace_dir (job directory) in provider_config")
         job_dir = Path(job_dir)
-        venv_path = job_dir / "venv"
-        venv_path.mkdir(parents=True, exist_ok=True)
-
-        self._ensure_venv_and_sync(venv_path)
-
         # Use a per-job workspace directory as HOME for local runs so tools that
         # rely on ~ and $HOME resolve inside the job workspace instead of the
         # user's real home directory. This makes it easier to clone and run
         # code in an isolated workspace for each job.
         workspace_home = job_dir / "workspace"
         workspace_home.mkdir(parents=True, exist_ok=True)
+
+        # Create the venv inside the per-job workspace HOME directory so that all
+        # environment state (including Python packages) lives under HOME.
+        venv_path = workspace_home / "venv"
+
+        self._ensure_venv_and_sync(venv_path)
 
         venv_bin = venv_path / "bin"
         env = os.environ.copy()
