@@ -5,8 +5,17 @@ reviews:
 
   high_level_summary: true
   poem: false
-
   diff_only: true # Stop reviewing old code that is not part of the PR
+
+  instructions: >
+    Do NOT suggest adding type annotations.
+    Do NOT comment on missing return type hints.
+    Focus on:
+    - runtime correctness
+    - security issues
+    - performance issues
+    - race conditions
+    - architectural risks
 
   auto_review:
     enabled: true
