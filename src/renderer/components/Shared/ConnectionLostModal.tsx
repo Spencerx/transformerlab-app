@@ -98,7 +98,10 @@ export default function ConnectionLostModal({
           if (fallbackBase) {
             const fallbackHealthz = await fetchHealthz(fallbackBase);
             if (fallbackHealthz !== null) {
-              if (typeof window !== 'undefined' && (window as any).TransformerLab) {
+              if (
+                typeof window !== 'undefined' &&
+                (window as any).TransformerLab
+              ) {
                 (window as any).TransformerLab.API_URL = fallbackBase;
               }
               setConnection(fallbackBase);
