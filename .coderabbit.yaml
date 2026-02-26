@@ -1,11 +1,11 @@
 reviews:
   profile: 'chill' # less aggressive than default
 
-  request_changes_workflow: false # don't auto-block PRs
-
   high_level_summary: true
-  poem: false
+  review_start_comment: false # disable the "starting review" comment
   diff_only: true # Stop reviewing old code that is not part of the PR
+  request_changes_workflow: false # don't auto-block PRs
+  poem: false
 
   instructions: >
     Do NOT suggest adding type annotations.
