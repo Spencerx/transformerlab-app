@@ -6,6 +6,8 @@ reviews:
   high_level_summary: true
   poem: false
 
+  diff_only: true # Stop reviewing old code that is not part of the PR
+
   auto_review:
     enabled: true
     drafts: false # don't review draft PRs
