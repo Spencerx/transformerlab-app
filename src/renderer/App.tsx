@@ -212,7 +212,7 @@ export default function App() {
   const initialApiUrl = (() => {
     const envUrl = process.env?.TL_API_URL;
     // If undefined, null, or the string "default", choose a fallback:
-    // - For localhost, assume API is on port 8338 (Electron dev)
+    // - For localhost or frontend port 1212, assume API is on port 8338 (Electron dev)
     // - For non-localhost, assume API is served from the same origin as the frontend
     if (!envUrl || envUrl === 'default' || envUrl.trim() === '') {
       const protocol = window.location.protocol;
@@ -221,6 +221,11 @@ export default function App() {
 
       // Local dev: API runs on 8338 even if frontend uses another port
       if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        return `${protocol}//${hostname}:8338/`;
+      }
+
+      // Local dev: frontend often on 1212, API on 8338
+      if (port === '1212') {
         return `${protocol}//${hostname}:8338/`;
       }
 

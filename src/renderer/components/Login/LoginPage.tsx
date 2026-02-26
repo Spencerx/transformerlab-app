@@ -132,7 +132,7 @@ export default function LoginPage() {
       const verifyEmail = async () => {
         try {
           // Normalize TL_API_URL - ensure it's not "default" or empty, and mirror App.tsx behavior:
-          // - For localhost, assume API is on port 8338
+          // - For localhost or port 1212, assume API is on port 8338
           // - For non-localhost, assume API is served from the same origin as the frontend
           const envUrl = process.env.TL_API_URL;
           let apiUrl: string;
@@ -141,6 +141,8 @@ export default function LoginPage() {
             const { protocol, hostname, port } = window.location;
 
             if (hostname === 'localhost' || hostname === '127.0.0.1') {
+              apiUrl = `${protocol}//${hostname}:8338`;
+            } else if (port === '1212') {
               apiUrl = `${protocol}//${hostname}:8338`;
             } else {
               const isDefaultHttpPort = port === '' || port === '80';
