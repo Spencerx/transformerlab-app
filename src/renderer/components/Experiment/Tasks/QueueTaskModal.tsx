@@ -103,6 +103,42 @@ export default function QueueTaskModal({
   );
   const [sweepMetric, setSweepMetric] = React.useState('eval/loss');
   const [lowerIsBetter, setLowerIsBetter] = React.useState(true);
+  const loadingMessages = React.useMemo(
+    () => [
+      'Contacting compute provider…',
+      'Reserving resources…',
+      'Preparing environment…',
+      'Submitting job configuration…',
+      'Waiting for job ID…',
+    ],
+    [],
+  );
+  const [loadingMessageIndex, setLoadingMessageIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!open || !isSubmitting || loadingMessages.length === 0) {
+      return;
+    }
+
+    // Reset to first message whenever a new submission starts
+    setLoadingMessageIndex(0);
+
+    const interval = window.setInterval(() => {
+      setLoadingMessageIndex((prev) => {
+        const lastIndex = loadingMessages.length - 1;
+        // Once we reach the final message ("Waiting for job ID…"),
+        // stay there instead of looping back to the beginning.
+        if (prev >= lastIndex) {
+          return lastIndex;
+        }
+        return prev + 1;
+      });
+    }, 1500);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [open, isSubmitting, loadingMessages]);
 
   // Fetch available models and datasets from the API
   const { data: modelsData } = useSWR(
@@ -1170,6 +1206,11 @@ export default function QueueTaskModal({
           >
             Submit
           </Button>
+          {isSubmitting && (
+            <Typography level="body-sm" sx={{ ml: 1 }}>
+              {loadingMessages[loadingMessageIndex]}
+            </Typography>
+          )}
         </DialogActions>
       </ModalDialog>
     </Modal>
