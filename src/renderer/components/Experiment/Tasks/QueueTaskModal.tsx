@@ -987,26 +987,18 @@ export default function QueueTaskModal({
                     listbox: { sx: { maxHeight: 240 } },
                   }}
                 >
-                  {providers.map((provider: any) => {
-                    const compatible = isProviderCompatible(provider);
-                    return (
-                      <Option key={provider.id} value={provider.id}>
-                        <Stack
-                          direction="row"
-                          justifyContent="space-between"
-                          alignItems="center"
-                          sx={{ width: '100%' }}
-                        >
-                          <Typography>{provider.name}</Typography>
-                          {taskResources?.accelerators && compatible && (
-                            <Chip size="sm" color="success" variant="soft">
-                              Compatible
-                            </Chip>
-                          )}
-                        </Stack>
-                      </Option>
-                    );
-                  })}
+                  {providers.map((provider: any) => (
+                    <Option key={provider.id} value={provider.id}>
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        sx={{ width: '100%' }}
+                      >
+                        <Typography>{provider.name}</Typography>
+                      </Stack>
+                    </Option>
+                  ))}
                 </Select>
                 <FormHelperText>
                   Choose which compute provider should run this task.
