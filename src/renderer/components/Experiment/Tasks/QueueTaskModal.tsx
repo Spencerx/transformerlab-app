@@ -971,6 +971,18 @@ export default function QueueTaskModal({
                   disabled={
                     isSubmitting || providersIsLoading || providers.length === 0
                   }
+                  renderValue={(selected) => {
+                    const value = selected?.value;
+                    const provider = providers.find(
+                      (p: { id: string }) => p.id === value,
+                    );
+                    return (
+                      provider?.name ||
+                      (providers.length
+                        ? 'Select a compute provider'
+                        : 'No compute providers configured')
+                    );
+                  }}
                   slotProps={{
                     listbox: { sx: { maxHeight: 240 } },
                   }}
