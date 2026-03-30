@@ -235,7 +235,9 @@ async def _check_job_via_provider(
         cluster_state = cluster_status.state
         status_message = getattr(cluster_status, "status_message", "")
 
-        provider_empty_jobs_polls_raw = job_data.get("provider_empty_jobs_polls", 0) if isinstance(job_data, dict) else 0
+        provider_empty_jobs_polls_raw = (
+            job_data.get("provider_empty_jobs_polls", 0) if isinstance(job_data, dict) else 0
+        )
         try:
             provider_empty_jobs_polls = int(provider_empty_jobs_polls_raw or 0)
         except (TypeError, ValueError):
