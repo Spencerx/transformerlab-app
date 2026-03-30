@@ -81,13 +81,7 @@ description: "2-node distributed PyTorch run on SLURM"
 resources:
   provider: slurm
   num_nodes: 2
-  # Optional provider-specific settings:
-  provider_config:
-    partition: gpu
-    # Optional: fully override task layout if needed
-    # custom_sbatch_flags: |
-    #   --ntasks=8
-    #   --ntasks-per-node=4
+  # Configure SLURM partition and custom sbatch flags in provider settings.
 
 env:
   # Optional override (otherwise defaults from job id logic)
