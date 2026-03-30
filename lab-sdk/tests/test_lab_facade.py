@@ -2,6 +2,7 @@ import os
 import asyncio
 import json
 import importlib
+import pytest
 
 
 def _fresh(monkeypatch):
@@ -1057,3 +1058,13 @@ def test_lab_load_generation_model_smoke(tmp_path, monkeypatch):
     assert isinstance(model, LocalHTTPGenerationModel)
     assert model.base_url == "http://localhost:9999/v1"
     assert model.model == "test-model"
+
+
+def test_run_async_propagates_runtime_error_from_coroutine():
+    from lab.lab_facade import _run_async
+
+    async def _raises_runtime_error():
+        raise RuntimeError("inner runtime error")
+
+    with pytest.raises(RuntimeError, match="inner runtime error"):
+        _run_async(_raises_runtime_error())
