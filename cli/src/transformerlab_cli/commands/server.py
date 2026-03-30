@@ -17,7 +17,7 @@ STORAGE_TYPES = ["Use local filesystem (localfs)", "aws", "gcp", "azure"]
 STORAGE_TYPE_VALUES = ["localfs", "aws", "gcp", "azure"]
 COMPUTE_TYPES = [
     "Local – run jobs directly on this machine",
-    "SkyPilot – auto-provision cloud VMs (AWS, GCP, Azure, Lambda, etc.)",
+    "SkyPilot – connect to a SkyPilot server",
     "Slurm – submit jobs to an HPC/Slurm cluster",
     "RunPod – launch serverless GPU pods on RunPod",
     "Skip – don't configure a compute provider now",
@@ -212,14 +212,7 @@ def _prompt_compute(existing: dict[str, str]) -> dict[str, str]:
     console.print("\n[bold header]4. Compute Provider[/bold header]")
     console.print(
         "[dim]A compute provider tells Transformer Lab where to run training and\n"
-        "inference jobs. Pick the option that matches your hardware setup:[/dim]\n"
-        "\n"
-        "  • [bold]Local[/bold] – best for single-machine setups; runs jobs directly on this host.\n"
-        "  • [bold]SkyPilot[/bold] – automatically provisions cloud GPU VMs across AWS, GCP,\n"
-        "    Azure, Lambda, and more. Good for elastic, cloud-native workflows.\n"
-        "  • [bold]Slurm[/bold] – submits jobs to an existing HPC / Slurm cluster.\n"
-        "  • [bold]RunPod[/bold] – launches serverless GPU pods on RunPod.\n"
-        "  • [bold]Skip[/bold] – don't configure now; you can add one later with [bold]lab provider add[/bold]."
+        "inference jobs. Pick the option that matches your hardware setup:[/dim]"
     )
 
     current = existing.get("DEFAULT_COMPUTE_PROVIDER", "")
