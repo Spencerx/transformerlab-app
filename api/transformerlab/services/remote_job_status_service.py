@@ -235,12 +235,18 @@ async def _check_job_via_provider(
         cluster_state = cluster_status.state
         status_message = getattr(cluster_status, "status_message", "")
 
+        provider_empty_jobs_polls_raw = job_data.get("provider_empty_jobs_polls", 0) if isinstance(job_data, dict) else 0
+        try:
+            provider_empty_jobs_polls = int(provider_empty_jobs_polls_raw or 0)
+        except (TypeError, ValueError):
+            provider_empty_jobs_polls = 0
+
         # RUNPOD: if the pod is visible again, clear consecutive "Pod not found" polls.
         if (
             provider_type == ProviderType.RUNPOD.value
             and status_message != "Pod not found"
             and isinstance(job_data, dict)
-            and int(job_data.get("provider_empty_jobs_polls", 0) or 0) > 0
+            and provider_empty_jobs_polls > 0
         ):
             try:
                 await job_service.job_update_job_data_insert_key_value(
