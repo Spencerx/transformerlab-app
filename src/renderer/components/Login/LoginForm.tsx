@@ -117,7 +117,7 @@ export default function LoginForm() {
       if (result instanceof Error) {
         if (result.info?.detail === 'LOGIN_USER_NOT_VERIFIED') {
           setError(
-            'Email not verified. Please check your email for the verification link.',
+            'Email not verified. Please check your email for the verification link. If running in dev mode, check the server logs instead.',
           );
           return;
         }

@@ -117,7 +117,8 @@ export default function RegisterForm({ onClose }: { onClose: () => void }) {
           Confirmation Sent!
         </Typography>
         <Typography level="body-md">
-          Please check your email to validate your account before logging in.
+          Please check your email to validate your account before logging in. If
+          running in dev mode, check the server logs for the verification link.
         </Typography>
         <Button
           onClick={onClose}
