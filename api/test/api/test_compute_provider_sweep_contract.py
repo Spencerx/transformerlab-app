@@ -2,6 +2,7 @@ import pytest
 from fastapi import HTTPException
 
 from transformerlab.routers.compute_provider import sweep
+from transformerlab.services.compute_provider import sweep_job_service
 
 
 @pytest.mark.asyncio
@@ -14,7 +15,7 @@ async def test_check_sweep_status_all_contract(monkeypatch):
             {"id": "102", "type": "SWEEP", "status": "COMPLETE", "job_data": {}},
         ]
 
-    monkeypatch.setattr(sweep.job_service, "jobs_get_all", fake_jobs_get_all)
+    monkeypatch.setattr(sweep_job_service.job_service, "jobs_get_all", fake_jobs_get_all)
 
     response = await sweep.check_sweep_status_all(
         experiment_id="exp-1",
@@ -49,7 +50,7 @@ async def test_check_sweep_status_contract(monkeypatch):
             },
         }
 
-    monkeypatch.setattr(sweep.job_service, "job_get", fake_job_get)
+    monkeypatch.setattr(sweep_job_service.job_service, "job_get", fake_job_get)
 
     response = await sweep.check_sweep_status(
         job_id="123",
@@ -82,7 +83,7 @@ async def test_check_sweep_status_non_sweep_raises(monkeypatch):
             "job_data": {},
         }
 
-    monkeypatch.setattr(sweep.job_service, "job_get", fake_job_get)
+    monkeypatch.setattr(sweep_job_service.job_service, "job_get", fake_job_get)
 
     with pytest.raises(HTTPException) as exc_info:
         await sweep.check_sweep_status(
@@ -117,7 +118,7 @@ async def test_check_sweep_status_all_complete_true(monkeypatch):
             },
         }
 
-    monkeypatch.setattr(sweep.job_service, "job_get", fake_job_get)
+    monkeypatch.setattr(sweep_job_service.job_service, "job_get", fake_job_get)
 
     response = await sweep.check_sweep_status(
         job_id="789",
