@@ -26,7 +26,6 @@ async def get_usage_report(
     Aggregates usage data by user, provider, and resources.
     Only accessible to team owners.
     """
-    from datetime import datetime
     from lab import Experiment
 
     team_id = owner_info["team_id"]

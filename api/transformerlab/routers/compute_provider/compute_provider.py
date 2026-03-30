@@ -27,9 +27,9 @@ router = APIRouter(prefix="/compute_provider", tags=["compute_provider"])
 
 # Provider-scoped sub-routers: provider_id injected via include prefix
 router.include_router(providers.router)
-router.include_router(setup.router,    prefix="/providers/{provider_id}")
+router.include_router(setup.router, prefix="/providers/{provider_id}")
 router.include_router(clusters.router, prefix="/providers/{provider_id}")
-router.include_router(launch.router,   prefix="/providers/{provider_id}")
+router.include_router(launch.router, prefix="/providers/{provider_id}")
 
 # Flat sub-routers: own their full path namespace
 router.include_router(jobs.router)

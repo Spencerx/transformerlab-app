@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import time
 from typing import Optional
 
@@ -131,11 +130,8 @@ async def resume_from_checkpoint(
     Resume a REMOTE job from a checkpoint by creating a new job with the same configuration
     and setting parent_job_id and resumed_from_checkpoint in job_data.
     """
-    import json
     from transformerlab.services import job_service
     from lab.dirs import get_job_checkpoints_dir
-    from lab import storage
-    import time
 
     # Get the original job
     original_job = await job_service.job_get(job_id, experiment_id=experimentId)

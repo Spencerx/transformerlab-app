@@ -8,7 +8,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from transformerlab.shared.models.user_model import get_async_session
 from transformerlab.routers.auth import get_user_and_team
