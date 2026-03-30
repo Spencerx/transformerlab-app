@@ -3,6 +3,7 @@
 import asyncio
 import requests
 import os
+import re
 from typing import Dict, Any, Optional, Union, List
 from lab import storage
 from .base import ComputeProvider
@@ -65,15 +66,12 @@ class SLURMProvider(ComputeProvider):
         if not raw_flags:
             return False
         normalized = " ".join(line.strip() for line in raw_flags.splitlines() if line.strip())
-        task_flag_tokens = [
-            "--ntasks",
-            "--ntasks=",
-            "--ntasks-per-node",
-            "--ntasks-per-node=",
-            "-n ",
-            "-n",
+        task_flag_patterns = [
+            r"(?:^|\s)--ntasks(?:\s+|=|$)",
+            r"(?:^|\s)--ntasks-per-node(?:\s+|=|$)",
+            r"(?:^|\s)-n(?:\s+|=|$)",
         ]
-        return any(token in normalized for token in task_flag_tokens)
+        return any(re.search(pattern, normalized) for pattern in task_flag_patterns)
 
     def _build_distributed_env_setup(self, num_nodes: Optional[int]) -> str:
         """Build shell exports that normalize distributed env vars across launchers."""
