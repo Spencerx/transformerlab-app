@@ -58,7 +58,7 @@ export default function RegisterForm({ onClose }: { onClose: () => void }) {
         const response = await fetch(`${apiUrl}healthz`);
         if (response.ok) {
           const data = await response.json();
-          setEmailMethod(data.email_method);
+          setEmailMethod(data.metadata?.email_method ?? 'smtp');
         }
       } catch (err) {
         console.warn('Failed to check email method:', err);

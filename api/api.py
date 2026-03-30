@@ -366,7 +366,9 @@ async def healthz():
         "message": "OK",
         "mode": mode,
         "version": version_info,
-        "email_method": email_method,
+        "metadata": {
+            "email_method": email_method,
+        },
     }
 
 
