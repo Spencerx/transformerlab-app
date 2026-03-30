@@ -25,7 +25,6 @@ import EditInteractiveTaskModal from '../Tasks/EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from '../Tasks/DeleteTaskConfirmModal';
 import InteractiveJobCard from './InteractiveJobCard';
 import JobsList from '../Tasks/JobsList';
-import ViewOutputModalStreaming from '../Tasks/ViewOutputModalStreaming';
 import FileBrowserModal from '../Tasks/FileBrowserModal';
 
 const duration = require('dayjs/plugin/duration');
@@ -69,9 +68,6 @@ export default function Interactive() {
   const [launchProgressByJobId, setLaunchProgressByJobId] = useState<
     Record<string, { phase?: string; percent?: number; message?: string }>
   >({});
-  const [viewOutputFromJob, setViewOutputFromJob] = useState<string | null>(
-    null,
-  );
   const [viewFileBrowserFromJob, setViewFileBrowserFromJob] = useState<
     string | null
   >(null);
@@ -1194,12 +1190,7 @@ export default function Interactive() {
           jobs={historyJobs}
           loading={jobsIsLoading || !experimentInfo?.id}
           onDeleteJob={handleDeleteJob}
-          onViewOutput={(jobId) => {
-            const jobIdStr =
-              jobId === null || jobId === undefined ? '' : String(jobId);
-            if (!jobIdStr || jobIdStr === '-1' || jobIdStr === 'NaN') return;
-            setViewOutputFromJob(jobIdStr);
-          }}
+          hideOutputButton
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));
@@ -1223,14 +1214,6 @@ export default function Interactive() {
         taskId={taskToDelete?.id ?? null}
         taskName={taskToDelete?.name ?? null}
         onConfirm={handleConfirmDeleteTask}
-      />
-      <ViewOutputModalStreaming
-        jobId={viewOutputFromJob}
-        setJobId={(jobId: string | null) => setViewOutputFromJob(jobId)}
-        jobStatus={
-          historyJobs?.find((j: any) => String(j.id) === viewOutputFromJob)
-            ?.status || ''
-        }
       />
       <FileBrowserModal
         mode="job"
