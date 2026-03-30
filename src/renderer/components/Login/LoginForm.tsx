@@ -25,7 +25,7 @@ export default function LoginForm() {
   const [oidcProviders, setOidcProviders] = useState<
     Array<{ id: string; name: string }>
   >([]);
-  const [emailMethod, setEmailMethod] = useState('dev');
+  const [emailMethod, setEmailMethod] = useState('smtp');
 
   const { login, setIsDefaultPassword } = useAuth();
   const { addNotification } = useNotification();
@@ -74,7 +74,7 @@ export default function LoginForm() {
         const response = await fetch(`${apiUrl}healthz`);
         if (response.ok) {
           const data = await response.json();
-          setEmailMethod(data.email_method);
+          setEmailMethod(data.metadata?.email_method ?? 'smtp');
         }
       } catch (err) {
         console.warn('Failed to check email method:', err);
