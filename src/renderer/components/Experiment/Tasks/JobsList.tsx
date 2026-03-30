@@ -128,6 +128,7 @@ const JobsList: React.FC<JobsListProps> = ({
 
     const userInfo = jobData.user_info || {};
     const userDisplay = userInfo.name || userInfo.email || '';
+    const providerDisplay = jobData.provider_name || job?.provider_name || '';
 
     if (job?.placeholder) {
       return (
@@ -138,7 +139,7 @@ const JobsList: React.FC<JobsListProps> = ({
       );
     }
     // Build preferred details
-    if (clusterName || userDisplay) {
+    if (clusterName || userDisplay || providerDisplay) {
       return (
         <>
           {clusterName && (
@@ -149,6 +150,11 @@ const JobsList: React.FC<JobsListProps> = ({
           )}
           {userDisplay && (
             <Typography level="body-sm">{userDisplay}</Typography>
+          )}
+          {providerDisplay && (
+            <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+              <b>Provider:</b> {providerDisplay}
+            </Typography>
           )}
         </>
       );
