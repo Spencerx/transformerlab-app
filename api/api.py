@@ -107,8 +107,8 @@ async def lifespan(app: FastAPI):
     setup_cache()
     print("✅ CACHE ENABLED")
 
-    # Validate cloud credentials early - fail fast if missing
-    validate_cloud_credentials()
+    # Validate cloud credentials early - fail fast if missing (blocking boto3 off the event loop)
+    await asyncio.to_thread(validate_cloud_credentials)
     await db.init()
 
     # One-time migration: legacy workspace/jobs -> workspace/experiments/<exp_id>/jobs
