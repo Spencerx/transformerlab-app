@@ -24,7 +24,6 @@ dependencies = [
   "hf_xet==1.1.4",
   "httpx-oauth==0.16.1",
   "macmon-python==0.1.2",
-  "markitdown[all]==0.1.1",
   "nltk==3.9.1",
   "packaging==24.1",
   "pydantic>=2.0,<3.0",

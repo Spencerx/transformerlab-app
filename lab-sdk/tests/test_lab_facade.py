@@ -934,6 +934,71 @@ def test_lab_get_dataset_nonexistent(tmp_path, monkeypatch):
         pass  # Expected
 
 
+def test_lab_list_and_read_documents(tmp_path, monkeypatch):
+    _fresh(monkeypatch)
+    home = tmp_path / ".tfl_home"
+    ws = tmp_path / ".tfl_ws"
+    home.mkdir()
+    ws.mkdir()
+    monkeypatch.setenv("TFL_HOME_DIR", str(home))
+    monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
+
+    from lab.lab_facade import Lab
+    from lab.experiment import Experiment
+
+    lab = Lab()
+    lab.init(experiment_id="test_exp_docs")
+
+    exp = Experiment("test_exp_docs")
+    exp_dir = asyncio.run(exp.get_dir())
+    docs_dir = os.path.join(exp_dir, "documents")
+    os.makedirs(docs_dir, exist_ok=True)
+
+    txt_path = os.path.join(docs_dir, "notes.txt")
+    with open(txt_path, "w", encoding="utf-8") as f:
+        f.write("hello docs")
+
+    listed = lab.list_documents()
+    names = [entry["name"] for entry in listed]
+    assert "notes.txt" in names
+
+    text_content = lab.get_document_contents("notes.txt")
+    assert text_content == "hello docs"
+
+    byte_content = lab.get_document_bytes("notes.txt")
+    assert byte_content == b"hello docs"
+
+
+def test_lab_list_documents_in_folder_with_explicit_experiment_id(tmp_path, monkeypatch):
+    _fresh(monkeypatch)
+    home = tmp_path / ".tfl_home"
+    ws = tmp_path / ".tfl_ws"
+    home.mkdir()
+    ws.mkdir()
+    monkeypatch.setenv("TFL_HOME_DIR", str(home))
+    monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
+
+    from lab.lab_facade import Lab
+    from lab.experiment import Experiment
+
+    exp = asyncio.run(Experiment.create("test_exp_docs_folder"))
+    exp_dir = asyncio.run(exp.get_dir())
+    folder_path = os.path.join(exp_dir, "documents", "articles")
+    os.makedirs(folder_path, exist_ok=True)
+    with open(os.path.join(folder_path, "a.txt"), "w", encoding="utf-8") as f:
+        f.write("folder doc")
+
+    lab = Lab()
+    docs = lab.list_documents(folder="articles", experiment_id="test_exp_docs_folder")
+    assert len(docs) == 1
+    assert docs[0]["name"] == "a.txt"
+
+    content = lab.get_document_contents(
+        document_name="a.txt", folder="articles", experiment_id="test_exp_docs_folder"
+    )
+    assert content == "folder doc"
+
+
 def test_lab_list_models(tmp_path, monkeypatch):
     _fresh(monkeypatch)
     home = tmp_path / ".tfl_home"
