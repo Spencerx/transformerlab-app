@@ -34,10 +34,6 @@ from fastchat.protocol.openai_api_protocol import (  # noqa: E402
     ErrorResponse,
 )
 
-from transformerlab.services.experiment_init import (  # noqa: E402
-    seed_default_experiments,
-    seed_default_admin_user,
-)
 import transformerlab.db.session as db  # noqa: E402
 
 from transformerlab.shared.ssl_utils import ensure_persistent_self_signed_cert  # noqa: E402
@@ -62,7 +58,6 @@ from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 from transformerlab.routers.experiment import experiment  # noqa: E402
 from transformerlab.routers.experiment import jobs  # noqa: E402
 from transformerlab.shared import shared  # noqa: E402
-from transformerlab.shared import galleries  # noqa: E402
 from transformerlab.shared import dirs  # noqa: E402
 from lab.dirs import set_organization_id as lab_set_org_id  # noqa: E402
 from transformerlab.shared.remote_workspace import validate_cloud_credentials  # noqa: E402
@@ -114,40 +109,13 @@ async def lifespan(app: FastAPI):
 
     # Validate cloud credentials early - fail fast if missing
     validate_cloud_credentials()
-    await galleries.update_gallery_cache()
-    await db.init()  # This now runs Alembic migrations internally
-    print("✅ SEED DATA")
-    # Seed default admin user
-    await seed_default_admin_user()
-    # Initialize default experiments (requires org/team context)
-    await seed_default_experiments()
+    await db.init()
 
     # One-time migration: legacy workspace/jobs -> workspace/experiments/<exp_id>/jobs
     # Runs in the background so it doesn't delay the API startup.
     from transformerlab.services.migrate_jobs_to_experiment_dirs import start_jobs_migration_worker
 
     await start_jobs_migration_worker()
-
-    # Create buckets/folders for all existing teams if cloud or localfs storage is enabled
-    tfl_remote_storage_enabled = os.getenv("TFL_REMOTE_STORAGE_ENABLED", "false").lower() == "true"
-    if tfl_remote_storage_enabled or (os.getenv("TFL_STORAGE_PROVIDER") == "localfs" and os.getenv("TFL_STORAGE_URI")):
-        print("✅ CHECKING STORAGE FOR EXISTING TEAMS")
-        try:
-            from transformerlab.db.session import async_session
-            from transformerlab.shared.remote_workspace import create_buckets_for_all_teams
-
-            async with async_session() as session:
-                success_count, failure_count, error_messages = await create_buckets_for_all_teams(
-                    session, profile_name="transformerlab-s3"
-                )
-                if success_count > 0:
-                    print(f"✅ Created/verified storage for {success_count} team(s)")
-                if failure_count > 0:
-                    print(f"⚠️  Failed to create storage for {failure_count} team(s)")
-                    for error in error_messages:
-                        print(f"   - {error}")
-        except Exception as e:
-            print(f"⚠️  Error creating storage for existing teams: {e}")
 
     if "--reload" in sys.argv:
         await install_all_plugins()
