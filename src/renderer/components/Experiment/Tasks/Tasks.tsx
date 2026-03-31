@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@mui/joy';
 
-import { PlusIcon, TerminalIcon, HeartIcon } from 'lucide-react';
+import { PlusIcon, TerminalIcon, StarIcon } from 'lucide-react';
 import { useSWRWithAuth as useSWR, useAPI } from 'renderer/lib/authContext';
 
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
@@ -97,7 +97,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const [compareEvalJobIds, setCompareEvalJobIds] = useState<string[]>([]);
   const [isCompareSelectMode, setIsCompareSelectMode] = useState(false);
   const [compareEvalModalOpen, setCompareEvalModalOpen] = useState(false);
-  const [showFavouritesOnly, setShowFavouritesOnly] = useState(false);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [viewFileBrowserFromJob, setViewFileBrowserFromJob] = useState<
     string | null
@@ -461,14 +461,14 @@ export default function Tasks({ subtype }: { subtype?: string }) {
 
   const filteredJobsForDisplay = useMemo(() => {
     let result = jobsWithPlaceholders;
-    if (showFavouritesOnly) {
-      result = result.filter((j: any) => j?.job_data?.favourite);
+    if (showFavoritesOnly) {
+      result = result.filter((j: any) => j?.job_data?.favorite);
     }
     if (!showHidden) {
       result = result.filter((j: any) => !j?.job_data?.hidden);
     }
     return result;
-  }, [jobsWithPlaceholders, showFavouritesOnly, showHidden]);
+  }, [jobsWithPlaceholders, showFavoritesOnly, showHidden]);
 
   const hiddenJobCount = useMemo(() => {
     return jobsWithPlaceholders.filter((j: any) => j?.job_data?.hidden).length;
@@ -559,44 +559,66 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     }
   };
 
-  const handleToggleFavourite = async (
+  const updateJobDataOptimistic = (
     jobId: string,
-    currentValue: boolean,
+    field: string,
+    value: any,
   ) => {
+    // Optimistically update local SWR data so the UI reflects the change instantly
+    jobsMutate(
+      (currentData: any) => {
+        if (!Array.isArray(currentData)) return currentData;
+        return currentData.map((job: any) => {
+          if (String(job.id) !== String(jobId)) return job;
+          const jobData =
+            typeof job.job_data === 'string'
+              ? JSON.parse(job.job_data)
+              : { ...job.job_data };
+          jobData[field] = value;
+          return { ...job, job_data: jobData };
+        });
+      },
+      { revalidate: false },
+    );
+  };
+
+  const handleToggleFavorite = async (jobId: string, currentValue: boolean) => {
     if (!experimentInfo?.id) return;
+    const newValue = !currentValue;
+    updateJobDataOptimistic(jobId, 'favorite', newValue);
     try {
-      const response = await fetchWithAuth(
+      await fetchWithAuth(
         chatAPI.Endpoints.Jobs.UpdateJobData(experimentInfo.id, jobId),
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates: { favourite: !currentValue } }),
+          body: JSON.stringify({ updates: { favorite: newValue } }),
         },
       );
-      if (response.ok) {
-        await jobsMutate();
-      }
     } catch (error) {
-      console.error('Error toggling favourite:', error);
+      console.error('Error toggling favorite:', error);
+      // Revert on failure
+      updateJobDataOptimistic(jobId, 'favorite', currentValue);
     }
   };
 
   const handleToggleHidden = async (jobId: string, currentValue: boolean) => {
     if (!experimentInfo?.id) return;
+    const newValue = !currentValue;
+    updateJobDataOptimistic(jobId, 'hidden', newValue);
     try {
-      const response = await fetchWithAuth(
+      await fetchWithAuth(
         chatAPI.Endpoints.Jobs.UpdateJobData(experimentInfo.id, jobId),
         {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ updates: { hidden: !currentValue } }),
+          body: JSON.stringify({ updates: { hidden: newValue } }),
         },
       );
-      if (response.ok) {
-        await jobsMutate();
-      }
     } catch (error) {
       console.error('Error toggling hidden:', error);
+      // Revert on failure
+      updateJobDataOptimistic(jobId, 'hidden', currentValue);
     }
   };
 
@@ -1335,16 +1357,14 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           )}
           <IconButton
             size="sm"
-            variant={showFavouritesOnly ? 'solid' : 'outlined'}
-            color={showFavouritesOnly ? 'danger' : 'neutral'}
-            onClick={() => setShowFavouritesOnly((prev) => !prev)}
-            title={
-              showFavouritesOnly ? 'Show all jobs' : 'Show favourites only'
-            }
+            variant={showFavoritesOnly ? 'solid' : 'outlined'}
+            color={showFavoritesOnly ? 'warning' : 'neutral'}
+            onClick={() => setShowFavoritesOnly((prev) => !prev)}
+            title={showFavoritesOnly ? 'Show all jobs' : 'Show favorites only'}
           >
-            <HeartIcon
+            <StarIcon
               size={16}
-              fill={showFavouritesOnly ? 'currentColor' : 'none'}
+              fill={showFavoritesOnly ? 'currentColor' : 'none'}
             />
           </IconButton>
           {hiddenJobCount > 0 && (
@@ -1429,7 +1449,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
               return [prev[1], id];
             });
           }}
-          onToggleFavourite={handleToggleFavourite}
+          onToggleFavorite={handleToggleFavorite}
           onToggleHidden={handleToggleHidden}
         />
       </Sheet>

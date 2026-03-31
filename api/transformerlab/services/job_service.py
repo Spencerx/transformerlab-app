@@ -379,6 +379,10 @@ async def job_update_job_data_insert_key_values(job_id, updates: Dict[str, Any],
 
         job = await Job.get(job_id, experiment_id)
         await job.update_job_data_field(updates, multiple=True)
+
+        # Invalidate the cache so the updated job_data is visible immediately
+        key = _job_cache_key(str(job_id))
+        await cache.delete(key)
     except Exception as e:
         print(f"Error updating job {job_id}: {e}")
 

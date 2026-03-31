@@ -19,7 +19,7 @@ import {
   FileTextIcon,
   DatabaseIcon,
   FolderOpenIcon,
-  HeartIcon,
+  StarIcon,
   MoreVerticalIcon,
   EyeOffIcon,
   EyeIcon,
@@ -57,7 +57,7 @@ interface JobsListProps {
   selectMode?: boolean;
   selectedJobIds?: string[];
   onToggleJobSelected?: (jobId: string) => void;
-  onToggleFavourite?: (jobId: string, currentValue: boolean) => void;
+  onToggleFavorite?: (jobId: string, currentValue: boolean) => void;
   onToggleHidden?: (jobId: string, currentValue: boolean) => void;
 }
 
@@ -84,7 +84,7 @@ const JobsList: React.FC<JobsListProps> = ({
   selectMode = false,
   selectedJobIds = [],
   onToggleJobSelected,
-  onToggleFavourite,
+  onToggleFavorite,
   onToggleHidden,
 }) => {
   const formatJobConfig = (job: any) => {
@@ -221,7 +221,10 @@ const JobsList: React.FC<JobsListProps> = ({
             const displayJobId =
               String(job?.short_id ?? '').trim() || fullJobId.slice(0, 8);
             return (
-              <tr key={job.id}>
+              <tr
+                key={job.id}
+                style={job?.job_data?.hidden ? { opacity: 0.45 } : undefined}
+              >
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
                   {selectMode &&
                     job?.job_data?.eval_results &&
@@ -234,32 +237,6 @@ const JobsList: React.FC<JobsListProps> = ({
                         sx={{ mr: 1 }}
                       />
                     )}
-                  {!job?.placeholder && (
-                    <IconButton
-                      size="sm"
-                      variant="plain"
-                      color={job?.job_data?.favourite ? 'danger' : 'neutral'}
-                      onClick={() =>
-                        onToggleFavourite?.(
-                          String(job.id),
-                          !!job?.job_data?.favourite,
-                        )
-                      }
-                      sx={{ mr: 0.5, minWidth: 0, minHeight: 0 }}
-                      title={
-                        job?.job_data?.favourite
-                          ? 'Remove from favourites'
-                          : 'Add to favourites'
-                      }
-                    >
-                      <HeartIcon
-                        size={16}
-                        fill={
-                          job?.job_data?.favourite ? 'currentColor' : 'none'
-                        }
-                      />
-                    </IconButton>
-                  )}
                   <b title={fullJobId}>{displayJobId}</b>
                 </td>
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
@@ -571,6 +548,24 @@ const JobsList: React.FC<JobsListProps> = ({
                           <MoreVerticalIcon size={16} />
                         </MenuButton>
                         <Menu>
+                          <MenuItem
+                            onClick={() =>
+                              onToggleFavorite?.(
+                                String(job.id),
+                                !!job?.job_data?.favorite,
+                              )
+                            }
+                          >
+                            {job?.job_data?.favorite ? (
+                              <>
+                                <StarIcon size={16} /> Unfavorite
+                              </>
+                            ) : (
+                              <>
+                                <StarIcon size={16} /> Favorite
+                              </>
+                            )}
+                          </MenuItem>
                           <MenuItem
                             onClick={() =>
                               onToggleHidden?.(

@@ -77,9 +77,9 @@ async def job_delete(job_id: str, experimentId: str):
 
 @router.put("/{job_id}/job_data")
 async def job_update_job_data(job_id: str, experimentId: str, body: dict = Body(...)):
-    """Update user-facing metadata fields in job_data (favourite, hidden, tags)."""
+    """Update user-facing metadata fields in job_data (favorite, hidden, tags)."""
     updates = body.get("updates", {})
-    ALLOWED_KEYS = {"favourite", "hidden", "tags"}
+    ALLOWED_KEYS = {"favorite", "hidden", "tags"}
     filtered = {k: v for k, v in updates.items() if k in ALLOWED_KEYS}
     if not filtered:
         return {"message": "No valid keys to update"}
