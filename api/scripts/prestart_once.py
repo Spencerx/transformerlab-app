@@ -13,6 +13,10 @@ from transformerlab.shared import dirs, galleries
 
 
 async def main() -> None:
+    # api.py normally sets this internal env var at process startup.
+    # prestart_once runs standalone (e.g. in Docker build), so set it here too.
+    os.environ["_TFL_SOURCE_CODE_DIR"] = dirs.TFL_SOURCE_CODE_DIR
+
     # Ensure expected directory structure exists before other startup steps.
     await dirs.initialize_dirs()
 
