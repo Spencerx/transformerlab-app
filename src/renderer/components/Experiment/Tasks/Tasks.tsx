@@ -34,7 +34,7 @@ import SafeJSONParse from '../../Shared/SafeJSONParse';
 import NewTaskModal2 from './NewTaskModal/NewTaskModal2';
 import TaskYamlEditorModal from './TaskYamlEditorModal';
 import TrackioModal from './TrackioModal';
-import { isTerminalJobStatus } from 'renderer/lib/utils';
+import { isDeletableJobRecordStatus } from 'renderer/lib/utils';
 
 const duration = require('dayjs/plugin/duration');
 const dayjs = require('dayjs');
@@ -491,11 +491,11 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     if (!experimentInfo?.id) return;
 
     const target = jobs.find((j) => String(j.id) === String(jobId));
-    if (!target || !isTerminalJobStatus(target.status)) {
+    if (!target || !isDeletableJobRecordStatus(target.status)) {
       addNotification({
         type: 'warning',
         message:
-          'You can only delete jobs that have finished (complete, stopped, failed, or cancelled). Stop the job first if it is still running.',
+          'You can only delete jobs that have not started yet or have finished (complete, stopped, failed, or cancelled). Stop the job first if it is still running.',
       });
       return;
     }

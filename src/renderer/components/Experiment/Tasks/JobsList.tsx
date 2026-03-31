@@ -21,8 +21,8 @@ import {
   FolderOpenIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
+import { isDeletableJobRecordStatus } from 'renderer/lib/utils';
 import JobProgress from './JobProgress';
-import { isTerminalJobStatus } from 'renderer/lib/utils';
 
 export interface LaunchProgressInfo {
   phase?: string;
@@ -514,9 +514,9 @@ const JobsList: React.FC<JobsListProps> = ({
                     {!job?.placeholder && (
                       <IconButton
                         variant="plain"
-                        disabled={!isTerminalJobStatus(job?.status)}
+                        disabled={!isDeletableJobRecordStatus(job?.status)}
                         onClick={() => {
-                          if (!isTerminalJobStatus(job?.status)) {
+                          if (!isDeletableJobRecordStatus(job?.status)) {
                             return;
                           }
                           onDeleteJob?.(job.id);
