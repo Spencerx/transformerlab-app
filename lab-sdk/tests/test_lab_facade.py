@@ -993,9 +993,7 @@ def test_lab_list_documents_in_folder_with_explicit_experiment_id(tmp_path, monk
     assert len(docs) == 1
     assert docs[0]["name"] == "a.txt"
 
-    content = lab.get_document_contents(
-        document_name="a.txt", folder="articles", experiment_id="test_exp_docs_folder"
-    )
+    content = lab.get_document_contents(document_name="a.txt", folder="articles", experiment_id="test_exp_docs_folder")
     assert content == "folder doc"
 
 
