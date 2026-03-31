@@ -15,6 +15,7 @@ from transformerlab.shared.shared import slugify
 from lab import Experiment, storage
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+FOLDER_MARKER_FILE = ".keep"
 
 allowed_file_types = [
     ".txt",
@@ -111,6 +112,8 @@ async def document_list(experimentId: str, folder: str = None):
                 is_dir = await storage.isdir(full_path)
                 size = 0 if is_dir else 0
                 mtime = None
+            if name in {".tlab_markitdown", FOLDER_MARKER_FILE}:
+                continue
             if is_dir:
                 date_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M:%S") if mtime else ""
                 documents.append({"name": name, "size": 0, "date": date_str, "type": "folder", "path": full_path})
@@ -218,6 +221,12 @@ async def create_folder(experimentId: str, name: str):
     print(f"Creating folder {path}")
     if not await storage.exists(path):
         await storage.makedirs(path, exist_ok=True)
+    # Object stores (e.g. S3) don't persist empty directories. Create a marker object
+    # so empty folders are visible in listings until real files are uploaded.
+    marker_path = storage.join(path, FOLDER_MARKER_FILE)
+    if not await storage.exists(marker_path):
+        async with await storage.open(marker_path, "w", encoding="utf-8") as marker_file:
+            await marker_file.write("")
     return {"status": "success"}
 
 
