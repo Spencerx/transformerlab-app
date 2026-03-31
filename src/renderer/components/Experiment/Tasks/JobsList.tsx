@@ -19,6 +19,10 @@ import {
   FileTextIcon,
   DatabaseIcon,
   FolderOpenIcon,
+  HeartIcon,
+  MoreVerticalIcon,
+  EyeOffIcon,
+  EyeIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
 import JobProgress from './JobProgress';
@@ -53,6 +57,8 @@ interface JobsListProps {
   selectMode?: boolean;
   selectedJobIds?: string[];
   onToggleJobSelected?: (jobId: string) => void;
+  onToggleFavourite?: (jobId: string, currentValue: boolean) => void;
+  onToggleHidden?: (jobId: string, currentValue: boolean) => void;
 }
 
 const JobsList: React.FC<JobsListProps> = ({
@@ -78,6 +84,8 @@ const JobsList: React.FC<JobsListProps> = ({
   selectMode = false,
   selectedJobIds = [],
   onToggleJobSelected,
+  onToggleFavourite,
+  onToggleHidden,
 }) => {
   const formatJobConfig = (job: any) => {
     const jobData = job?.job_data || {};
@@ -226,6 +234,32 @@ const JobsList: React.FC<JobsListProps> = ({
                         sx={{ mr: 1 }}
                       />
                     )}
+                  {!job?.placeholder && (
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color={job?.job_data?.favourite ? 'danger' : 'neutral'}
+                      onClick={() =>
+                        onToggleFavourite?.(
+                          String(job.id),
+                          !!job?.job_data?.favourite,
+                        )
+                      }
+                      sx={{ mr: 0.5, minWidth: 0, minHeight: 0 }}
+                      title={
+                        job?.job_data?.favourite
+                          ? 'Remove from favourites'
+                          : 'Add to favourites'
+                      }
+                    >
+                      <HeartIcon
+                        size={16}
+                        fill={
+                          job?.job_data?.favourite ? 'currentColor' : 'none'
+                        }
+                      />
+                    </IconButton>
+                  )}
                   <b title={fullJobId}>{displayJobId}</b>
                 </td>
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
@@ -524,6 +558,39 @@ const JobsList: React.FC<JobsListProps> = ({
                       >
                         <Trash2Icon style={{ cursor: 'pointer' }} />
                       </IconButton>
+                    )}
+                    {!job?.placeholder && (
+                      <Dropdown>
+                        <MenuButton
+                          slots={{ root: IconButton }}
+                          slotProps={{
+                            root: { variant: 'plain', color: 'neutral' },
+                          }}
+                          sx={{ minWidth: 0 }}
+                        >
+                          <MoreVerticalIcon size={16} />
+                        </MenuButton>
+                        <Menu>
+                          <MenuItem
+                            onClick={() =>
+                              onToggleHidden?.(
+                                String(job.id),
+                                !!job?.job_data?.hidden,
+                              )
+                            }
+                          >
+                            {job?.job_data?.hidden ? (
+                              <>
+                                <EyeIcon size={16} /> Unhide
+                              </>
+                            ) : (
+                              <>
+                                <EyeOffIcon size={16} /> Hide
+                              </>
+                            )}
+                          </MenuItem>
+                        </Menu>
+                      </Dropdown>
                     )}
                   </ButtonGroup>
                 </td>
