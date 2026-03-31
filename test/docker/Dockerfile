@@ -71,7 +71,7 @@ EXPOSE 8338
 
 # Run the prestart script with .env exported so seeding uses
 # the same storage provider/URI as runtime.
-RUN set -a && . /app/api/.env && set +a && python -m scripts.prestart_once
+RUN set -a && . /app/api/.env && set +a && python -m scripts.on_server_start
 
 # Run the API
 CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8338"]
