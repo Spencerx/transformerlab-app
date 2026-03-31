@@ -826,7 +826,7 @@ class Lab:
                 return dest
 
         # Handle DataFrame input when type="evals"
-        if type == "eval" and hasattr(source_path, "to_csv"):
+        if type == "evals" and hasattr(source_path, "to_csv"):
             # Normalize input: convert Hugging Face datasets.Dataset to pandas DataFrame
             df = source_path
             try:
