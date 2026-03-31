@@ -3,6 +3,7 @@ import csv
 from fnmatch import fnmatch
 import json
 import os
+import posixpath
 from typing import List, Optional
 
 import pandas as pd
@@ -30,6 +31,7 @@ from lab.dirs import (
     get_workspace_dir,
     get_local_provider_job_dir,
     get_job_datasets_dir,
+    get_job_eval_results_dir,
     get_datasets_dir,
     get_job_models_dir,
     get_models_dir,
@@ -38,6 +40,32 @@ from transformerlab.services import asset_version_service
 
 
 router = APIRouter(prefix="/jobs", tags=["train"])
+
+
+def _normalize_dir_for_compare(path: str) -> str:
+    """Normalize directory strings for equality (local paths, s3://, gs://, Windows separators)."""
+    if not path:
+        return ""
+    return str(path).replace("\\", "/").rstrip("/")
+
+
+def _eval_results_storage_path(stored_path: str, eval_dir: str) -> str:
+    """
+    If ``stored_path`` lives under a different directory than the canonical job eval folder,
+    open the same filename under ``eval_dir`` (post-migration layout). Otherwise use the stored path as-is.
+    """
+    p = str(stored_path).strip()
+    if not p:
+        return p
+    p_norm = p.replace("\\", "/")
+    canonical = _normalize_dir_for_compare(eval_dir)
+    parent = _normalize_dir_for_compare(posixpath.dirname(p_norm))
+    basename = posixpath.basename(p_norm.strip("/"))
+    if not basename:
+        return p
+    if parent != canonical:
+        return storage.join(eval_dir, basename)
+    return p
 
 
 @router.get("/list")
@@ -777,7 +805,12 @@ async def get_eval_results(job_id: str, experimentId: str, task: str = "view", f
     job = await job_service.job_get(job_id, experiment_id=experimentId)
     if job is None:
         return Response("Job not found", status_code=404)
-    job_data = job["job_data"]
+    job_data = job.get("job_data", {})
+    if not isinstance(job_data, dict):
+        try:
+            job_data = json.loads(job_data)
+        except (JSONDecodeError, TypeError):
+            job_data = {}
 
     # Check if the job has eval_results
     if "eval_results" not in job_data or not job_data["eval_results"]:
@@ -790,8 +823,16 @@ async def get_eval_results(job_id: str, experimentId: str, task: str = "view", f
     # Get the file path (use file_index to select which file if multiple)
     if file_index >= len(eval_results_list):
         file_index = 0
-    file_path = eval_results_list[file_index]
+    raw_path = eval_results_list[file_index]
+    if not isinstance(raw_path, str) or not str(raw_path).strip():
+        return Response("No evaluation results found for this job", media_type="text/csv")
 
+    eval_dir = await get_job_eval_results_dir(str(job_id), str(experimentId))
+    file_path = _eval_results_storage_path(raw_path, eval_dir)
+    if not await storage.exists(file_path):
+        stored = str(raw_path).strip()
+        if stored and file_path != stored and await storage.exists(stored):
+            file_path = stored
     if not await storage.exists(file_path):
         return Response("Evaluation results file not found", media_type="text/csv")
 
