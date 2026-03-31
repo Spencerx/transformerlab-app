@@ -130,7 +130,8 @@ export PYTHONUNBUFFERED=1
 UVICORN_WORKERS=${TFL_UVICORN_WORKERS:-1}
 
 echo "▶️ Running one-time startup tasks before workers"
-python -m scripts.prestart_once
+python -m scripts.prestart_once || { echo "❌ Prestart failed"; exit 1; }
+
 
 echo "▶️ Starting the API server:"
 if [ "$RELOAD" = true ]; then
