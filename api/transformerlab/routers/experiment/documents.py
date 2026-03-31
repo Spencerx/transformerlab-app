@@ -230,16 +230,6 @@ async def create_folder(experimentId: str, name: str):
     return {"status": "success"}
 
 
-@router.post("/upload_links", summary="Upload the contents from the provided web links.")
-async def document_upload_links(experimentId: str, folder: str = None, data: dict = Body(...)):
-    _ = data.get("urls")
-    _ = secure_filename(folder)
-    raise HTTPException(
-        status_code=400,
-        detail="Uploading webpage links is no longer supported. Upload document files directly instead.",
-    )
-
-
 @router.post("/download_zip", summary="Download and extract a ZIP file from a URL.")
 async def document_download_zip(experimentId: str, data: dict = Body(...)):
     """Download a ZIP file from a URL and extract its contents to the documents folder."""
