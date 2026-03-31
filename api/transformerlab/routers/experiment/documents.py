@@ -3,7 +3,6 @@ import os
 import tempfile
 import zipfile
 
-import aiofiles
 import httpx
 from fastapi import APIRouter, Body, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -155,7 +154,6 @@ async def delete_document(experimentId: str, document_name: str, folder: str = N
 @router.post("/upload", summary="Upload the contents of a document.")
 async def document_upload(experimentId: str, folder: str, files: list[UploadFile]):
     fileNames = []
-    tfl_remote_storage_enabled = os.getenv("TFL_REMOTE_STORAGE_ENABLED", "false").lower() == "true"
 
     # Adding secure filename to the folder name as well
     folder = secure_filename(folder)
@@ -197,12 +195,8 @@ async def document_upload(experimentId: str, folder: str, files: list[UploadFile
                 await storage.makedirs(documents_dir, exist_ok=True)
 
             newfilename = storage.join(documents_dir, str(file_name))
-            if tfl_remote_storage_enabled:
-                async with await storage.open(newfilename, "wb") as out_file:
-                    await out_file.write(content)
-            else:
-                async with aiofiles.open(newfilename, "wb") as out_file:
-                    await out_file.write(content)
+            async with await storage.open(newfilename, "wb") as out_file:
+                await out_file.write(content)
         except Exception as e:
             print(f"Error uploading file: {e}")
             raise HTTPException(status_code=403, detail="There was a problem uploading the file")
