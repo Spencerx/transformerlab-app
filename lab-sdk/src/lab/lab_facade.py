@@ -1756,6 +1756,16 @@ class Lab:
         if self._experiment is None or self._job is None:
             raise RuntimeError("lab not initialized. Call lab.init(experiment_id=...) first.")
 
+    def _resolve_experiment_id(self, experiment_id: Optional[str] = None) -> str:
+        if isinstance(experiment_id, str) and experiment_id.strip() != "":
+            return secure_filename(experiment_id)
+        if self._experiment is not None:
+            return str(self._experiment.id)
+        raise RuntimeError(
+            "No experiment_id provided and lab is not initialized. "
+            "Call lab.init(experiment_id=...) or pass experiment_id explicitly."
+        )
+
     @property
     def job(self) -> Job:
         self._ensure_initialized()
@@ -1838,6 +1848,132 @@ class Lab:
             - json_data: Additional dataset metadata
         """
         return _run_async(Dataset.list_all())
+
+    def list_documents(self, folder: Optional[str] = None, experiment_id: Optional[str] = None) -> list[Dict[str, Any]]:
+        """
+        List documents for an experiment folder (sync version).
+        """
+        return _run_async(self.async_list_documents(folder=folder, experiment_id=experiment_id))
+
+    async def async_list_documents(
+        self, folder: Optional[str] = None, experiment_id: Optional[str] = None
+    ) -> list[Dict[str, Any]]:
+        """
+        List documents for an experiment folder (async version).
+        """
+        resolved_experiment_id = self._resolve_experiment_id(experiment_id)
+        exp = Experiment(resolved_experiment_id)
+        experiment_dir = await exp.get_dir()
+        documents_dir = storage.join(experiment_dir, "documents")
+
+        safe_folder = secure_filename(folder) if folder else ""
+        if safe_folder:
+            documents_dir = storage.join(documents_dir, safe_folder)
+
+        if not await storage.exists(documents_dir):
+            return []
+
+        entries = await storage.ls(documents_dir, detail=False)
+        results: list[Dict[str, Any]] = []
+        for full_path in entries:
+            name = os.path.basename(str(full_path).rstrip("/"))
+            if name in {".tlab_markitdown", ".keep"}:
+                continue
+            is_dir = await storage.isdir(full_path)
+            results.append(
+                {
+                    "name": name,
+                    "path": full_path,
+                    "type": "folder" if is_dir else os.path.splitext(name)[1].lower(),
+                }
+            )
+        return sorted(results, key=lambda item: item["name"])
+
+    def get_document_contents(
+        self,
+        document_name: str,
+        folder: Optional[str] = None,
+        experiment_id: Optional[str] = None,
+        encoding: str = "utf-8",
+        errors: str = "strict",
+    ) -> str:
+        """
+        Read a document as text (sync version).
+        """
+        return _run_async(
+            self.async_get_document_contents(
+                document_name=document_name,
+                folder=folder,
+                experiment_id=experiment_id,
+                encoding=encoding,
+                errors=errors,
+            )
+        )
+
+    async def async_get_document_contents(
+        self,
+        document_name: str,
+        folder: Optional[str] = None,
+        experiment_id: Optional[str] = None,
+        encoding: str = "utf-8",
+        errors: str = "strict",
+    ) -> str:
+        """
+        Read a document as text (async version).
+        """
+        document_bytes = await self.async_get_document_bytes(
+            document_name=document_name,
+            folder=folder,
+            experiment_id=experiment_id,
+        )
+        return document_bytes.decode(encoding, errors=errors)
+
+    def get_document_bytes(
+        self,
+        document_name: str,
+        folder: Optional[str] = None,
+        experiment_id: Optional[str] = None,
+    ) -> bytes:
+        """
+        Read a document as bytes (sync version).
+        """
+        return _run_async(
+            self.async_get_document_bytes(
+                document_name=document_name,
+                folder=folder,
+                experiment_id=experiment_id,
+            )
+        )
+
+    async def async_get_document_bytes(
+        self,
+        document_name: str,
+        folder: Optional[str] = None,
+        experiment_id: Optional[str] = None,
+    ) -> bytes:
+        """
+        Read a document as bytes (async version).
+        """
+        resolved_experiment_id = self._resolve_experiment_id(experiment_id)
+        exp = Experiment(resolved_experiment_id)
+        experiment_dir = await exp.get_dir()
+
+        safe_name = secure_filename(document_name)
+        if not safe_name:
+            raise ValueError("document_name must be a non-empty filename")
+
+        documents_dir = storage.join(experiment_dir, "documents")
+        safe_folder = secure_filename(folder) if folder else ""
+        if safe_folder:
+            document_path = storage.join(documents_dir, safe_folder, safe_name)
+        else:
+            document_path = storage.join(documents_dir, safe_name)
+
+        if not await storage.exists(document_path):
+            raise FileNotFoundError(f"Document not found: {document_path}")
+
+        async with await storage.open(document_path, "rb") as f:
+            return await f.read()
 
     def get_dataset(self, dataset_id: str, job_id: Optional[str] = None) -> Dataset:
         """
