@@ -25,11 +25,33 @@ import EditInteractiveTaskModal from '../Tasks/EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from '../Tasks/DeleteTaskConfirmModal';
 import InteractiveJobCard from './InteractiveJobCard';
 import JobsList from '../Tasks/JobsList';
+import FileBrowserModal from '../Tasks/FileBrowserModal';
 
 const duration = require('dayjs/plugin/duration');
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
+
+/** Interactive tasks may have no stored provider_id; prefer a remote provider over local. */
+function defaultLaunchProviderId(
+  providers: { id?: string; type?: string }[],
+): string | null {
+  if (!providers?.length) return null;
+  const remote = providers.find((p) => p.type !== 'local');
+  return remote?.id ?? providers[0]?.id ?? null;
+}
+
+/** Local interactive runs do not use ngrok; never send token placeholder or secret to the provider. */
+function omitNgrokAuthTokenForLocal(
+  env: Record<string, string> | undefined,
+  isLocalProvider: boolean,
+): Record<string, string> {
+  const out = { ...(env || {}) };
+  if (isLocalProvider) {
+    delete out.NGROK_AUTH_TOKEN;
+  }
+  return out;
+}
 
 export default function Interactive() {
   const [interactiveModalOpen, setInteractiveModalOpen] = useState(false);
@@ -46,6 +68,9 @@ export default function Interactive() {
   const [launchProgressByJobId, setLaunchProgressByJobId] = useState<
     Record<string, { phase?: string; percent?: number; message?: string }>
   >({});
+  const [viewFileBrowserFromJob, setViewFileBrowserFromJob] = useState<
+    string | null
+  >(null);
 
   const { experimentInfo } = useExperimentInfo();
   const { addNotification } = useNotification();
@@ -500,6 +525,29 @@ export default function Interactive() {
       if (template.local_task_dir || template.github_repo_url) {
         // Use the gallery import API which reads task.yaml and copies files,
         // just like the "Upload from Local Directory" or GitHub import flow.
+        const envVarsForImport: Record<string, string> = {
+          ...(data.env_parameters || {}),
+        };
+        // Remote interactive tasks with exposed ports get auto-ngrok on the server; ensure the
+        // team ngrok secret is referenced (same as non-GitHub template path). ollama_gradio etc.
+        // do not list NGROK_AUTH_TOKEN in env_parameters, so it would otherwise be missing.
+        const galleryPorts = Array.isArray(template?.ports)
+          ? template.ports
+          : [];
+        const hasNgrokField = template?.env_parameters?.some(
+          (p: { env_var?: string }) => p.env_var === 'NGROK_AUTH_TOKEN',
+        );
+        const shouldInjectNgrokSecret =
+          providerMeta.type !== 'local' &&
+          !envVarsForImport.NGROK_AUTH_TOKEN?.trim() &&
+          (galleryPorts.length > 0 || hasNgrokField);
+        if (shouldInjectNgrokSecret) {
+          envVarsForImport.NGROK_AUTH_TOKEN = '{{secret._NGROK_AUTH_TOKEN}}';
+        }
+        const envVarsForImportClean = omitNgrokAuthTokenForLocal(
+          envVarsForImport,
+          providerMeta.type === 'local',
+        );
         response = await chatAPI.authenticatedFetch(
           chatAPI.Endpoints.Task.ImportFromGallery(experimentInfo.id),
           {
@@ -509,7 +557,13 @@ export default function Interactive() {
               gallery_id: templateId,
               experiment_id: experimentInfo.id,
               is_interactive: true,
-              env_vars: data.env_parameters || undefined,
+              env_vars:
+                Object.keys(envVarsForImportClean).length > 0
+                  ? envVarsForImportClean
+                  : undefined,
+              cpus: data.cpus || undefined,
+              memory: data.memory || undefined,
+              accelerators: data.accelerators || undefined,
             }),
           },
         );
@@ -529,6 +583,10 @@ export default function Interactive() {
         ) {
           envVars.NGROK_AUTH_TOKEN = '{{secret._NGROK_AUTH_TOKEN}}';
         }
+        const envVarsClean = omitNgrokAuthTokenForLocal(
+          envVars,
+          providerMeta.type === 'local',
+        );
 
         templatePayload = {
           name: data.title,
@@ -546,7 +604,8 @@ export default function Interactive() {
           interactive_gallery_id: templateId,
           provider_id: providerMeta.id,
           provider_name: providerMeta.name,
-          env_vars: Object.keys(envVars).length > 0 ? envVars : undefined,
+          env_vars:
+            Object.keys(envVarsClean).length > 0 ? envVarsClean : undefined,
           github_repo_url: galleryTemplate?.github_repo_url || undefined,
           github_directory: galleryTemplate?.github_repo_dir || undefined,
         };
@@ -593,7 +652,9 @@ export default function Interactive() {
 
           // Launch the task immediately. If launch fails (e.g. missing secrets),
           // keep the modal open and show the error inline.
-          const launch = await launchInteractiveTask(newTask);
+          const launch = await launchInteractiveTask(newTask, {
+            provider_id: data.provider_id,
+          });
           if (!launch.ok) {
             setInteractiveModalError(launch.error);
             return;
@@ -628,7 +689,10 @@ export default function Interactive() {
   };
 
   const launchInteractiveTask = useCallback(
-    async (task: any): Promise<{ ok: true } | { ok: false; error: string }> => {
+    async (
+      task: any,
+      launchOverrides?: { provider_id?: string },
+    ): Promise<{ ok: true } | { ok: false; error: string }> => {
       if (!experimentInfo?.id) {
         return { ok: false, error: 'No experiment selected.' };
       }
@@ -636,10 +700,15 @@ export default function Interactive() {
       const cfg =
         task.config !== undefined ? SafeJSONParse(task.config, task) : task;
 
+      // Prefer the provider the user picked in the modal. Imported interactive tasks
+      // (e.g. GitHub task.yaml) get provider_id from _resolve_provider on the server
+      // (often the first listed provider — frequently local), which would otherwise
+      // ignore the user's selection here.
       const providerId =
+        launchOverrides?.provider_id ||
         cfg.provider_id ||
         task.provider_id ||
-        (providers.length ? providers[0]?.id : null);
+        defaultLaunchProviderId(providers);
       if (!providerId) {
         return {
           ok: false,
@@ -682,7 +751,10 @@ export default function Interactive() {
         accelerators: cfg.accelerators || task.accelerators,
         num_nodes: cfg.num_nodes || task.num_nodes,
         setup: cfg.setup || task.setup,
-        env_vars: cfg.env_vars || task.env_vars || {},
+        env_vars: omitNgrokAuthTokenForLocal(
+          { ...(cfg.env_vars || task.env_vars || {}) },
+          providerMeta.type === 'local',
+        ),
         parameters: cfg.parameters || task.parameters || undefined,
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: providerMeta.name,
@@ -711,6 +783,7 @@ export default function Interactive() {
               : undefined,
         minutes_requested:
           cfg.minutes_requested || task.minutes_requested || undefined,
+        local: providerMeta.type === 'local',
       };
 
       try {
@@ -775,9 +848,7 @@ export default function Interactive() {
       task.config !== undefined ? SafeJSONParse(task.config, task) : task;
 
     const providerId =
-      cfg.provider_id ||
-      task.provider_id ||
-      (providers.length ? providers[0]?.id : null);
+      cfg.provider_id || task.provider_id || defaultLaunchProviderId(providers);
     if (!providerId) {
       addNotification({
         type: 'danger',
@@ -832,7 +903,10 @@ export default function Interactive() {
         accelerators: cfg.accelerators || task.accelerators,
         num_nodes: cfg.num_nodes || task.num_nodes,
         setup: cfg.setup || task.setup,
-        env_vars: cfg.env_vars || task.env_vars || {},
+        env_vars: omitNgrokAuthTokenForLocal(
+          { ...(cfg.env_vars || task.env_vars || {}) },
+          providerMeta.type === 'local',
+        ),
         parameters: cfg.parameters || task.parameters || undefined,
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: providerMeta.name,
@@ -861,6 +935,7 @@ export default function Interactive() {
               : undefined,
         minutes_requested:
           cfg.minutes_requested || task.minutes_requested || undefined,
+        local: providerMeta.type === 'local',
       };
 
       const response = await fetchWithAuth(
@@ -1114,6 +1189,12 @@ export default function Interactive() {
         <JobsList
           jobs={historyJobs}
           loading={jobsIsLoading || !experimentInfo?.id}
+          onDeleteJob={handleDeleteJob}
+          hideOutputButton
+          onViewFileBrowser={(jobId) => {
+            if (jobId == null || jobId === '') return;
+            setViewFileBrowserFromJob(String(jobId));
+          }}
         />
         {/* TODO: remove TaskTemplateList once migration is complete
         <TaskTemplateList
@@ -1133,6 +1214,12 @@ export default function Interactive() {
         taskId={taskToDelete?.id ?? null}
         taskName={taskToDelete?.name ?? null}
         onConfirm={handleConfirmDeleteTask}
+      />
+      <FileBrowserModal
+        mode="job"
+        open={viewFileBrowserFromJob !== null}
+        onClose={() => setViewFileBrowserFromJob(null)}
+        jobId={viewFileBrowserFromJob ?? ''}
       />
     </Sheet>
   );
