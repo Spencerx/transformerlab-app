@@ -1877,6 +1877,8 @@ class Lab:
         results: list[Dict[str, Any]] = []
         for full_path in entries:
             name = os.path.basename(str(full_path).rstrip("/"))
+            if name in {".tlab_markitdown", ".keep"}:
+                continue
             is_dir = await storage.isdir(full_path)
             results.append(
                 {

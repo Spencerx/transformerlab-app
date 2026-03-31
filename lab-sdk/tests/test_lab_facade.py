@@ -997,6 +997,40 @@ def test_lab_list_documents_in_folder_with_explicit_experiment_id(tmp_path, monk
     assert content == "folder doc"
 
 
+def test_lab_list_documents_filters_internal_files(tmp_path, monkeypatch):
+    _fresh(monkeypatch)
+    home = tmp_path / ".tfl_home"
+    ws = tmp_path / ".tfl_ws"
+    home.mkdir()
+    ws.mkdir()
+    monkeypatch.setenv("TFL_HOME_DIR", str(home))
+    monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
+
+    from lab.lab_facade import Lab
+    from lab.experiment import Experiment
+
+    lab = Lab()
+    lab.init(experiment_id="test_exp_docs_filters")
+
+    exp = Experiment("test_exp_docs_filters")
+    exp_dir = asyncio.run(exp.get_dir())
+    docs_dir = os.path.join(exp_dir, "documents")
+    os.makedirs(docs_dir, exist_ok=True)
+
+    with open(os.path.join(docs_dir, ".tlab_markitdown"), "w", encoding="utf-8") as f:
+        f.write("internal")
+    with open(os.path.join(docs_dir, ".keep"), "w", encoding="utf-8") as f:
+        f.write("")
+    with open(os.path.join(docs_dir, "visible.txt"), "w", encoding="utf-8") as f:
+        f.write("hello")
+
+    listed = lab.list_documents()
+    names = [entry["name"] for entry in listed]
+    assert "visible.txt" in names
+    assert ".tlab_markitdown" not in names
+    assert ".keep" not in names
+
+
 def test_lab_list_models(tmp_path, monkeypatch):
     _fresh(monkeypatch)
     home = tmp_path / ".tfl_home"
