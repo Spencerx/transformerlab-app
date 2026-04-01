@@ -19,6 +19,10 @@ import {
   FileTextIcon,
   DatabaseIcon,
   FolderOpenIcon,
+  BookmarkIcon,
+  MoreVerticalIcon,
+  EyeOffIcon,
+  EyeIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
 import { isDeletableJobRecordStatus } from 'renderer/lib/utils';
@@ -53,6 +57,8 @@ interface JobsListProps {
   selectMode?: boolean;
   selectedJobIds?: string[];
   onToggleJobSelected?: (jobId: string) => void;
+  onToggleFavorite?: (jobId: string, currentValue: boolean) => void;
+  onToggleHidden?: (jobId: string, currentValue: boolean) => void;
 }
 
 const JobsList: React.FC<JobsListProps> = ({
@@ -78,6 +84,8 @@ const JobsList: React.FC<JobsListProps> = ({
   selectMode = false,
   selectedJobIds = [],
   onToggleJobSelected,
+  onToggleFavorite,
+  onToggleHidden,
 }) => {
   const formatJobConfig = (job: any) => {
     const jobData = job?.job_data || {};
@@ -144,7 +152,10 @@ const JobsList: React.FC<JobsListProps> = ({
         <>
           {clusterName && (
             <Typography level="title-sm" fontWeight="bold">
-              {clusterName}
+              {clusterName}{' '}
+              {job?.job_data?.favorite && (
+                <BookmarkIcon size={16} fill="currentColor" />
+              )}
               <br />
             </Typography>
           )}
@@ -213,7 +224,10 @@ const JobsList: React.FC<JobsListProps> = ({
             const displayJobId =
               String(job?.short_id ?? '').trim() || fullJobId.slice(0, 8);
             return (
-              <tr key={job.id}>
+              <tr
+                key={job.id}
+                style={job?.job_data?.hidden ? { opacity: 0.45 } : undefined}
+              >
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
                   {selectMode &&
                     job?.job_data?.eval_results &&
@@ -524,6 +538,58 @@ const JobsList: React.FC<JobsListProps> = ({
                       >
                         <Trash2Icon style={{ cursor: 'pointer' }} />
                       </IconButton>
+                    )}
+                    {!job?.placeholder && (
+                      <Dropdown>
+                        <MenuButton
+                          slots={{ root: IconButton }}
+                          slotProps={{
+                            root: { variant: 'plain', color: 'neutral' },
+                          }}
+                          sx={{ minWidth: 0 }}
+                        >
+                          <MoreVerticalIcon size={16} />
+                        </MenuButton>
+                        <Menu>
+                          <MenuItem
+                            onClick={() =>
+                              onToggleFavorite?.(
+                                String(job.id),
+                                !!job?.job_data?.favorite,
+                              )
+                            }
+                          >
+                            {job?.job_data?.favorite ? (
+                              <>
+                                <BookmarkIcon size={16} fill="currentColor" />{' '}
+                                Unfavorite
+                              </>
+                            ) : (
+                              <>
+                                <BookmarkIcon size={16} /> Favorite
+                              </>
+                            )}
+                          </MenuItem>
+                          <MenuItem
+                            onClick={() =>
+                              onToggleHidden?.(
+                                String(job.id),
+                                !!job?.job_data?.hidden,
+                              )
+                            }
+                          >
+                            {job?.job_data?.hidden ? (
+                              <>
+                                <EyeIcon size={16} /> Unhide
+                              </>
+                            ) : (
+                              <>
+                                <EyeOffIcon size={16} /> Hide
+                              </>
+                            )}
+                          </MenuItem>
+                        </Menu>
+                      </Dropdown>
                     )}
                   </ButtonGroup>
                 </td>
