@@ -259,6 +259,7 @@ async def root_uri() -> str:
     try:
         return root
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(fs)
 
 
@@ -283,6 +284,7 @@ async def debug_info() -> dict:
             "filesystem_type": type(fs).__name__,
         }
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(fs)
 
 
@@ -300,6 +302,7 @@ async def exists(path: str) -> bool:
     try:
         return await asyncio.to_thread(fs.exists, path)
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(fs)
 
 
@@ -312,6 +315,7 @@ async def isdir(path: str, fs=None) -> bool:
         return False
     finally:
         if fs is None:
+            # Close filesystem even if exception raised.
             await _close_filesystem(filesys)
 
 
@@ -323,6 +327,7 @@ async def isfile(path: str) -> bool:
     except Exception:
         return False
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(fs)
 
 
@@ -335,6 +340,7 @@ async def makedirs(path: str, exist_ok: bool = True) -> None:
         if not exist_ok or not await exists(path):
             await asyncio.to_thread(fs.makedirs, path)
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(fs)
 
 
@@ -363,6 +369,7 @@ async def ls(path: str, detail: bool = False, fs=None):
         return paths
     finally:
         if fs is None:
+            # Close filesystem even if exception raised.
             await _close_filesystem(filesys)
 
 
@@ -588,8 +595,10 @@ async def copy_file(src: str, dest: str) -> None:
     try:
         await asyncio.to_thread(_do_copy)
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(src_fs)
         if dest_fs is not src_fs:
+            # Close filesystem even if exception raised.
             await _close_filesystem(dest_fs)
 
 
@@ -641,4 +650,5 @@ async def copy_dir(src_dir: str, dest_dir: str) -> None:
             # Copy the file using streaming (robust across FSes)
             await copy_file(src_file, dest_file)
     finally:
+        # Close filesystem even if exception raised.
         await _close_filesystem(src_fs)
