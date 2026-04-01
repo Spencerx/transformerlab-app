@@ -152,7 +152,10 @@ const JobsList: React.FC<JobsListProps> = ({
         <>
           {clusterName && (
             <Typography level="title-sm" fontWeight="bold">
-              {clusterName}
+              {clusterName}{' '}
+              {job?.job_data?.favorite && (
+                <BookmarkIcon size={16} fill="currentColor" />
+              )}
               <br />
             </Typography>
           )}
