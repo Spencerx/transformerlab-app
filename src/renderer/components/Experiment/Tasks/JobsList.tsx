@@ -19,7 +19,7 @@ import {
   FileTextIcon,
   DatabaseIcon,
   FolderOpenIcon,
-  StarIcon,
+  BookmarkIcon,
   MoreVerticalIcon,
   EyeOffIcon,
   EyeIcon,
@@ -558,12 +558,12 @@ const JobsList: React.FC<JobsListProps> = ({
                           >
                             {job?.job_data?.favorite ? (
                               <>
-                                <StarIcon size={16} fill="currentColor" />{' '}
+                                <BookmarkIcon size={16} fill="currentColor" />{' '}
                                 Unfavorite
                               </>
                             ) : (
                               <>
-                                <StarIcon size={16} /> Favorite
+                                <BookmarkIcon size={16} /> Favorite
                               </>
                             )}
                           </MenuItem>

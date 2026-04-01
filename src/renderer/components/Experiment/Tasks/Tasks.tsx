@@ -10,7 +10,7 @@ import {
   Typography,
 } from '@mui/joy';
 
-import { PlusIcon, TerminalIcon, StarIcon } from 'lucide-react';
+import { PlusIcon, TerminalIcon, BookmarkIcon } from 'lucide-react';
 import { useSWRWithAuth as useSWR, useAPI } from 'renderer/lib/authContext';
 
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
@@ -1362,7 +1362,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
             onClick={() => setShowFavoritesOnly((prev) => !prev)}
             title={showFavoritesOnly ? 'Show all jobs' : 'Show favorites only'}
           >
-            <StarIcon
+            <BookmarkIcon
               size={16}
               fill={showFavoritesOnly ? 'currentColor' : 'none'}
             />
