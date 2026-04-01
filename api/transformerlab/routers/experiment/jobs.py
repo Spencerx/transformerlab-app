@@ -7,7 +7,7 @@ import posixpath
 from typing import List, Optional
 
 import pandas as pd
-from fastapi import APIRouter, Response, Request, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Response, Request, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse, FileResponse
 from json import JSONDecodeError
 from lab import Job, storage
@@ -100,6 +100,18 @@ async def jobs_get_all(
 @router.get("/delete/{job_id}")
 async def job_delete(job_id: str, experimentId: str):
     await job_service.job_delete(job_id, experiment_id=experimentId)
+    return {"message": "OK"}
+
+
+@router.put("/{job_id}/job_data")
+async def job_update_job_data(job_id: str, experimentId: str, body: dict = Body(...)):
+    """Update user-facing metadata fields in job_data (favorite, hidden, tags)."""
+    updates = body.get("updates", {})
+    ALLOWED_KEYS = {"favorite", "hidden", "tags"}
+    filtered = {k: v for k, v in updates.items() if k in ALLOWED_KEYS}
+    if not filtered:
+        return {"message": "No valid keys to update"}
+    await job_service.job_update_job_data_insert_key_values(job_id, filtered, experimentId)
     return {"message": "OK"}
 
 

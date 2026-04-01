@@ -475,6 +475,8 @@ Endpoints.Jobs = {
     `${API_URL()}experiment/${experimentId}/jobs/update/${jobId}?status=${status}`,
   GetEvalImages: (experimentId: string, jobId: string) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_eval_images`,
+  UpdateJobData: (experimentId: string, jobId: string) =>
+    `${API_URL()}experiment/${experimentId}/jobs/${jobId}/job_data`,
 };
 
 Endpoints.Quota = {
