@@ -21,7 +21,10 @@ import {
   FolderOpenIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
-import { isDeletableJobRecordStatus } from 'renderer/lib/utils';
+import {
+  isDeletableJobRecordStatus,
+  isTerminalJobStatus,
+} from 'renderer/lib/utils';
 import JobProgress from './JobProgress';
 
 export interface LaunchProgressInfo {
@@ -79,6 +82,10 @@ const JobsList: React.FC<JobsListProps> = ({
   selectedJobIds = [],
   onToggleJobSelected,
 }) => {
+  const showTrackioForStatus = (status?: string): boolean => {
+    return String(status || '') === 'RUNNING' || isTerminalJobStatus(status);
+  };
+
   const formatJobConfig = (job: any) => {
     const jobData = job?.job_data || {};
 
@@ -278,26 +285,27 @@ const JobsList: React.FC<JobsListProps> = ({
                     )}
 
                     {(job?.job_data?.trackio_db_artifact_path ||
-                      job?.job_data?.trackio_project_name) && (
-                      <Button
-                        size="sm"
-                        variant="plain"
-                        onClick={() => onViewTrackio?.(String(job?.id))}
-                        startDecorator={<LineChartIcon />}
-                      >
-                        <Box
-                          sx={{
-                            display: {
-                              xs: 'none',
-                              sm: 'none',
-                              md: 'inline-flex',
-                            },
-                          }}
+                      job?.job_data?.trackio_project_name) &&
+                      showTrackioForStatus(job?.status) && (
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          onClick={() => onViewTrackio?.(String(job?.id))}
+                          startDecorator={<LineChartIcon />}
                         >
-                          Trackio
-                        </Box>
-                      </Button>
-                    )}
+                          <Box
+                            sx={{
+                              display: {
+                                xs: 'none',
+                                sm: 'none',
+                                md: 'inline-flex',
+                              },
+                            }}
+                          >
+                            Trackio
+                          </Box>
+                        </Button>
+                      )}
 
                     {!hideOutputButton && (
                       <Button
