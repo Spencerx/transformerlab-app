@@ -153,14 +153,17 @@ class Lab:
                 existing_run = context_vars.current_run.get()
                 if existing_run is None:
                     if trackio_project_name_env:
-                        # Shared project: use temp dir, seed from shared path, init with project + run name
+                        # Shared project: metrics dir should be set by compute launch (TRACKIO_DIR) before
+                        # trackio is imported; fall back for local/scripts without a provider.
                         job_id_env = os.environ.get("_TFL_JOB_ID", "unknown")
-                        temp_dir = f"/tmp/trackio/{job_id_env}"
-                        os.makedirs(temp_dir, exist_ok=True)
-                        os.environ["TRACKIO_DIR"] = temp_dir
+                        trackio_dir = (os.environ.get("TRACKIO_DIR") or "").strip()
+                        if not trackio_dir:
+                            trackio_dir = dirs.get_trackio_dir(job_id_env)
+                        os.makedirs(trackio_dir, exist_ok=True)
+                        os.environ.setdefault("TRACKIO_DIR", trackio_dir)
                         _run_async(
                             self._seed_trackio_shared_path_async(
-                                experiment_id or "", trackio_project_name_env, temp_dir
+                                experiment_id or "", trackio_project_name_env, trackio_dir
                             )
                         )
                         trackio.init(
@@ -170,7 +173,13 @@ class Lab:
                         self._trackio_managed = True
                         logger.info(f"📊 Trackio auto-init enabled for shared project '{trackio_project_name_env}'")
                     else:
-                        # Legacy: per-job project name
+                        # Legacy: per-job project name (still avoid Trackio default under HF cache).
+                        job_id_env = os.environ.get("_TFL_JOB_ID", "unknown")
+                        trackio_dir = (os.environ.get("TRACKIO_DIR") or "").strip()
+                        if not trackio_dir:
+                            trackio_dir = dirs.get_trackio_dir(job_id_env)
+                        os.makedirs(trackio_dir, exist_ok=True)
+                        os.environ.setdefault("TRACKIO_DIR", trackio_dir)
                         project_name = str(experiment_id or "TransformerLab")
                         trackio.init(project=project_name)
                         self._trackio_managed = True
