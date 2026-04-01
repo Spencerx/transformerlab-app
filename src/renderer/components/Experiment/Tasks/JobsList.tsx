@@ -558,7 +558,8 @@ const JobsList: React.FC<JobsListProps> = ({
                           >
                             {job?.job_data?.favorite ? (
                               <>
-                                <StarIcon size={16} /> Unfavorite
+                                <StarIcon size={16} fill="currentColor" />{' '}
+                                Unfavorite
                               </>
                             ) : (
                               <>
