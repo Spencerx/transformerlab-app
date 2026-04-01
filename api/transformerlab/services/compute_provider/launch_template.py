@@ -22,6 +22,11 @@ from transformerlab.services.compute_provider.launch_credentials import (
 from transformerlab.services.compute_provider.launch_secrets import find_missing_secrets_for_template_launch
 from transformerlab.services.compute_provider.launch_sweep import create_sweep_parent_job, launch_sweep_jobs
 from transformerlab.services.compute_provider.launch_task_files import copy_task_files_to_dir
+from transformerlab.services.compute_provider.trackio_launch import (
+    apply_trackio_launch_env,
+    build_trackio_run_name,
+    resolve_trackio_project_name,
+)
 from transformerlab.services.compute_provider.cluster_naming import sanitize_cluster_basename
 from transformerlab.services.local_provider_queue import enqueue_local_launch
 from transformerlab.services.provider_harness_hook_service import build_hooked_command
@@ -34,7 +39,7 @@ from transformerlab.shared.interactive_gallery_utils import find_interactive_gal
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
-from lab.dirs import get_job_dir, get_local_provider_job_dir, get_task_dir, get_trackio_dir, get_workspace_dir
+from lab.dirs import get_job_dir, get_local_provider_job_dir, get_task_dir, get_workspace_dir
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
 from werkzeug.utils import secure_filename
@@ -341,24 +346,17 @@ async def launch_template_on_provider(
     trackio_project_name_for_job: Optional[str] = None
     trackio_run_name_for_job: Optional[str] = None
     if request.enable_trackio:
-        env_vars["TLAB_TRACKIO_AUTO_INIT"] = "true"
-        project_name = (request.trackio_project_name or "").strip() or str(request.experiment_id)
-        trackio_run_name = f"{request.task_name or 'task'}-job-{job_short_id}"
+        project_name = resolve_trackio_project_name(request.experiment_id, request.trackio_project_name)
+        trackio_run_name = build_trackio_run_name(request.task_name, job_short_id)
         trackio_project_name_for_job = project_name
         trackio_run_name_for_job = trackio_run_name
-        env_vars["TLAB_TRACKIO_PROJECT_NAME"] = project_name
-        env_vars["TLAB_TRACKIO_RUN_NAME"] = trackio_run_name
-        # Isolate metrics on the runner and set before user imports trackio (default is ~/.cache/huggingface/trackio).
-        env_vars["TRACKIO_DIR"] = get_trackio_dir(job_id)
-        # Create shared project dir so the SDK can sync into it; path is derived by dashboard when needed.
-        workspace_dir = await get_workspace_dir()
-        shared_path = storage.join(
-            workspace_dir,
-            "trackio_runs",
-            secure_filename(str(request.experiment_id)),
-            secure_filename(project_name),
+        await apply_trackio_launch_env(
+            env_vars,
+            job_id=job_id,
+            experiment_id=request.experiment_id,
+            project_name=project_name,
+            run_name=trackio_run_name,
         )
-        await storage.makedirs(shared_path, exist_ok=True)
 
     if request.enable_profiling:
         env_vars["_TFL_PROFILING"] = "1"

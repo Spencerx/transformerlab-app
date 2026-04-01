@@ -20,15 +20,19 @@ from transformerlab.services.compute_provider.launch_credentials import (
     generate_gcp_credentials_setup,
     get_aws_credentials_from_file,
 )
+from transformerlab.services.compute_provider.trackio_launch import (
+    apply_trackio_launch_env,
+    build_trackio_run_name,
+    resolve_trackio_project_name,
+)
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.github_utils import read_github_pat_from_workspace, generate_github_clone_setup
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
-from lab.dirs import get_trackio_dir, get_workspace_dir, set_organization_id
+from lab.dirs import get_workspace_dir, set_organization_id
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
-from werkzeug.utils import secure_filename
 
 
 async def create_sweep_parent_job(
@@ -180,23 +184,18 @@ async def launch_sweep_jobs(
                 trackio_project_name_for_child: str | None = None
                 trackio_run_name_for_child: str | None = None
                 if request.enable_trackio:
-                    env_vars["TLAB_TRACKIO_AUTO_INIT"] = "true"
-                    st_project_name = (request.trackio_project_name or "").strip() or str(request.experiment_id)
+                    st_project_name = resolve_trackio_project_name(request.experiment_id, request.trackio_project_name)
                     child_job_short_id = job_service.get_short_job_id(child_job_id)
-                    st_run_name = f"{request.task_name or 'task'}-job-{child_job_short_id}"
+                    st_run_name = build_trackio_run_name(request.task_name, child_job_short_id)
                     trackio_project_name_for_child = st_project_name
                     trackio_run_name_for_child = st_run_name
-                    env_vars["TLAB_TRACKIO_PROJECT_NAME"] = st_project_name
-                    env_vars["TLAB_TRACKIO_RUN_NAME"] = st_run_name
-                    env_vars["TRACKIO_DIR"] = get_trackio_dir(child_job_id)
-                    workspace_dir_st = await get_workspace_dir()
-                    shared_path_st = storage.join(
-                        workspace_dir_st,
-                        "trackio_runs",
-                        secure_filename(str(request.experiment_id)),
-                        secure_filename(st_project_name),
+                    await apply_trackio_launch_env(
+                        env_vars,
+                        job_id=child_job_id,
+                        experiment_id=request.experiment_id,
+                        project_name=st_project_name,
+                        run_name=st_run_name,
                     )
-                    await storage.makedirs(shared_path_st, exist_ok=True)
 
                 tfl_storage_uri = None
                 try:

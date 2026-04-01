@@ -11,14 +11,18 @@ from transformerlab.compute_providers.models import ClusterConfig
 from transformerlab.schemas.compute_providers import ResumeFromCheckpointRequest
 from transformerlab.services import job_service, quota_service
 from transformerlab.services.compute_provider.cluster_naming import sanitize_cluster_basename
+from transformerlab.services.compute_provider.trackio_launch import (
+    apply_trackio_launch_env,
+    build_trackio_run_name,
+    resolve_trackio_project_name,
+)
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
 from transformerlab.shared.github_utils import generate_github_clone_setup, read_github_pat_from_workspace
 from transformerlab.shared.models.models import ProviderType
 from lab import storage
-from lab.dirs import get_job_checkpoints_dir, get_trackio_dir, get_workspace_dir, set_organization_id
+from lab.dirs import get_job_checkpoints_dir, get_workspace_dir, set_organization_id
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
-from werkzeug.utils import secure_filename
 
 
 async def ensure_quota_recorded_for_completed_jobs(
@@ -203,27 +207,20 @@ async def resume_remote_job_from_checkpoint(
     old_trackio_project_name = (job_data.get("trackio_project_name") or "").strip()
     old_trackio_auto = str(env_vars.get("TLAB_TRACKIO_AUTO_INIT", "")).lower() == "true"
     if old_trackio_auto or old_trackio_project_name:
-        project_name = (
-            old_trackio_project_name
-            or (str(env_vars.get("TLAB_TRACKIO_PROJECT_NAME", "")).strip())
-            or str(experiment_id)
+        project_name = resolve_trackio_project_name(
+            experiment_id,
+            old_trackio_project_name or str(env_vars.get("TLAB_TRACKIO_PROJECT_NAME", "")).strip(),
         )
-        trackio_run_name = f"{job_data.get('task_name') or 'task'}-job-{new_job_short_id}"
+        trackio_run_name = build_trackio_run_name(job_data.get("task_name"), new_job_short_id)
         trackio_project_name_for_job = project_name
         trackio_run_name_for_job = trackio_run_name
-        env_vars["TLAB_TRACKIO_AUTO_INIT"] = "true"
-        env_vars["TLAB_TRACKIO_PROJECT_NAME"] = project_name
-        env_vars["TLAB_TRACKIO_RUN_NAME"] = trackio_run_name
-        env_vars["TRACKIO_DIR"] = get_trackio_dir(new_job_id)
-
-        workspace_dir = await get_workspace_dir()
-        shared_path = storage.join(
-            workspace_dir,
-            "trackio_runs",
-            secure_filename(str(experiment_id)),
-            secure_filename(project_name),
+        await apply_trackio_launch_env(
+            env_vars,
+            job_id=new_job_id,
+            experiment_id=experiment_id,
+            project_name=project_name,
+            run_name=trackio_run_name,
         )
-        await storage.makedirs(shared_path, exist_ok=True)
 
     tfl_storage_uri = None
     try:
