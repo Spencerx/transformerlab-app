@@ -158,7 +158,7 @@ class Lab:
                         job_id_env = os.environ.get("_TFL_JOB_ID", "unknown")
                         trackio_dir = (os.environ.get("TRACKIO_DIR") or "").strip()
                         if not trackio_dir:
-                            trackio_dir = f"/tmp/trackio/{job_id_env}"
+                            trackio_dir = dirs.get_trackio_dir(job_id_env)
                         os.makedirs(trackio_dir, exist_ok=True)
                         os.environ.setdefault("TRACKIO_DIR", trackio_dir)
                         _run_async(
@@ -177,7 +177,7 @@ class Lab:
                         job_id_env = os.environ.get("_TFL_JOB_ID", "unknown")
                         trackio_dir = (os.environ.get("TRACKIO_DIR") or "").strip()
                         if not trackio_dir:
-                            trackio_dir = f"/tmp/trackio/{job_id_env}"
+                            trackio_dir = dirs.get_trackio_dir(job_id_env)
                         os.makedirs(trackio_dir, exist_ok=True)
                         os.environ.setdefault("TRACKIO_DIR", trackio_dir)
                         project_name = str(experiment_id or "TransformerLab")

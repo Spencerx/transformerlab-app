@@ -25,7 +25,7 @@ from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.github_utils import read_github_pat_from_workspace, generate_github_clone_setup
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
-from lab.dirs import get_workspace_dir, set_organization_id
+from lab.dirs import get_trackio_dir, get_workspace_dir, set_organization_id
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
 from werkzeug.utils import secure_filename
@@ -188,7 +188,7 @@ async def launch_sweep_jobs(
                     trackio_run_name_for_child = st_run_name
                     env_vars["TLAB_TRACKIO_PROJECT_NAME"] = st_project_name
                     env_vars["TLAB_TRACKIO_RUN_NAME"] = st_run_name
-                    env_vars["TRACKIO_DIR"] = f"/tmp/trackio/{child_job_id}"
+                    env_vars["TRACKIO_DIR"] = get_trackio_dir(child_job_id)
                     workspace_dir_st = await get_workspace_dir()
                     shared_path_st = storage.join(
                         workspace_dir_st,

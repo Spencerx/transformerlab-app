@@ -34,7 +34,7 @@ from transformerlab.shared.interactive_gallery_utils import find_interactive_gal
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
-from lab.dirs import get_job_dir, get_local_provider_job_dir, get_task_dir, get_workspace_dir
+from lab.dirs import get_job_dir, get_local_provider_job_dir, get_task_dir, get_trackio_dir, get_workspace_dir
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
 from werkzeug.utils import secure_filename
@@ -349,7 +349,7 @@ async def launch_template_on_provider(
         env_vars["TLAB_TRACKIO_PROJECT_NAME"] = project_name
         env_vars["TLAB_TRACKIO_RUN_NAME"] = trackio_run_name
         # Isolate metrics on the runner and set before user imports trackio (default is ~/.cache/huggingface/trackio).
-        env_vars["TRACKIO_DIR"] = f"/tmp/trackio/{job_id}"
+        env_vars["TRACKIO_DIR"] = get_trackio_dir(job_id)
         # Create shared project dir so the SDK can sync into it; path is derived by dashboard when needed.
         workspace_dir = await get_workspace_dir()
         shared_path = storage.join(
