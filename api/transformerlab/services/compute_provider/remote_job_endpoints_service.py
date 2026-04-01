@@ -18,6 +18,7 @@ from lab import storage
 from lab.dirs import get_job_checkpoints_dir, get_workspace_dir, set_organization_id
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
+from werkzeug.utils import secure_filename
 
 
 async def ensure_quota_recorded_for_completed_jobs(
@@ -195,6 +196,35 @@ async def resume_remote_job_from_checkpoint(
     if user:
         env_vars["_TFL_USER_ID"] = str(user.id)
 
+    # Preserve Trackio behavior on checkpoint resumes, but remap job-specific paths
+    # to the new job id so resumed runs do not write into the old job's local dir.
+    trackio_project_name_for_job: str | None = None
+    trackio_run_name_for_job: str | None = None
+    old_trackio_project_name = (job_data.get("trackio_project_name") or "").strip()
+    old_trackio_auto = str(env_vars.get("TLAB_TRACKIO_AUTO_INIT", "")).lower() == "true"
+    if old_trackio_auto or old_trackio_project_name:
+        project_name = (
+            old_trackio_project_name
+            or (str(env_vars.get("TLAB_TRACKIO_PROJECT_NAME", "")).strip())
+            or str(experiment_id)
+        )
+        trackio_run_name = f"{job_data.get('task_name') or 'task'}-job-{new_job_short_id}"
+        trackio_project_name_for_job = project_name
+        trackio_run_name_for_job = trackio_run_name
+        env_vars["TLAB_TRACKIO_AUTO_INIT"] = "true"
+        env_vars["TLAB_TRACKIO_PROJECT_NAME"] = project_name
+        env_vars["TLAB_TRACKIO_RUN_NAME"] = trackio_run_name
+        env_vars["TRACKIO_DIR"] = f"/tmp/trackio/{new_job_id}"
+
+        workspace_dir = await get_workspace_dir()
+        shared_path = storage.join(
+            workspace_dir,
+            "trackio_runs",
+            secure_filename(str(experiment_id)),
+            secure_filename(project_name),
+        )
+        await storage.makedirs(shared_path, exist_ok=True)
+
     tfl_storage_uri = None
     try:
         storage_root = await storage.root_uri()
@@ -264,6 +294,10 @@ async def resume_remote_job_from_checkpoint(
         "team_id": team_id,
         "start_time": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
     }
+    if trackio_project_name_for_job is not None:
+        launch_job_data["trackio_project_name"] = trackio_project_name_for_job
+    if trackio_run_name_for_job is not None:
+        launch_job_data["trackio_run_name"] = trackio_run_name_for_job
 
     await job_service.job_update_job_data_insert_key_values(
         new_job_id, {k: v for k, v in launch_job_data.items() if v is not None}, experiment_id
