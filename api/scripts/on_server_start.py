@@ -23,10 +23,10 @@ async def main() -> None:
     print("✅ Running one-time startup tasks")
     await run_alembic_migrations()
     await seed_default_admin_user()
-    await seed_default_experiments()
     await galleries.update_gallery_cache()
 
-    # Create buckets/folders for all existing teams if cloud or localfs storage is enabled.
+    # Buckets/containers/local workspace dirs must exist before seed_default_experiments(),
+    # which writes experiment metadata to remote storage (e.g. Azure block upload).
     tfl_remote_storage_enabled = os.getenv("TFL_REMOTE_STORAGE_ENABLED", "false").lower() == "true"
     if tfl_remote_storage_enabled or (os.getenv("TFL_STORAGE_PROVIDER") == "localfs" and os.getenv("TFL_STORAGE_URI")):
         print("✅ CHECKING STORAGE FOR EXISTING TEAMS")
@@ -43,6 +43,8 @@ async def main() -> None:
                         print(f"   - {error}")
         except Exception as e:
             print(f"⚠️  Error creating storage for existing teams: {e}")
+
+    await seed_default_experiments()
 
     print("✅ One-time startup tasks complete")
 
