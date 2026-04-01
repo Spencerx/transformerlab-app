@@ -375,7 +375,11 @@ async def ls(path: str, detail: bool = False, fs=None):
 
 async def find(path: str) -> list[str]:
     fs = await filesystem()
-    return await asyncio.to_thread(fs.find, path)
+    try:
+        return await asyncio.to_thread(fs.find, path)
+    finally:
+        # Close filesystem even if exception raised.
+        await _close_filesystem(fs)
 
 
 async def walk(path: str, maxdepth=None, topdown=True, on_error="omit"):
@@ -392,15 +396,25 @@ async def walk(path: str, maxdepth=None, topdown=True, on_error="omit"):
         List of (root, dirs, files) tuples similar to os.walk()
     """
     fs = await filesystem()
-    # Materialise the generator in a thread so the blocking filesystem
-    # traversal never stalls the event loop.
-    return await asyncio.to_thread(lambda: list(fs.walk(path, maxdepth=maxdepth, topdown=topdown, on_error=on_error)))
+    try:
+        # Materialise the generator in a thread so the blocking filesystem
+        # traversal never stalls the event loop.
+        return await asyncio.to_thread(
+            lambda: list(fs.walk(path, maxdepth=maxdepth, topdown=topdown, on_error=on_error))
+        )
+    finally:
+        # Close filesystem even if exception raised.
+        await _close_filesystem(fs)
 
 
 async def rm(path: str) -> None:
     if await exists(path):
         fs = await filesystem()
-        await asyncio.to_thread(fs.rm, path)
+        try:
+            await asyncio.to_thread(fs.rm, path)
+        finally:
+            # Close filesystem even if exception raised.
+            await _close_filesystem(fs)
 
 
 async def rm_tree(path: str) -> None:
@@ -414,6 +428,9 @@ async def rm_tree(path: str) -> None:
             files = await find(path)
             for file_path in reversed(files):  # Remove files before directories
                 await asyncio.to_thread(fs.rm, file_path)
+        finally:
+            # Close filesystem even if exception raised.
+            await _close_filesystem(fs)
 
 
 async def open(path: str, mode: str = "r", fs=None, uncached: bool = False, **kwargs):
