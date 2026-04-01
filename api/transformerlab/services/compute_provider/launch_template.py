@@ -348,6 +348,8 @@ async def launch_template_on_provider(
         trackio_run_name_for_job = trackio_run_name
         env_vars["TLAB_TRACKIO_PROJECT_NAME"] = project_name
         env_vars["TLAB_TRACKIO_RUN_NAME"] = trackio_run_name
+        # Isolate metrics on the runner and set before user imports trackio (default is ~/.cache/huggingface/trackio).
+        env_vars["TRACKIO_DIR"] = f"/tmp/trackio/{job_id}"
         # Create shared project dir so the SDK can sync into it; path is derived by dashboard when needed.
         workspace_dir = await get_workspace_dir()
         shared_path = storage.join(

@@ -28,6 +28,7 @@ from lab import storage
 from lab.dirs import get_workspace_dir, set_organization_id
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
+from werkzeug.utils import secure_filename
 
 
 async def create_sweep_parent_job(
@@ -176,6 +177,27 @@ async def launch_sweep_jobs(
                 env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
                 env_vars["_TFL_USER_ID"] = user_id
 
+                trackio_project_name_for_child: str | None = None
+                trackio_run_name_for_child: str | None = None
+                if request.enable_trackio:
+                    env_vars["TLAB_TRACKIO_AUTO_INIT"] = "true"
+                    st_project_name = (request.trackio_project_name or "").strip() or str(request.experiment_id)
+                    child_job_short_id = job_service.get_short_job_id(child_job_id)
+                    st_run_name = f"{request.task_name or 'task'}-job-{child_job_short_id}"
+                    trackio_project_name_for_child = st_project_name
+                    trackio_run_name_for_child = st_run_name
+                    env_vars["TLAB_TRACKIO_PROJECT_NAME"] = st_project_name
+                    env_vars["TLAB_TRACKIO_RUN_NAME"] = st_run_name
+                    env_vars["TRACKIO_DIR"] = f"/tmp/trackio/{child_job_id}"
+                    workspace_dir_st = await get_workspace_dir()
+                    shared_path_st = storage.join(
+                        workspace_dir_st,
+                        "trackio_runs",
+                        secure_filename(str(request.experiment_id)),
+                        secure_filename(st_project_name),
+                    )
+                    await storage.makedirs(shared_path_st, exist_ok=True)
+
                 tfl_storage_uri = None
                 try:
                     storage_root = await storage.root_uri()
@@ -311,6 +333,10 @@ async def launch_sweep_jobs(
                 }
                 if request.file_mounts is True and request.task_id:
                     child_job_data["task_id"] = request.task_id
+                if trackio_project_name_for_child is not None:
+                    child_job_data["trackio_project_name"] = trackio_project_name_for_child
+                if trackio_run_name_for_child is not None:
+                    child_job_data["trackio_run_name"] = trackio_run_name_for_child
 
                 child_job_updates = {key: value for key, value in child_job_data.items() if value is not None}
                 if child_job_updates:
