@@ -135,33 +135,22 @@ async def lifespan(app: FastAPI):
     await start_remote_job_status_worker()
     await start_notification_worker()
 
-    # Start DB-backed job queue workers (Phase 2).
-    from transformerlab.services.local_provider_queue import start_local_job_queue_worker
-    from transformerlab.services.remote_provider_queue import start_remote_job_queue_worker
+    # Start DB-backed remote job queue worker.
+    from transformerlab.services.remote_provider_queue import start_remote_job_queue_worker, stop_remote_job_queue_worker
 
-    await start_local_job_queue_worker()
     await start_remote_job_queue_worker()
-    if "--reload" in sys.argv:
-        await install_all_plugins()
 
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
     await stop_sweep_status_worker()
-    from transformerlab.services.remote_job_status_service import stop_remote_job_status_worker
-    from transformerlab.services.notification_service import stop_notification_worker
-
     await stop_remote_job_status_worker()
     await stop_notification_worker()
+    await stop_remote_job_queue_worker()
+
     from transformerlab.services.migrate_jobs_to_experiment_dirs import stop_jobs_migration_worker
 
     await stop_jobs_migration_worker()
-
-    from transformerlab.services.local_provider_queue import stop_local_job_queue_worker
-    from transformerlab.services.remote_provider_queue import stop_remote_job_queue_worker
-
-    await stop_local_job_queue_worker()
-    await stop_remote_job_queue_worker()
 
     from transformerlab.services.process_registry import get_registry
 
