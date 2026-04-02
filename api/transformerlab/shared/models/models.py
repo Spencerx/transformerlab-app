@@ -284,3 +284,29 @@ class QuotaHold(Base):
         Index("idx_quota_holds_task_id", "task_id"),
         Index("idx_quota_holds_job_id", "job_id"),
     )
+
+
+class JobQueue(Base):
+    """Persistent queue for jobs waiting to be dispatched by a background worker.
+
+    Rows are inserted when a job is enqueued (e.g. via ``enqueue_remote_launch``)
+    and transition from ``PENDING`` → ``DISPATCHED`` once the worker picks them up.
+    The worker queries ``status = 'PENDING'`` ordered by ``created_at`` to drain
+    the queue in FIFO order.
+    """
+
+    __tablename__ = "job_queue"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id: Mapped[str] = mapped_column(String, nullable=False)
+    experiment_id: Mapped[str] = mapped_column(String, nullable=False)
+    team_id: Mapped[str] = mapped_column(String, nullable=False)
+    queue_type: Mapped[str] = mapped_column(String, nullable=False)  # e.g. "REMOTE"
+    status: Mapped[str] = mapped_column(String, nullable=False)  # "PENDING", "DISPATCHED", "FAILED"
+    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("idx_job_queue_status_type", "status", "queue_type"),
+        Index("idx_job_queue_job_id", "job_id"),
+    )
