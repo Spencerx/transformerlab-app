@@ -143,10 +143,12 @@ async def launch_template_on_provider(
     # NOTE: We no longer launch inline; provider instance is resolved in the remote launch worker.
 
     # Interactive templates should start directly in INTERACTIVE state instead of LAUNCHING,
-    # except for LOCAL providers where we introduce a WAITING status while queued.
-    initial_status = JobStatus.INTERACTIVE if request.subtype == "interactive" else JobStatus.LAUNCHING
+    # except for LOCAL providers where we use QUEUED_LOCAL while waiting for the worker,
+    # and for non-local providers we use QUEUED_REMOTE.
     if provider.type == ProviderType.LOCAL.value:
-        initial_status = JobStatus.WAITING
+        initial_status = JobStatus.QUEUED_LOCAL
+    else:
+        initial_status = JobStatus.QUEUED_REMOTE
 
     job_id = await job_service.job_create(
         type="REMOTE",
@@ -561,6 +563,14 @@ async def launch_template_on_provider(
     if trackio_run_name_for_job is not None:
         job_data["trackio_run_name"] = trackio_run_name_for_job
 
+    # Store quota_hold_id so the background worker can release it on failure.
+    if quota_hold:
+        job_data["quota_hold_id"] = str(quota_hold.id)
+
+    # Store initial_status so the background worker knows the target state after launch.
+    local_initial_status = JobStatus.INTERACTIVE if request.subtype == "interactive" else JobStatus.LAUNCHING
+    job_data["initial_status"] = str(local_initial_status)
+
     await job_service.job_update_job_data_insert_key_values(
         job_id, {k: v for k, v in job_data.items() if v is not None}, request.experiment_id
     )
@@ -643,6 +653,12 @@ async def launch_template_on_provider(
         use_spot=skypilot_use_spot,
     )
 
+    # Persist cluster_config into job_data so the DB-backed queue workers
+    # can reconstruct the work item without the in-memory object.
+    await job_service.job_update_job_data_insert_key_value(
+        job_id, "cluster_config", cluster_config.model_dump(), request.experiment_id
+    )
+
     await job_service.job_update_launch_progress(
         job_id,
         request.experiment_id,
@@ -676,11 +692,11 @@ async def launch_template_on_provider(
         )
 
         return {
-            "status": JobStatus.WAITING,
+            "status": JobStatus.QUEUED_LOCAL,
             "job_id": job_id,
             "cluster_name": formatted_cluster_name,
             "request_id": None,
-            "message": "Local provider launch waiting in queue",
+            "message": "Local provider launch queued",
         }
 
     await enqueue_remote_launch(
@@ -696,7 +712,7 @@ async def launch_template_on_provider(
     )
 
     return {
-        "status": "success",
+        "status": JobStatus.QUEUED_REMOTE,
         "job_id": job_id,
         "cluster_name": formatted_cluster_name,
         "request_id": None,
