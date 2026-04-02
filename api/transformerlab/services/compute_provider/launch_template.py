@@ -143,12 +143,10 @@ async def launch_template_on_provider(
     # NOTE: We no longer launch inline; provider instance is resolved in the remote launch worker.
 
     # Interactive templates should start directly in INTERACTIVE state instead of LAUNCHING,
-    # except for LOCAL providers where we use QUEUED_LOCAL while waiting for the worker,
-    # and for non-local providers we use QUEUED_REMOTE.
+    # except for LOCAL providers where we introduce a WAITING status while queued.
+    initial_status = JobStatus.INTERACTIVE if request.subtype == "interactive" else JobStatus.LAUNCHING
     if provider.type == ProviderType.LOCAL.value:
-        initial_status = JobStatus.QUEUED_LOCAL
-    else:
-        initial_status = JobStatus.QUEUED_REMOTE
+        initial_status = JobStatus.WAITING
 
     job_id = await job_service.job_create(
         type="REMOTE",
@@ -567,10 +565,6 @@ async def launch_template_on_provider(
     if quota_hold:
         job_data["quota_hold_id"] = str(quota_hold.id)
 
-    # Store initial_status so the background worker knows the target state after launch.
-    local_initial_status = JobStatus.INTERACTIVE if request.subtype == "interactive" else JobStatus.LAUNCHING
-    job_data["initial_status"] = str(local_initial_status)
-
     await job_service.job_update_job_data_insert_key_values(
         job_id, {k: v for k, v in job_data.items() if v is not None}, request.experiment_id
     )
@@ -692,11 +686,11 @@ async def launch_template_on_provider(
         )
 
         return {
-            "status": JobStatus.QUEUED_LOCAL,
+            "status": JobStatus.WAITING,
             "job_id": job_id,
             "cluster_name": formatted_cluster_name,
             "request_id": None,
-            "message": "Local provider launch queued",
+            "message": "Local provider launch waiting in queue",
         }
 
     await enqueue_remote_launch(
@@ -712,7 +706,7 @@ async def launch_template_on_provider(
     )
 
     return {
-        "status": JobStatus.QUEUED_REMOTE,
+        "status": "success",
         "job_id": job_id,
         "cluster_name": formatted_cluster_name,
         "request_id": None,
