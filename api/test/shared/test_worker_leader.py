@@ -92,10 +92,12 @@ def test_try_acquire_leadership_failure_pid_in_message(reset_worker_leader_state
             # Check that PID is in the log message
             pid_str = str(os.getpid())
             assert len(caplog.records) > 0, f"No log records captured. Got: {caplog.records}"
-            assert any(pid_str in record.message for record in caplog.records), \
+            assert any(pid_str in record.message for record in caplog.records), (
                 f"PID {pid_str} not found in log messages: {[r.message for r in caplog.records]}"
-            assert any("not the leader" in record.message for record in caplog.records), \
+            )
+            assert any("not the leader" in record.message for record in caplog.records), (
                 f"'not the leader' not found in log messages: {[r.message for r in caplog.records]}"
+            )
 
 
 def test_try_acquire_leadership_catches_blocking_io_error(reset_worker_leader_state, mock_lock_path):
@@ -167,5 +169,6 @@ def test_fcntl_unavailable_fallback(reset_worker_leader_state, mock_lock_path, c
         assert result is True
         assert wl.is_leader() is True
         assert len(caplog.records) > 0, f"No log records captured. Got: {caplog.records}"
-        assert any("fcntl unavailable" in record.message for record in caplog.records), \
+        assert any("fcntl unavailable" in record.message for record in caplog.records), (
             f"'fcntl unavailable' not found in log messages: {[r.message for r in caplog.records]}"
+        )
