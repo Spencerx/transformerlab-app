@@ -59,10 +59,11 @@ def try_acquire_leadership() -> bool:
         _leader = True
         logger.info("[leader] This process acquired worker leadership (pid=%s)", os.getpid())
         return True
-    except OSError:
+    except BlockingIOError:
         # Another process already holds the lock.
         _leader = False
-        logger.info("[worker] This process is not the leader; background workers will not start")
+        logger.info("[worker] This process is not the leader (pid=%s); background workers will not start", os.getpid())
+        fd.close()
         return False
 
 
