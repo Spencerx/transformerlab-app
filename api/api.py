@@ -111,70 +111,57 @@ async def lifespan(app: FastAPI):
     await asyncio.to_thread(validate_cloud_credentials)
     await db.init()
 
-    # --- Leader election ------------------------------------------------
-    from transformerlab.shared.worker_leader import try_acquire_leadership, is_leader
+    # One-time migration: legacy workspace/jobs -> workspace/experiments/<exp_id>/jobs
+    # Runs in the background so it doesn't delay the API startup.
+    from transformerlab.services.migrate_jobs_to_experiment_dirs import start_jobs_migration_worker
 
-    try_acquire_leadership()
-    if is_leader():
-        print("[leader] This process acquired worker leadership")
-    else:
-        print("[worker] This process is not the leader; background workers will not start")
+    await start_jobs_migration_worker()
 
-    # --- Background workers (leader only) --------------------------------
-    if is_leader():
-        # One-time migration: legacy workspace/jobs -> workspace/experiments/<exp_id>/jobs
-        # Runs in the background so it doesn't delay the API startup.
-        from transformerlab.services.migrate_jobs_to_experiment_dirs import start_jobs_migration_worker
+    if "--reload" in sys.argv:
+        await install_all_plugins()
 
-        await start_jobs_migration_worker()
+    # Start background sweep status updater after all startup steps succeed.
+    await start_sweep_status_worker()
+    # Start background remote job status poller (replaces inline provider polling in check-status).
+    from transformerlab.services.remote_job_status_service import (
+        start_remote_job_status_worker,
+        stop_remote_job_status_worker,
+    )
+    from transformerlab.services.notification_service import (
+        start_notification_worker,
+        stop_notification_worker,
+    )
 
-        if "--reload" in sys.argv:
-            await install_all_plugins()
+    await start_remote_job_status_worker()
+    await start_notification_worker()
 
-        # Start background sweep status updater after all startup steps succeed.
-        await start_sweep_status_worker()
-        # Start background remote job status poller (replaces inline provider polling in check-status).
-        from transformerlab.services.remote_job_status_service import (
-            start_remote_job_status_worker,
-            stop_remote_job_status_worker,
-        )
-        from transformerlab.services.notification_service import (
-            start_notification_worker,
-            stop_notification_worker,
-        )
+    # Start DB-backed job queue workers (Phase 2).
+    from transformerlab.services.local_provider_queue import start_local_job_queue_worker
+    from transformerlab.services.remote_provider_queue import start_remote_job_queue_worker
 
-        await start_remote_job_status_worker()
-        await start_notification_worker()
-
-        # Start DB-backed job queue workers (Phase 2).
-        from transformerlab.services.local_provider_queue import start_local_job_queue_worker
-        from transformerlab.services.remote_provider_queue import start_remote_job_queue_worker
-
-        await start_local_job_queue_worker()
-        await start_remote_job_queue_worker()
-    else:
-        if "--reload" in sys.argv:
-            await install_all_plugins()
+    await start_local_job_queue_worker()
+    await start_remote_job_queue_worker()
+    if "--reload" in sys.argv:
+        await install_all_plugins()
 
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
-    if is_leader():
-        await stop_sweep_status_worker()
-        from transformerlab.services.remote_job_status_service import stop_remote_job_status_worker
-        from transformerlab.services.notification_service import stop_notification_worker
+    await stop_sweep_status_worker()
+    from transformerlab.services.remote_job_status_service import stop_remote_job_status_worker
+    from transformerlab.services.notification_service import stop_notification_worker
 
-        await stop_remote_job_status_worker()
-        await stop_notification_worker()
-        from transformerlab.services.migrate_jobs_to_experiment_dirs import stop_jobs_migration_worker
+    await stop_remote_job_status_worker()
+    await stop_notification_worker()
+    from transformerlab.services.migrate_jobs_to_experiment_dirs import stop_jobs_migration_worker
 
-        await stop_jobs_migration_worker()
+    await stop_jobs_migration_worker()
 
-        from transformerlab.services.local_provider_queue import stop_local_job_queue_worker
-        from transformerlab.services.remote_provider_queue import stop_remote_job_queue_worker
+    from transformerlab.services.local_provider_queue import stop_local_job_queue_worker
+    from transformerlab.services.remote_provider_queue import stop_remote_job_queue_worker
 
-        await stop_local_job_queue_worker()
-        await stop_remote_job_queue_worker()
+    await stop_local_job_queue_worker()
+    await stop_remote_job_queue_worker()
 
     from transformerlab.services.process_registry import get_registry
 
