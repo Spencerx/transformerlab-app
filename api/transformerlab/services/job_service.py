@@ -1012,37 +1012,3 @@ async def format_model(dir_path: str) -> Optional[Dict[str, any]]:
     except Exception as e:
         print(f"Error formatting model {dir_path}: {e}")
         return None
-
-
-async def jobs_get_by_status(status: str, experiment_id: Optional[str] = None) -> list[dict]:
-    """Return all jobs matching *status*, optionally scoped to a single experiment.
-
-    When *experiment_id* is ``None`` the function scans **every** experiment
-    visible in the current organisation context (set via ``lab.dirs``).
-
-    Results are sorted by ``created_at`` ascending (oldest first) so callers
-    that process jobs serially respect FIFO ordering.
-    """
-    target_experiments: list[str] = []
-    if experiment_id:
-        target_experiments = [str(experiment_id)]
-    else:
-        try:
-            experiments_data = await Experiment.get_all()
-        except Exception:
-            logger.exception("jobs_get_by_status: failed to list experiments")
-            return []
-        target_experiments = [str(exp.get("id")) for exp in experiments_data if exp.get("id")]
-
-    matched: list[dict] = []
-    for exp_id in target_experiments:
-        try:
-            jobs = await jobs_get_all(exp_id, type="", status=status)
-            matched.extend(jobs)
-        except Exception:
-            logger.exception("jobs_get_by_status: error listing jobs for experiment=%s", exp_id)
-            continue
-
-    # Sort oldest-first so workers drain in FIFO order.
-    matched.sort(key=_sort_key_job_recency)
-    return matched
