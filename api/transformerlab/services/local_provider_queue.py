@@ -145,8 +145,7 @@ def _reconstruct_work_item(job: dict) -> Optional[LocalLaunchWorkItem]:
 
     if not provider_id or not team_id or not cluster_name:
         logger.error(
-            "Local job queue worker: job %s missing required fields "
-            "(provider_id=%s, team_id=%s, cluster_name=%s)",
+            "Local job queue worker: job %s missing required fields (provider_id=%s, team_id=%s, cluster_name=%s)",
             job_id,
             provider_id,
             team_id,
@@ -234,9 +233,7 @@ async def start_local_job_queue_worker() -> None:
     if _local_job_queue_worker_task and not _local_job_queue_worker_task.done():
         return
 
-    _local_job_queue_worker_task = asyncio.create_task(
-        _local_job_queue_worker_loop(), name="local-job-queue-worker"
-    )
+    _local_job_queue_worker_task = asyncio.create_task(_local_job_queue_worker_loop(), name="local-job-queue-worker")
 
 
 async def stop_local_job_queue_worker() -> None:
