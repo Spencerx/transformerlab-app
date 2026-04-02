@@ -136,7 +136,10 @@ async def lifespan(app: FastAPI):
     await start_notification_worker()
 
     # Start DB-backed remote job queue worker.
-    from transformerlab.services.remote_provider_queue import start_remote_job_queue_worker, stop_remote_job_queue_worker
+    from transformerlab.services.remote_provider_queue import (
+        start_remote_job_queue_worker,
+        stop_remote_job_queue_worker,
+    )
 
     await start_remote_job_queue_worker()
 

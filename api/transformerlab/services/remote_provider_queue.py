@@ -133,8 +133,7 @@ def _reconstruct_work_item(job: dict) -> Optional[RemoteLaunchWorkItem]:
 
     if not provider_id or not team_id or not cluster_name:
         logger.error(
-            "Remote job queue worker: job %s missing required fields "
-            "(provider_id=%s, team_id=%s, cluster_name=%s)",
+            "Remote job queue worker: job %s missing required fields (provider_id=%s, team_id=%s, cluster_name=%s)",
             job_id,
             provider_id,
             team_id,
@@ -247,9 +246,7 @@ async def start_remote_job_queue_worker() -> None:
     if _remote_job_queue_worker_task and not _remote_job_queue_worker_task.done():
         return
 
-    _remote_job_queue_worker_task = asyncio.create_task(
-        _remote_job_queue_worker_loop(), name="remote-job-queue-worker"
-    )
+    _remote_job_queue_worker_task = asyncio.create_task(_remote_job_queue_worker_loop(), name="remote-job-queue-worker")
 
 
 async def stop_remote_job_queue_worker() -> None:
