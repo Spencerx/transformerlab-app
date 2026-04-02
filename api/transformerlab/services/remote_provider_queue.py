@@ -1,16 +1,19 @@
 import asyncio
+import json as _json
 import logging
 import os
+import uuid
 from typing import Optional
 
 from pydantic import BaseModel
+from sqlalchemy import select, update
 
 from transformerlab.compute_providers.models import ClusterConfig
 from transformerlab.db.session import async_session
 from transformerlab.services import job_service, quota_service
 from transformerlab.services.provider_service import get_provider_by_id, get_provider_instance
-from lab import Experiment, dirs as lab_dirs
-from lab.dirs import set_organization_id as lab_set_org_id
+from transformerlab.shared.models.models import JobQueue
+from lab import dirs as lab_dirs
 from lab.job_status import JobStatus
 
 logger = logging.getLogger(__name__)
@@ -59,10 +62,22 @@ async def enqueue_remote_launch(
     quota_hold_id: Optional[str],
     subtype: Optional[str],
 ) -> None:
-    """Mark a remote provider launch job as QUEUED_REMOTE in the DB.
+    """Insert a row into the job_queue table and set the job status to QUEUED_REMOTE.
 
-    The leader's background worker will pick it up and process it.
+    The background worker polls this table and dispatches PENDING entries.
     """
+    async with async_session() as session:
+        entry = JobQueue(
+            id=str(uuid.uuid4()),
+            job_id=str(job_id),
+            experiment_id=str(experiment_id),
+            team_id=str(team_id),
+            queue_type="REMOTE",
+            status="PENDING",
+        )
+        session.add(entry)
+        await session.commit()
+
     await job_service.job_update_status(
         str(job_id),
         JobStatus.QUEUED_REMOTE,
@@ -72,64 +87,40 @@ async def enqueue_remote_launch(
 
 
 # ---------------------------------------------------------------------------
-# Background worker - started only by the leader process
+# Background worker
 # ---------------------------------------------------------------------------
 
 
-def _set_org_context(org_id: Optional[str]) -> None:
-    lab_set_org_id(org_id)
+async def _poll_pending_remote_entries() -> list[JobQueue]:
+    """Query the job_queue table for PENDING REMOTE entries, ordered by created_at (FIFO)."""
+    async with async_session() as session:
+        stmt = (
+            select(JobQueue)
+            .where(JobQueue.status == "PENDING", JobQueue.queue_type == "REMOTE")
+            .order_by(JobQueue.created_at.asc())
+        )
+        result = await session.execute(stmt)
+        return list(result.scalars().all())
 
 
-def _clear_org_context() -> None:
-    _set_org_context(None)
+async def _mark_entry_dispatched(entry_id: str) -> None:
+    """Transition a job_queue row from PENDING to DISPATCHED."""
+    async with async_session() as session:
+        stmt = update(JobQueue).where(JobQueue.id == entry_id).values(status="DISPATCHED")
+        await session.execute(stmt)
+        await session.commit()
 
 
-async def _list_all_org_ids():
-    from transformerlab.services import team_service
-
-    try:
-        return await team_service.get_all_team_ids()
-    except Exception as exc:
-        logger.warning(f"Remote job queue worker: failed listing orgs: {exc}")
-        return []
-
-
-async def _list_experiment_ids_for_current_org():
-    try:
-        experiments_data = await Experiment.get_all()
-    except Exception as exc:
-        logger.warning(f"Remote job queue worker: failed listing experiments: {exc}")
-        return []
-    return [str(exp.get("id")) for exp in experiments_data if exp.get("id")]
-
-
-async def _poll_queued_remote_jobs() -> list[dict]:
-    """Find all QUEUED_REMOTE jobs across all orgs and experiments, oldest first."""
-    all_jobs: list[dict] = []
-    org_ids = await _list_all_org_ids()
-    for org_id in org_ids:
-        try:
-            _set_org_context(org_id)
-            experiment_ids = await _list_experiment_ids_for_current_org()
-            for exp_id in experiment_ids:
-                try:
-                    jobs = await job_service.jobs_get_all(exp_id, type="", status=JobStatus.QUEUED_REMOTE)
-                    all_jobs.extend(jobs)
-                except Exception:
-                    logger.exception(
-                        "Remote job queue worker: error listing QUEUED_REMOTE jobs for experiment=%s", exp_id
-                    )
-        finally:
-            _clear_org_context()
-    # Sort oldest-first (FIFO).
-    all_jobs.sort(key=job_service._sort_key_job_recency)
-    return all_jobs
+async def _mark_entry_failed(entry_id: str) -> None:
+    """Transition a job_queue row to FAILED (could not reconstruct work item)."""
+    async with async_session() as session:
+        stmt = update(JobQueue).where(JobQueue.id == entry_id).values(status="FAILED")
+        await session.execute(stmt)
+        await session.commit()
 
 
 def _reconstruct_work_item(job: dict) -> Optional[RemoteLaunchWorkItem]:
     """Reconstruct a RemoteLaunchWorkItem from stored job data."""
-    import json as _json
-
     job_data = job.get("job_data") or {}
     if isinstance(job_data, str):
         try:
@@ -147,7 +138,8 @@ def _reconstruct_work_item(job: dict) -> Optional[RemoteLaunchWorkItem]:
 
     if not provider_id or not team_id or not cluster_name:
         logger.error(
-            "Remote job queue worker: job %s missing required fields (provider_id=%s, team_id=%s, cluster_name=%s)",
+            "Remote job queue worker: job %s missing required fields "
+            "(provider_id=%s, team_id=%s, cluster_name=%s)",
             job_id,
             provider_id,
             team_id,
@@ -196,25 +188,43 @@ def _log_task_exception(task: asyncio.Task) -> None:
 
 
 async def _remote_job_queue_worker_loop() -> None:
-    """Long-running worker that polls DB for QUEUED_REMOTE jobs and dispatches them concurrently."""
+    """Long-running worker that polls the job_queue SQL table for PENDING remote jobs."""
     logger.info("Remote job queue worker: started")
     try:
         while True:
             try:
-                queued_jobs = await _poll_queued_remote_jobs()
-                if not queued_jobs:
+                pending_entries = await _poll_pending_remote_entries()
+                if not pending_entries:
                     await asyncio.sleep(_REMOTE_QUEUE_POLL_INTERVAL)
                     continue
 
-                for job in queued_jobs:
-                    job_id = str(job.get("id", ""))
-                    experiment_id = str(job.get("experiment_id", ""))
+                for entry in pending_entries:
+                    # Mark dispatched immediately so the next poll cycle doesn't pick it up again.
+                    await _mark_entry_dispatched(entry.id)
+
+                    # Set org context so the job_service can find the job on disk.
+                    lab_dirs.set_organization_id(entry.team_id)
+                    try:
+                        job = await job_service.job_get(entry.job_id, experiment_id=entry.experiment_id)
+                    finally:
+                        lab_dirs.set_organization_id(None)
+
+                    if not job:
+                        logger.error(
+                            "Remote job queue worker: job %s not found (experiment=%s)",
+                            entry.job_id,
+                            entry.experiment_id,
+                        )
+                        await _mark_entry_failed(entry.id)
+                        continue
+
                     item = _reconstruct_work_item(job)
                     if item is None:
+                        await _mark_entry_failed(entry.id)
                         await job_service.job_update_status(
-                            job_id,
+                            entry.job_id,
                             JobStatus.FAILED,
-                            experiment_id=experiment_id,
+                            experiment_id=entry.experiment_id,
                             error_msg="Failed to reconstruct launch work item from job data - "
                             "required fields (provider_id, team_id, cluster_name, cluster_config) may be missing.",
                         )
@@ -224,7 +234,7 @@ async def _remote_job_queue_worker_loop() -> None:
                     task = asyncio.create_task(_process_launch_item(item))
                     task.add_done_callback(_log_task_exception)
 
-                # After dispatching all found jobs, loop immediately to check for more.
+                # After dispatching all found entries, loop immediately to check for more.
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -233,8 +243,6 @@ async def _remote_job_queue_worker_loop() -> None:
     except asyncio.CancelledError:
         logger.info("Remote job queue worker: stopping")
         raise
-    finally:
-        _clear_org_context()
 
 
 async def start_remote_job_queue_worker() -> None:
@@ -244,7 +252,9 @@ async def start_remote_job_queue_worker() -> None:
     if _remote_job_queue_worker_task and not _remote_job_queue_worker_task.done():
         return
 
-    _remote_job_queue_worker_task = asyncio.create_task(_remote_job_queue_worker_loop(), name="remote-job-queue-worker")
+    _remote_job_queue_worker_task = asyncio.create_task(
+        _remote_job_queue_worker_loop(), name="remote-job-queue-worker"
+    )
 
 
 async def stop_remote_job_queue_worker() -> None:
