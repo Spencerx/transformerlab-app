@@ -148,12 +148,12 @@ async def lifespan(app: FastAPI):
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
-        await stop_sweep_status_worker()
-        await stop_remote_job_status_worker()
-        await stop_notification_worker()
-        from transformerlab.services.migrate_jobs_to_experiment_dirs import stop_jobs_migration_worker
+    await stop_sweep_status_worker()
+    await stop_remote_job_status_worker()
+    await stop_notification_worker()
+    from transformerlab.services.migrate_jobs_to_experiment_dirs import stop_jobs_migration_worker
 
-        await stop_jobs_migration_worker()
+    await stop_jobs_migration_worker()
     from transformerlab.services.process_registry import get_registry
 
     get_registry().kill_all()
