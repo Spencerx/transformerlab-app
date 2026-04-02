@@ -72,7 +72,7 @@ def test_try_acquire_leadership_failure_pid_in_message(reset_worker_leader_state
     import transformerlab.shared.worker_leader as wl
     import logging
 
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.INFO, logger="transformerlab.shared.worker_leader")
 
     with patch("fcntl.flock") as mock_flock:
         mock_flock.side_effect = BlockingIOError("Resource temporarily unavailable")
@@ -91,8 +91,11 @@ def test_try_acquire_leadership_failure_pid_in_message(reset_worker_leader_state
 
             # Check that PID is in the log message
             pid_str = str(os.getpid())
-            assert any(pid_str in record.message for record in caplog.records)
-            assert any("not the leader" in record.message for record in caplog.records)
+            assert len(caplog.records) > 0, f"No log records captured. Got: {caplog.records}"
+            assert any(pid_str in record.message for record in caplog.records), \
+                f"PID {pid_str} not found in log messages: {[r.message for r in caplog.records]}"
+            assert any("not the leader" in record.message for record in caplog.records), \
+                f"'not the leader' not found in log messages: {[r.message for r in caplog.records]}"
 
 
 def test_try_acquire_leadership_catches_blocking_io_error(reset_worker_leader_state, mock_lock_path):
@@ -138,18 +141,31 @@ def test_is_leader_initial_state(reset_worker_leader_state):
     assert wl.is_leader() is False
 
 
-def test_fcntl_unavailable_fallback(reset_worker_leader_state, mock_lock_path, caplog):
+def test_fcntl_unavailable_fallback(reset_worker_leader_state, mock_lock_path, caplog, monkeypatch):
     """Test fallback behavior when fcntl is unavailable (e.g., Windows)."""
     import transformerlab.shared.worker_leader as wl
     import logging
+    import builtins
 
-    caplog.set_level(logging.INFO)
+    caplog.set_level(logging.INFO, logger="transformerlab.shared.worker_leader")
 
-    with patch.dict("sys.modules", {"fcntl": None}):
-        # This will trigger the ImportError path
-        with patch("builtins.__import__", side_effect=ImportError("No module named 'fcntl'")):
-            result = wl.try_acquire_leadership()
+    # Mock the import to fail for fcntl
+    original_import = builtins.__import__
 
-            assert result is True
-            assert wl.is_leader() is True
-            assert any("fcntl unavailable" in record.message for record in caplog.records)
+    def mock_import(name, *args, **kwargs):
+        if name == "fcntl":
+            raise ImportError("No module named 'fcntl'")
+        return original_import(name, *args, **kwargs)
+
+    # Reset the worker leader state
+    wl._leader = False
+    wl._lock_fd = None
+
+    with patch("builtins.__import__", side_effect=mock_import):
+        result = wl.try_acquire_leadership()
+
+        assert result is True
+        assert wl.is_leader() is True
+        assert len(caplog.records) > 0, f"No log records captured. Got: {caplog.records}"
+        assert any("fcntl unavailable" in record.message for record in caplog.records), \
+            f"'fcntl unavailable' not found in log messages: {[r.message for r in caplog.records]}"
