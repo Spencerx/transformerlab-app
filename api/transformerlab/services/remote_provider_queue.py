@@ -62,7 +62,7 @@ async def enqueue_remote_launch(
     quota_hold_id: Optional[str],
     subtype: Optional[str],
 ) -> None:
-    """Insert a row into the job_queue table and set the job status to QUEUED_REMOTE.
+    """Insert a row into the job_queue table for the background worker to pick up.
 
     The background worker polls this table and dispatches PENDING entries.
     """
@@ -78,12 +78,7 @@ async def enqueue_remote_launch(
         session.add(entry)
         await session.commit()
 
-    await job_service.job_update_status(
-        str(job_id),
-        JobStatus.QUEUED_REMOTE,
-        experiment_id=str(experiment_id),
-    )
-    print(f"[remote_provider_queue] Enqueued job {job_id} (cluster={cluster_name}, status=QUEUED_REMOTE)")
+    print(f"[remote_provider_queue] Enqueued job {job_id} (cluster={cluster_name})")
 
 
 # ---------------------------------------------------------------------------
