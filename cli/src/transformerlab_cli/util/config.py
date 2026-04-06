@@ -201,7 +201,9 @@ def get_current_experiment() -> str | None:
 
 def require_current_experiment() -> str:
     """Get the current experiment ID from config, or exit with a helpful message."""
-    check_configs()
+    from transformerlab_cli.state import cli_state
+
+    check_configs(output_format=cli_state.output_format)
     current_experiment = get_config("current_experiment")
     if not current_experiment or not str(current_experiment).strip():
         console.print(
