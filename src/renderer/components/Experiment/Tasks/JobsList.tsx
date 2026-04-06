@@ -255,7 +255,6 @@ const JobsList: React.FC<JobsListProps> = ({
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
                   <JobProgress
                     job={job}
-                    showLaunchResultInfo
                     launchProgress={
                       launchProgressByJobId?.[String(job.id)] ??
                       job?.job_data?.launch_progress

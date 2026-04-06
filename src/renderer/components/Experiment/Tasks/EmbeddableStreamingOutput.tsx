@@ -404,6 +404,11 @@ export default function EmbeddableStreamingOutput({
               )}
             </>
           )}
+          {activeTab === 'skypilot' && skypilotRequestId && (
+            <Typography level="body-sm" sx={{ fontFamily: 'monospace' }}>
+              Request ID: {skypilotRequestId}
+            </Typography>
+          )}
         </Box>
         <RefreshIndicator
           seconds={activeTab === 'output' ? outputCountdown : providerCountdown}
@@ -465,19 +470,9 @@ export default function EmbeddableStreamingOutput({
           >
             <Typography
               level="body-md"
-              sx={{ fontFamily: 'monospace', color: '#ccc' }}
+              sx={{ fontFamily: 'monospace', color: '#999' }}
             >
-              SkyPilot Request ID:{' '}
-              <Typography
-                component="span"
-                sx={{
-                  fontFamily: 'monospace',
-                  fontWeight: 'bold',
-                  color: '#fff',
-                }}
-              >
-                {skypilotRequestId || 'N/A'}
-              </Typography>
+              SkyPilot logs placeholder
             </Typography>
           </Box>
         ) : (
