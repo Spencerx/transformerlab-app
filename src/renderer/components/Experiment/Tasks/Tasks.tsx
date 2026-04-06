@@ -1464,6 +1464,16 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.status ||
           ''
         }
+        tabs={
+          jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.job_data
+            ?.provider_type === 'skypilot'
+            ? ['output', 'provider', 'skypilot']
+            : ['output', 'provider']
+        }
+        skypilotRequestId={
+          jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.job_data
+            ?.provider_launch_result?.request_id || ''
+        }
       />
       <ViewArtifactsModal
         open={viewArtifactsFromJob !== null}

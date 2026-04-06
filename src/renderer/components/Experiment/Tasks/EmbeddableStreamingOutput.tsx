@@ -198,11 +198,12 @@ function RefreshIndicator({
   );
 }
 
-type TabValue = 'output' | 'provider';
+type TabValue = 'output' | 'provider' | 'skypilot';
 
 const TAB_OPTIONS: { value: TabValue; label: string }[] = [
   { value: 'output', label: 'Lab SDK Output' },
   { value: 'provider', label: 'Machine Logs' },
+  { value: 'skypilot', label: 'SkyPilot Logs' },
 ];
 
 export interface EmbeddableStreamingOutputProps {
@@ -211,12 +212,15 @@ export interface EmbeddableStreamingOutputProps {
   tabs?: TabValue[];
   /** Current job status string (e.g. 'RUNNING', 'COMPLETE'). Passed from the parent to avoid extra polling. */
   jobStatus?: string;
+  /** The SkyPilot request ID for the job, shown in the SkyPilot Logs tab. */
+  skypilotRequestId?: string;
 }
 
 export default function EmbeddableStreamingOutput({
   jobId,
   tabs: tabsProp = ['output', 'provider'],
   jobStatus = '',
+  skypilotRequestId,
 }: EmbeddableStreamingOutputProps) {
   const { experimentInfo } = useExperimentInfo();
   const [activeTab, setActiveTab] = useState<TabValue>('output');
@@ -340,7 +344,9 @@ export default function EmbeddableStreamingOutput({
           onChange={(_event, value) => {
             if (
               typeof value === 'string' &&
-              (value === 'output' || value === 'provider')
+              (value === 'output' ||
+                value === 'provider' ||
+                value === 'skypilot')
             ) {
               setActiveTab(value as TabValue);
             }
@@ -417,7 +423,7 @@ export default function EmbeddableStreamingOutput({
           flexDirection: 'column',
         }}
       >
-        {tabs.includes('output') && activeTab === 'output' ? (
+        {activeTab === 'output' ? (
           <Box
             sx={{
               padding: '8px 11px',
@@ -440,6 +446,39 @@ export default function EmbeddableStreamingOutput({
               onValidatingChange={handleOutputValidatingChange}
               onMutateReady={handleOutputMutateReady}
             />
+          </Box>
+        ) : activeTab === 'skypilot' ? (
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: '#000',
+              borderRadius: '8px',
+              padding: '8px 11px',
+              gap: 1,
+            }}
+          >
+            <Typography
+              level="body-md"
+              sx={{ fontFamily: 'monospace', color: '#ccc' }}
+            >
+              SkyPilot Request ID:{' '}
+              <Typography
+                component="span"
+                sx={{
+                  fontFamily: 'monospace',
+                  fontWeight: 'bold',
+                  color: '#fff',
+                }}
+              >
+                {skypilotRequestId || 'N/A'}
+              </Typography>
+            </Typography>
           </Box>
         ) : (
           <Box
