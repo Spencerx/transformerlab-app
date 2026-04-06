@@ -104,7 +104,14 @@ function RowMenu({ experimentInfo, filename, foldername, mutate, row }) {
   );
 }
 
-function File({ row, fullPage, experimentInfo, currentFolder, mutate, onPreviewClick }) {
+function File({
+  row,
+  fullPage,
+  experimentInfo,
+  currentFolder,
+  mutate,
+  onPreviewClick,
+}) {
   return (
     <tr key={row?.name}>
       <td style={{ paddingLeft: '1rem' }}>
@@ -438,7 +445,9 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
           }
         } catch (error) {
           console.error('Error fetching document:', error);
-          setPreviewError(error instanceof Error ? error.message : 'Failed to load document');
+          setPreviewError(
+            error instanceof Error ? error.message : 'Failed to load document',
+          );
           setPreviewBlobUrl(null);
         }
       };
@@ -561,7 +570,12 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
         <Alert
           color="danger"
           variant="soft"
-          sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+          sx={{
+            mb: 2,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
         >
           {uploadError}
           <IconButton
