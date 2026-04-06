@@ -61,7 +61,9 @@ export default function JobProgress({
   const { fetchWithAuth } = useAuth();
   const stopping = job?.status === 'STOPPING';
   const effectiveLaunchProgress =
-    launchProgress ?? job?.job_data?.launch_progress ?? null;
+    job?.status === 'INTERACTIVE'
+      ? null
+      : (launchProgress ?? job?.job_data?.launch_progress ?? null);
 
   // Shared stop handler for both LAUNCHING and RUNNING states
   const handleStopJob = useCallback(async () => {
