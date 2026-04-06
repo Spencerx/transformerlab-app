@@ -28,6 +28,7 @@ import {
   ListItemDecorator,
   Stack,
   Skeleton, // added Skeleton import
+  Alert,
 } from '@mui/joy';
 
 import {
@@ -103,7 +104,7 @@ function RowMenu({ experimentInfo, filename, foldername, mutate, row }) {
   );
 }
 
-function File({ row, fullPage, experimentInfo, currentFolder, mutate }) {
+function File({ row, fullPage, experimentInfo, currentFolder, mutate, onPreviewClick }) {
   return (
     <tr key={row?.name}>
       <td style={{ paddingLeft: '1rem' }}>
@@ -164,8 +165,8 @@ function File({ row, fullPage, experimentInfo, currentFolder, mutate }) {
             variant="plain"
             size="sm"
             style={{ fontSize: '11px' }}
-            disabled
-            title="Preview not available in remote mode"
+            onClick={() => onPreviewClick(row?.name)}
+            title="Preview document"
           >
             <EyeIcon size="16px" />
           </Button>
@@ -318,12 +319,14 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
   const [previewBlobUrl, setPreviewBlobUrl] = React.useState<string | null>(
     null,
   );
+  const [previewError, setPreviewError] = React.useState<string | null>(null);
   const previewBlobUrlRef = React.useRef<string | null>(null);
   const [showFolderModal, setShowFolderModal] = React.useState(false);
   const [newFolderName, setNewFolderName] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [currentFolder, setCurrentFolder] = React.useState(fixedFolder);
   const [order, setOrder] = React.useState<Order>('asc');
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
 
   const {
     data: rows,
@@ -336,6 +339,7 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
   );
 
   const uploadFiles = async (currentFolder, formData) => {
+    setUploadError(null);
     chatAPI
       .authenticatedFetch(
         chatAPI.Endpoints.Documents.Upload(experimentInfo?.id, currentFolder),
@@ -344,11 +348,22 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
           body: formData,
         },
       )
-      .then((response) => {
+      .then(async (response) => {
         if (response.ok) {
           return response.json();
         }
-        throw new Error('File upload failed');
+        // Try to parse error details from response
+        let errorMessage = 'File upload failed';
+        try {
+          const errorData = await response.json();
+          if (errorData.detail) {
+            errorMessage = errorData.detail;
+          }
+        } catch {
+          // If we can't parse JSON, use a generic message
+          errorMessage = `Upload failed: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       })
       .then((data) => {
         console.log('Server response:', data);
@@ -357,6 +372,8 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
       })
       .catch((error) => {
         console.error('Error uploading file:', error);
+        setLoading(false);
+        setUploadError(error.message || 'An error occurred during upload');
       });
   };
 
@@ -388,6 +405,7 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
       previewBlobUrlRef.current = null;
       setPreviewBlobUrl(null);
     }
+    setPreviewError(null);
 
     if (previewFile && experimentInfo?.id) {
       const fetchDocument = async () => {
@@ -403,12 +421,24 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
             const blobUrl = URL.createObjectURL(blob);
             previewBlobUrlRef.current = blobUrl;
             setPreviewBlobUrl(blobUrl);
+            setPreviewError(null);
           } else {
             console.error('Failed to fetch document:', response.status);
+            let errorMessage = `Failed to load document (HTTP ${response.status})`;
+            try {
+              const errorData = await response.json();
+              if (errorData.detail) {
+                errorMessage = errorData.detail;
+              }
+            } catch {
+              // Use default error message if can't parse JSON
+            }
+            setPreviewError(errorMessage);
             setPreviewBlobUrl(null);
           }
         } catch (error) {
           console.error('Error fetching document:', error);
+          setPreviewError(error instanceof Error ? error.message : 'Failed to load document');
           setPreviewBlobUrl(null);
         }
       };
@@ -463,7 +493,25 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
           <ModalClose />
           <Typography level="title-lg">Document: {previewFile}</Typography>
 
-          {previewBlobUrl ? (
+          {previewError ? (
+            <Box
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                height: '100%',
+                gap: 2,
+              }}
+            >
+              <Alert color="danger" variant="soft">
+                {previewError}
+              </Alert>
+              <Typography level="body-sm" color="neutral">
+                This file may not be displayable in the browser preview.
+              </Typography>
+            </Box>
+          ) : previewBlobUrl ? (
             <iframe
               src={previewBlobUrl}
               style={{ width: '100%', height: '100%' }}
@@ -508,6 +556,24 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
           </Box>
         </ModalDialog>
       </Modal>
+
+      {uploadError && (
+        <Alert
+          color="danger"
+          variant="soft"
+          sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          {uploadError}
+          <IconButton
+            size="sm"
+            variant="plain"
+            color="danger"
+            onClick={() => setUploadError(null)}
+          >
+            ×
+          </IconButton>
+        </Alert>
+      )}
 
       <Box
         sx={{
@@ -781,6 +847,7 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
                         experimentInfo={experimentInfo}
                         currentFolder={currentFolder}
                         mutate={mutate}
+                        onPreviewClick={setPreviewFile}
                       />
                     ),
                   )}
