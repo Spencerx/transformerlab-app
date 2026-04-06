@@ -4,8 +4,8 @@ import tempfile
 import zipfile
 
 import httpx
-from fastapi import APIRouter, Body, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Body, HTTPException, UploadFile, Response
+from fastapi.responses import StreamingResponse
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 
@@ -62,18 +62,68 @@ async def document_view(experimentId: str, document_name: str, folder: str = Non
         experiment_dir = await exp_obj.get_dir()
 
         document_name = secure_filename(document_name)
-        folder = secure_filename(folder)
+        folder = secure_filename(folder) if folder else ""
 
         if folder and folder != "":
             file_location = storage.join(experiment_dir, "documents", folder, document_name)
         else:
             file_location = storage.join(experiment_dir, "documents", document_name)
-        print(f"Returning document from {file_location}")
-        # with open(file_location, "r") as f:
-        #     file_contents = f.read()
-    except FileNotFoundError:
-        return "error file not found"
-    return FileResponse(file_location)
+
+        if not await storage.exists(file_location):
+            raise HTTPException(status_code=404, detail=f"Document '{document_name}' not found")
+
+        # Determine media type from extension
+        _, ext = os.path.splitext(document_name.lower())
+        media_type_map = {
+            ".pdf": "application/pdf",
+            ".txt": "text/plain",
+            ".md": "text/plain",
+            ".csv": "text/csv",
+            ".json": "application/json",
+            ".jsonl": "application/json",
+            ".xml": "text/xml",
+            ".html": "text/html",
+            ".epub": "application/epub+zip",
+            ".ipynb": "application/json",
+            ".mbox": "text/plain",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            ".ppt": "application/vnd.ms-powerpoint",
+            ".pptm": "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
+            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            ".zip": "application/zip",
+        }
+        media_type = media_type_map.get(ext, "application/octet-stream")
+
+        # For text-like files, read and return directly
+        text_types = {".txt", ".md", ".csv", ".json", ".jsonl", ".xml", ".html", ".mbox", ".ipynb"}
+        if ext in text_types:
+            try:
+                async with await storage.open(file_location, "r", encoding="utf-8") as f:
+                    content = await f.read()
+                return Response(content, media_type=media_type)
+            except Exception:
+                pass  # Fall through to binary streaming
+
+        # For binary files (PDF, DOCX, etc.), stream the content
+        async def generate():
+            async with await storage.open(file_location, "rb") as f:
+                while True:
+                    chunk = await f.read(8192)
+                    if not chunk:
+                        break
+                    yield chunk
+
+        return StreamingResponse(
+            generate(),
+            media_type=media_type,
+            headers={"Content-Disposition": f'inline; filename="{document_name}"'},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error retrieving document: {e}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving document: {str(e)}")
 
 
 @router.get("/list", summary="List available documents.")
