@@ -253,39 +253,6 @@ export default function JobProgress({
                 </Typography>
               </Stack>
             )}
-            {showLaunchResultInfo &&
-              job?.status === 'LAUNCHING' &&
-              job?.job_data?.provider_launch_result && (
-                <Tooltip
-                  title={
-                    <Typography
-                      level="body-xs"
-                      sx={{
-                        whiteSpace: 'pre-wrap',
-                        fontFamily: 'monospace',
-                        maxWidth: 400,
-                      }}
-                    >
-                      {formatProviderLaunchResult(
-                        job.job_data.provider_launch_result,
-                      )}
-                    </Typography>
-                  }
-                  arrow
-                  placement="top"
-                  variant="soft"
-                  sx={{ maxWidth: 400 }}
-                >
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    color="neutral"
-                    sx={{ minHeight: 'unset', p: 0.5 }}
-                  >
-                    <Info size={16} color="var(--joy-palette-neutral-500)" />
-                  </IconButton>
-                </Tooltip>
-              )}
             <IconButton
               color="danger"
               onClick={handleStopJob}
@@ -508,6 +475,35 @@ export default function JobProgress({
             )}
           </>
         </Stack>
+      )}
+      {showLaunchResultInfo && job?.job_data?.provider_launch_result && (
+        <Tooltip
+          title={
+            <Typography
+              level="body-xs"
+              sx={{
+                whiteSpace: 'pre-wrap',
+                fontFamily: 'monospace',
+                maxWidth: 400,
+              }}
+            >
+              {formatProviderLaunchResult(job.job_data.provider_launch_result)}
+            </Typography>
+          }
+          arrow
+          placement="top"
+          variant="soft"
+          sx={{ maxWidth: 400 }}
+        >
+          <IconButton
+            size="sm"
+            variant="plain"
+            color="neutral"
+            sx={{ minHeight: 'unset', p: 0.5 }}
+          >
+            <Info size={16} color="var(--joy-palette-neutral-500)" />
+          </IconButton>
+        </Tooltip>
       )}
     </Stack>
   );
