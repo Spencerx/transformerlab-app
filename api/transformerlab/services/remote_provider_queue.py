@@ -54,17 +54,13 @@ _remote_job_queue_worker_task: Optional[asyncio.Task] = None
 async def enqueue_remote_launch(
     job_id: str,
     experiment_id: str,
-    provider_id: str,
     team_id: str,
-    user_id: str,
-    cluster_name: str,
-    cluster_config: ClusterConfig,
-    quota_hold_id: Optional[str],
-    subtype: Optional[str],
 ) -> None:
     """Insert a row into the job_queue table for the background worker to pick up.
 
     The background worker polls this table and dispatches PENDING entries.
+    The job's job_data dict must contain all launch context (provider_id, user_id,
+    cluster_name, cluster_config, quota_hold_id, subtype).
     """
     async with async_session() as session:
         entry = JobQueue(
@@ -78,7 +74,7 @@ async def enqueue_remote_launch(
         session.add(entry)
         await session.commit()
 
-    print(f"[remote_provider_queue] Enqueued job {job_id} (cluster={cluster_name})")
+    logger.info(f"Enqueued remote job {job_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -194,6 +190,9 @@ async def _remote_job_queue_worker_loop() -> None:
 
                 for entry in pending_entries:
                     # Mark dispatched immediately so the next poll cycle doesn't pick it up again.
+                    # NOTE: There is only a single worker running, so we don't have to worry about
+                    # a race condition where the pending list changes between _poll_pending_remote_entries
+                    # and _mark_entry_dispatched.
                     await _mark_entry_dispatched(entry.id)
 
                     # Set org context so the job_service can find the job on disk.
@@ -263,7 +262,7 @@ async def stop_remote_job_queue_worker() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Launch logic (unchanged from original)
+# Launch logic
 # ---------------------------------------------------------------------------
 
 

@@ -293,6 +293,10 @@ class JobQueue(Base):
     and transition from ``PENDING`` → ``DISPATCHED`` once the worker picks them up.
     The worker queries ``status = 'PENDING'`` ordered by ``created_at`` to drain
     the queue in FIFO order.
+    
+    The DISPATCHED status is terminal for this queue table; we don't track what
+    happens to the job after dispatch. In the future, we may add a CANCELLED status
+    for jobs that should be removed from the queue.
     """
 
     __tablename__ = "job_queue"

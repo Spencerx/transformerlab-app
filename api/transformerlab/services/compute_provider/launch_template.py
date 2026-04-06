@@ -696,13 +696,7 @@ async def launch_template_on_provider(
     await enqueue_remote_launch(
         job_id=str(job_id),
         experiment_id=str(request.experiment_id),
-        provider_id=str(provider.id),
         team_id=str(team_id),
-        user_id=str(user.id),
-        cluster_name=formatted_cluster_name,
-        cluster_config=cluster_config,
-        quota_hold_id=str(quota_hold.id) if quota_hold else None,
-        subtype=request.subtype,
     )
 
     return {
