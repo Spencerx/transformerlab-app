@@ -717,8 +717,9 @@ class Lab:
                     if "is_image" in config:
                         is_image = config["is_image"]
 
-                # Use the existing save_dataset method with job_id parameter
-                output_path = await self.async_save_dataset(
+                # Delegate entirely to async_save_dataset which handles saving,
+                # metadata, and generated_datasets tracking.
+                return await self.async_save_dataset(
                     df=df,
                     dataset_id=dataset_id,
                     additional_metadata=additional_metadata if additional_metadata else None,
@@ -726,28 +727,6 @@ class Lab:
                     is_image=is_image,
                     job_id=job_id,
                 )
-
-                # Extract the actual dataset_id with prefix from the path
-                # The dataset_id with prefix is used in the path/filename
-                dataset_id_with_prefix = f"{job_id}_{dataset_id}"
-
-                # Track dataset_id in job_data
-                try:
-                    job_data = await self._job.get_job_data()
-                    generated_datasets_list = []
-                    if isinstance(job_data, dict):
-                        existing = job_data.get("generated_datasets", [])
-                        if isinstance(existing, list):
-                            generated_datasets_list = existing
-                    generated_datasets_list.append(dataset_id_with_prefix)
-                    await self._job.update_job_data_field("generated_datasets", generated_datasets_list)
-                except Exception:
-                    pass
-
-                await self._job.log_info(
-                    f"Dataset saved to '{output_path}' and registered as generated dataset '{dataset_id_with_prefix}'"
-                )  # type: ignore[union-attr]
-                return output_path
 
             # Handle file path input for datasets
             else:
@@ -1347,6 +1326,16 @@ class Lab:
         # Track dataset on the job for provenance
         try:
             await self._job.update_job_data_field("dataset_id", dataset_id_with_prefix)  # type: ignore[union-attr]
+            # Also track in generated_datasets list for consistency with save_artifact(type="dataset")
+            job_data = await self._job.get_job_data()  # type: ignore[union-attr]
+            generated_datasets_list: list = []
+            if isinstance(job_data, dict):
+                existing = job_data.get("generated_datasets", [])
+                if isinstance(existing, list):
+                    generated_datasets_list = existing
+            if dataset_id_with_prefix not in generated_datasets_list:
+                generated_datasets_list.append(dataset_id_with_prefix)
+            await self._job.update_job_data_field("generated_datasets", generated_datasets_list)  # type: ignore[union-attr]
         except Exception:
             logger.warning("Warning: Failed to track dataset in job_data", exc_info=True)
 
