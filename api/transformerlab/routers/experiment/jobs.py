@@ -454,7 +454,7 @@ async def get_request_logs(
     if not request_id:
         raise HTTPException(status_code=400, detail="Job does not have a provider request ID")
 
-    _, team_id = user_and_team
+    team_id = user_and_team["team_id"]
     try:
         provider_record = await get_team_provider(session, team_id, provider_id)
     except Exception as exc:
