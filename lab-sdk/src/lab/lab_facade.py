@@ -797,20 +797,24 @@ class Lab:
                 else:
                     await storage.copy_file(src, dest)
 
-                # Track in job_data
+                # Track in job_data (mirrors async_save_dataset tracking)
                 try:
+                    await self._job.update_job_data_field("dataset_id", base_name)  # type: ignore[union-attr]
                     job_data = await self._job.get_job_data()
-                    dataset_list = []
+                    dataset_list: list = []
                     if isinstance(job_data, dict):
                         existing = job_data.get("generated_datasets", [])
                         if isinstance(existing, list):
                             dataset_list = existing
-                    dataset_list.append(dest)
-                    await self._job.update_job_data_field("generated_datasets", dataset_list)
+                    if base_name not in dataset_list:
+                        dataset_list.append(base_name)
+                    await self._job.update_job_data_field("generated_datasets", dataset_list)  # type: ignore[union-attr]
                 except Exception:
                     pass
 
-                await self._job.log_info(f"Dataset saved to '{dest}'")  # type: ignore[union-attr]
+                await self._job.log_info(  # type: ignore[union-attr]
+                    f"Dataset saved to '{dest}' and registered as generated dataset '{base_name}'"
+                )
                 return dest
 
         # Handle DataFrame input when type="evals"
@@ -1339,7 +1343,9 @@ class Lab:
         except Exception:
             logger.warning("Warning: Failed to track dataset in job_data", exc_info=True)
 
-        logger.info(f"Dataset saved to '{output_path}' and registered as generated dataset '{dataset_id_with_prefix}'")
+        await self._job.log_info(  # type: ignore[union-attr]
+            f"Dataset saved to '{output_path}' and registered as generated dataset '{dataset_id_with_prefix}'"
+        )
         return output_path
 
     def save_checkpoint(self, source_path: str, name: Optional[str] = None) -> str:
