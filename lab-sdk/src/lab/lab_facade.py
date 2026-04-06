@@ -810,7 +810,7 @@ class Lab:
                         dataset_list.append(base_name)
                     await self._job.update_job_data_field("generated_datasets", dataset_list)  # type: ignore[union-attr]
                 except Exception:
-                    pass
+                    logger.warning("Warning: Failed to track dataset in job_data", exc_info=True)
 
                 await self._job.log_info(  # type: ignore[union-attr]
                     f"Dataset saved to '{dest}' and registered as generated dataset '{base_name}'"
