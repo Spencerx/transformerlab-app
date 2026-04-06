@@ -89,7 +89,7 @@ def command_provider_list(
     check_configs()
 
     with console.status("[bold success]Fetching providers...[/bold success]", spinner="dots"):
-        response = api.get(f"/compute_provider/?include_disabled={str(include_disabled).lower()}")
+        response = api.get(f"/compute_provider/providers/?include_disabled={str(include_disabled).lower()}")
 
     if response.status_code == 200:
         providers = response.json()
@@ -148,7 +148,7 @@ def command_provider_add(
     payload = {"name": name, "type": provider_type, "config": config_dict}
 
     with console.status("[bold success]Creating provider...[/bold success]", spinner="dots"):
-        response = api.post_json("/compute_provider/", json_data=payload)
+        response = api.post_json("/compute_provider/providers/", json_data=payload)
 
     if response.status_code == 200:
         result = response.json()
@@ -167,7 +167,7 @@ def command_provider_info(
     check_configs()
 
     with console.status(f"[bold success]Fetching provider {provider_id}...[/bold success]", spinner="dots"):
-        response = api.get(f"/compute_provider/{provider_id}")
+        response = api.get(f"/compute_provider/providers/{provider_id}")
 
     if response.status_code == 200:
         render_object(response.json(), format_type=cli_state.output_format)
@@ -208,7 +208,7 @@ def command_provider_update(
         raise typer.Exit(0)
 
     with console.status(f"[bold success]Updating provider {provider_id}...[/bold success]", spinner="dots"):
-        response = api.patch(f"/compute_provider/{provider_id}", json_data=payload)
+        response = api.patch(f"/compute_provider/providers/{provider_id}", json_data=payload)
 
     if response.status_code == 200:
         console.print(f"[success]✓[/success] Provider [bold]{provider_id}[/bold] updated.")
@@ -232,7 +232,7 @@ def command_provider_delete(
         typer.confirm(f"Delete provider {provider_id}?", abort=True)
 
     with console.status(f"[bold success]Deleting provider {provider_id}...[/bold success]", spinner="dots"):
-        response = api.delete(f"/compute_provider/{provider_id}")
+        response = api.delete(f"/compute_provider/providers/{provider_id}")
 
     if response.status_code == 200:
         console.print(f"[success]✓[/success] Provider [bold]{provider_id}[/bold] deleted.")
@@ -252,7 +252,7 @@ def command_provider_check(
     check_configs()
 
     with console.status(f"[bold success]Checking provider {provider_id}...[/bold success]", spinner="dots"):
-        response = api.get(f"/compute_provider/{provider_id}/check", timeout=60.0)
+        response = api.get(f"/compute_provider/providers/{provider_id}/check", timeout=60.0)
 
     if response.status_code == 200:
         result = response.json()
@@ -273,7 +273,7 @@ def command_provider_enable(
     check_configs()
 
     with console.status(f"[bold success]Enabling provider {provider_id}...[/bold success]", spinner="dots"):
-        response = api.patch(f"/compute_provider/{provider_id}", json_data={"disabled": False})
+        response = api.patch(f"/compute_provider/providers/{provider_id}", json_data={"disabled": False})
 
     if response.status_code == 200:
         console.print(f"[success]✓[/success] Provider [bold]{provider_id}[/bold] enabled.")
@@ -293,7 +293,7 @@ def command_provider_disable(
     check_configs()
 
     with console.status(f"[bold success]Disabling provider {provider_id}...[/bold success]", spinner="dots"):
-        response = api.patch(f"/compute_provider/{provider_id}", json_data={"disabled": True})
+        response = api.patch(f"/compute_provider/providers/{provider_id}", json_data={"disabled": True})
 
     if response.status_code == 200:
         console.print(f"[success]✓[/success] Provider [bold]{provider_id}[/bold] disabled.")
