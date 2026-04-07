@@ -110,6 +110,7 @@ export default function ProviderDetailsModal({
   const [slurmSshKeyPath, setSlurmSshKeyPath] = useState('');
   const [slurmRestUrl, setSlurmRestUrl] = useState('');
   const [slurmApiToken, setSlurmApiToken] = useState('');
+  const [slurmApiTokenChanged, setSlurmApiTokenChanged] = useState(false);
 
   // SkyPilot-specific form fields
   const [skypilotServerUrl, setSkypilotServerUrl] = useState('');
@@ -121,6 +122,7 @@ export default function ProviderDetailsModal({
   const [skypilotUseSpot, setSkypilotUseSpot] = useState(false);
   const [dstackServerUrl, setDstackServerUrl] = useState('');
   const [dstackApiToken, setDstackApiToken] = useState('');
+  const [dstackApiTokenChanged, setDstackApiTokenChanged] = useState(false);
   const [dstackProjectName, setDstackProjectName] = useState('');
 
   const { fetchWithAuth } = useAuth();
@@ -200,7 +202,10 @@ export default function ProviderDetailsModal({
       setSlurmSshPort(String(configObj.ssh_port || 22));
       setSlurmSshKeyPath(configObj.ssh_key_path || '');
       setSlurmRestUrl(configObj.rest_url || '');
-      setSlurmApiToken(configObj.api_token || '');
+      setSlurmApiToken(
+        configObj.api_token === '***' ? '' : configObj.api_token || '',
+      );
+      setSlurmApiTokenChanged(false);
       if (configObj.supported_accelerators) {
         setSupportedAccelerators(configObj.supported_accelerators);
       }
@@ -222,7 +227,7 @@ export default function ProviderDetailsModal({
       }
     } else {
       configObj.rest_url = slurmRestUrl;
-      if (slurmApiToken) {
+      if (!providerId || slurmApiTokenChanged) {
         configObj.api_token = slurmApiToken;
       }
       // REST mode still uses ssh_user for X-SLURM-USER-NAME header
@@ -244,13 +249,18 @@ export default function ProviderDetailsModal({
     slurmSshKeyPath,
     slurmRestUrl,
     slurmApiToken,
+    slurmApiTokenChanged,
     supportedAccelerators,
+    providerId,
   ]);
 
   const parseDstackConfig = (configObj: any) => {
     if (configObj && typeof configObj === 'object') {
       setDstackServerUrl(configObj.server_url || '');
-      setDstackApiToken(configObj.api_token || '');
+      setDstackApiToken(
+        configObj.api_token === '***' ? '' : configObj.api_token || '',
+      );
+      setDstackApiTokenChanged(false);
       setDstackProjectName(configObj.dstack_project || '');
       if (configObj.supported_accelerators) {
         setSupportedAccelerators(configObj.supported_accelerators);
@@ -261,9 +271,11 @@ export default function ProviderDetailsModal({
   const buildDstackConfig = useCallback(() => {
     const configObj: any = {
       server_url: dstackServerUrl,
-      api_token: dstackApiToken,
       dstack_project: dstackProjectName,
     };
+    if (!providerId || dstackApiTokenChanged) {
+      configObj.api_token = dstackApiToken;
+    }
     if (supportedAccelerators && supportedAccelerators.length > 0) {
       configObj.supported_accelerators = supportedAccelerators;
     }
@@ -271,8 +283,10 @@ export default function ProviderDetailsModal({
   }, [
     dstackServerUrl,
     dstackApiToken,
+    dstackApiTokenChanged,
     dstackProjectName,
     supportedAccelerators,
+    providerId,
   ]);
 
   // if a providerId is passed then we are editing an existing provider
@@ -340,6 +354,7 @@ export default function ProviderDetailsModal({
       setSlurmSshKeyPath('');
       setSlurmRestUrl('');
       setSlurmApiToken('');
+      setSlurmApiTokenChanged(false);
       setSkypilotServerUrl('');
       setSkypilotUserId('');
       setSkypilotUserName('');
@@ -349,6 +364,7 @@ export default function ProviderDetailsModal({
       setSkypilotUseSpot(false);
       setDstackServerUrl('');
       setDstackApiToken('');
+      setDstackApiTokenChanged(false);
       setDstackProjectName('');
     }
   }, [providerId, providerData]);
@@ -372,6 +388,7 @@ export default function ProviderDetailsModal({
       setSlurmSshKeyPath('');
       setSlurmRestUrl('');
       setSlurmApiToken('');
+      setSlurmApiTokenChanged(false);
       setSkypilotServerUrl('');
       setSkypilotUserId('');
       setSkypilotUserName('');
@@ -381,6 +398,7 @@ export default function ProviderDetailsModal({
       setSkypilotUseSpot(false);
       setDstackServerUrl('');
       setDstackApiToken('');
+      setDstackApiTokenChanged(false);
       setDstackProjectName('');
     }
   }, [open]);
@@ -965,10 +983,15 @@ export default function ProviderDetailsModal({
                         <FormLabel>API Token (Optional)</FormLabel>
                         <Input
                           value={slurmApiToken}
-                          onChange={(event) =>
-                            setSlurmApiToken(event.currentTarget.value)
+                          onChange={(event) => {
+                            setSlurmApiTokenChanged(true);
+                            setSlurmApiToken(event.currentTarget.value);
+                          }}
+                          placeholder={
+                            providerId
+                              ? 'Leave blank to keep existing token'
+                              : 'Your SLURM REST API token'
                           }
-                          placeholder="Your SLURM REST API token"
                           type="password"
                           fullWidth
                         />
@@ -1090,10 +1113,15 @@ export default function ProviderDetailsModal({
                     <FormLabel>dstack API Token *</FormLabel>
                     <Input
                       value={dstackApiToken}
-                      onChange={(event) =>
-                        setDstackApiToken(event.currentTarget.value)
+                      onChange={(event) => {
+                        setDstackApiTokenChanged(true);
+                        setDstackApiToken(event.currentTarget.value);
+                      }}
+                      placeholder={
+                        providerId
+                          ? 'Leave blank to keep existing token'
+                          : 'Your dstack API token'
                       }
-                      placeholder="Your dstack API token"
                       type="password"
                       fullWidth
                     />

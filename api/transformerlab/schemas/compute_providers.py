@@ -85,9 +85,8 @@ def mask_sensitive_config(config: Dict[str, Any], provider_type: str) -> Dict[st
     """
     masked = config.copy()
 
-    # Mask API tokens for providers that should not expose raw credentials.
-    # dstack is intentionally excluded so edits can round-trip the token.
-    if "api_token" in masked and masked["api_token"] and provider_type != ProviderType.DSTACK.value:
+    # Mask API tokens for all providers.
+    if "api_token" in masked and masked["api_token"]:
         masked["api_token"] = "***"
 
     # Mask any other sensitive fields
