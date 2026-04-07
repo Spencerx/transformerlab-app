@@ -26,7 +26,6 @@ Endpoints.Tasks = {
   Queue: (id: string) => `${API_URL()}tasks/${id}/queue`,
   GetByID: (id: string) => `${API_URL()}tasks/${id}/get`,
   UpdateTask: (id: string) => `${API_URL()}tasks/${id}/update`,
-  NewTask: () => `${API_URL()}tasks/new_task`,
   DeleteTask: (id: string) => `${API_URL()}tasks/${id}/delete`,
   Gallery: () => `${API_URL()}tasks/gallery`,
   ImportFromGallery: (experimentId: string) =>
@@ -58,8 +57,8 @@ Endpoints.Task = {
     `${API_URL()}experiment/${experimentId}/task/${id}/get`,
   UpdateTemplate: (experimentId: string, id: string) =>
     `${API_URL()}experiment/${experimentId}/task/${id}/update`,
-  NewTemplate: (experimentId: string) =>
-    `${API_URL()}experiment/${experimentId}/task/new_task`,
+  CreateTemplate: (experimentId: string) =>
+    `${API_URL()}experiment/${experimentId}/task/create`,
   DeleteTemplate: (experimentId: string, id: string) =>
     `${API_URL()}experiment/${experimentId}/task/${id}/delete`,
   Gallery: (experimentId: string) =>
