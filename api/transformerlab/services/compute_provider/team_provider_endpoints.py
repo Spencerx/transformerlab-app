@@ -76,10 +76,18 @@ async def create_provider_for_team(
     provider_data: ProviderCreate,
     force_refresh: bool,
 ) -> ProviderRead:
-    if provider_data.type not in [ProviderType.SLURM, ProviderType.SKYPILOT, ProviderType.RUNPOD, ProviderType.LOCAL]:
+    allowed_provider_types = [
+        ProviderType.SLURM,
+        ProviderType.SKYPILOT,
+        ProviderType.RUNPOD,
+        ProviderType.LOCAL,
+        ProviderType.DSTACK,
+    ]
+    if provider_data.type not in allowed_provider_types:
+        allowed_values = ", ".join(provider_type.value for provider_type in allowed_provider_types)
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid provider type. Must be one of: {ProviderType.SLURM.value}, {ProviderType.SKYPILOT.value}, {ProviderType.RUNPOD.value}, {ProviderType.LOCAL.value}",
+            detail=f"Invalid provider type. Must be one of: {allowed_values}",
         )
 
     if provider_data.type == ProviderType.LOCAL and _local_providers_disabled():

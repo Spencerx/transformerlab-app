@@ -60,6 +60,11 @@ const DEFAULT_CONFIGS = {
   "api_key": "<Your Runpod API key>",
   "api_base_url": "https://rest.runpod.io/v1"
 }`,
+  dstack: `{
+  "server_url": "<Your dstack server URL e.g. https://sky.dstack.ai>",
+  "api_token": "<Your dstack API token>",
+  "dstack_project": "<Your dstack project name>"
+}`,
   local: `{}`,
 } as const;
 
@@ -67,6 +72,7 @@ const DEFAULT_SUPPORTED_ACCELERATORS: Record<string, string[]> = {
   skypilot: ['NVIDIA'],
   slurm: ['NVIDIA'],
   runpod: ['NVIDIA'],
+  dstack: ['NVIDIA'],
   local: ['AppleSilicon', 'cpu'],
 };
 
@@ -113,6 +119,9 @@ export default function ProviderDetailsModal({
   const [skypilotDefaultRegion, setSkypilotDefaultRegion] = useState('');
   const [skypilotDefaultZone, setSkypilotDefaultZone] = useState('');
   const [skypilotUseSpot, setSkypilotUseSpot] = useState(false);
+  const [dstackServerUrl, setDstackServerUrl] = useState('');
+  const [dstackApiToken, setDstackApiToken] = useState('');
+  const [dstackProjectName, setDstackProjectName] = useState('');
 
   const { fetchWithAuth } = useAuth();
   const { data: providerData, isLoading: providerDataLoading } = useAPI(
@@ -238,6 +247,34 @@ export default function ProviderDetailsModal({
     supportedAccelerators,
   ]);
 
+  const parseDstackConfig = (configObj: any) => {
+    if (configObj && typeof configObj === 'object') {
+      setDstackServerUrl(configObj.server_url || '');
+      setDstackApiToken(configObj.api_token || '');
+      setDstackProjectName(configObj.dstack_project || '');
+      if (configObj.supported_accelerators) {
+        setSupportedAccelerators(configObj.supported_accelerators);
+      }
+    }
+  };
+
+  const buildDstackConfig = useCallback(() => {
+    const configObj: any = {
+      server_url: dstackServerUrl,
+      api_token: dstackApiToken,
+      dstack_project: dstackProjectName,
+    };
+    if (supportedAccelerators && supportedAccelerators.length > 0) {
+      configObj.supported_accelerators = supportedAccelerators;
+    }
+    return configObj;
+  }, [
+    dstackServerUrl,
+    dstackApiToken,
+    dstackProjectName,
+    supportedAccelerators,
+  ]);
+
   // if a providerId is passed then we are editing an existing provider
   // Otherwise we are creating a new provider
   useEffect(() => {
@@ -281,6 +318,9 @@ export default function ProviderDetailsModal({
       if (providerData.type === 'skypilot') {
         parseSkypilotConfig(rawConfigObj);
       }
+      if (providerData.type === 'dstack') {
+        parseDstackConfig(rawConfigObj);
+      }
       setConfig(JSON.stringify(rawConfigObj, null, 2));
     } else if (!providerId) {
       // Reset form when in "add" mode (no providerId)
@@ -307,6 +347,9 @@ export default function ProviderDetailsModal({
       setSkypilotDefaultRegion('');
       setSkypilotDefaultZone('');
       setSkypilotUseSpot(false);
+      setDstackServerUrl('');
+      setDstackApiToken('');
+      setDstackProjectName('');
     }
   }, [providerId, providerData]);
 
@@ -336,6 +379,9 @@ export default function ProviderDetailsModal({
       setSkypilotDefaultRegion('');
       setSkypilotDefaultZone('');
       setSkypilotUseSpot(false);
+      setDstackServerUrl('');
+      setDstackApiToken('');
+      setDstackProjectName('');
     }
   }, [open]);
 
@@ -403,6 +449,14 @@ export default function ProviderDetailsModal({
           // Ignore parse errors
         }
       }
+      if (type === 'dstack') {
+        try {
+          const configObj = JSON.parse(defaultConfig);
+          parseDstackConfig(configObj);
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
     }
   }, [type, providerId]);
 
@@ -418,8 +472,12 @@ export default function ProviderDetailsModal({
         const configObj = buildSkypilotConfig();
         setConfig(JSON.stringify(configObj, null, 2));
       }
+      if (type === 'dstack') {
+        const configObj = buildDstackConfig();
+        setConfig(JSON.stringify(configObj, null, 2));
+      }
     }
-  }, [buildSlurmConfig, buildSkypilotConfig, type, providerId]);
+  }, [buildSlurmConfig, buildSkypilotConfig, buildDstackConfig, type, providerId]);
 
   // Local provider setup: poll background setup status and keep modal open until done.
   const pollLocalSetupStatus = (providerIdForSetup: string) => {
@@ -544,6 +602,8 @@ export default function ProviderDetailsModal({
         parsedConfig = buildSlurmConfig();
       } else if (type === 'skypilot') {
         parsedConfig = buildSkypilotConfig();
+      } else if (type === 'dstack') {
+        parsedConfig = buildDstackConfig();
       } else if (type === 'local') {
         // Local providers are configured via supported accelerators only
         parsedConfig = {};
@@ -700,6 +760,7 @@ export default function ProviderDetailsModal({
                   <Option value="skypilot">Skypilot</Option>
                   <Option value="slurm">SLURM</Option>
                   <Option value="runpod">Runpod</Option>
+                  <Option value="dstack">dstack</Option>
                   {!hasLocalProvider && !providerId && (
                     <Option value="local">Local (beta)</Option>
                   )}
@@ -1006,8 +1067,50 @@ export default function ProviderDetailsModal({
                 </>
               )}
 
+              {type === 'dstack' && (
+                <>
+                  <FormControl sx={{ mt: 2 }}>
+                    <FormLabel>dstack Server URL *</FormLabel>
+                    <Input
+                      value={dstackServerUrl}
+                      onChange={(event) =>
+                        setDstackServerUrl(event.currentTarget.value)
+                      }
+                      placeholder="https://sky.dstack.ai"
+                      fullWidth
+                    />
+                  </FormControl>
+                  <FormControl sx={{ mt: 1 }}>
+                    <FormLabel>dstack API Token *</FormLabel>
+                    <Input
+                      value={dstackApiToken}
+                      onChange={(event) =>
+                        setDstackApiToken(event.currentTarget.value)
+                      }
+                      placeholder="Your dstack API token"
+                      type="password"
+                      fullWidth
+                    />
+                  </FormControl>
+                  <FormControl sx={{ mt: 1 }}>
+                    <FormLabel>dstack Project Name *</FormLabel>
+                    <Input
+                      value={dstackProjectName}
+                      onChange={(event) =>
+                        setDstackProjectName(event.currentTarget.value)
+                      }
+                      placeholder="main"
+                      fullWidth
+                    />
+                  </FormControl>
+                </>
+              )}
+
               {/* Generic JSON config for non-structured providers or advanced editing */}
-              {type !== 'slurm' && type !== 'skypilot' && type !== 'local' && (
+              {type !== 'slurm' &&
+                type !== 'skypilot' &&
+                type !== 'dstack' &&
+                type !== 'local' && (
                 <FormControl sx={{ mt: 1 }}>
                   <FormLabel>Configuration</FormLabel>
                   <Textarea
@@ -1025,7 +1128,8 @@ export default function ProviderDetailsModal({
               )}
 
               {/* Show JSON for SLURM or SkyPilot providers in edit mode for advanced users */}
-              {(type === 'slurm' || type === 'skypilot') && providerId && (
+              {(type === 'slurm' || type === 'skypilot' || type === 'dstack') &&
+                providerId && (
                 <FormControl sx={{ mt: 1 }}>
                   <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
                   <Textarea
@@ -1043,6 +1147,8 @@ export default function ProviderDetailsModal({
                           parseSlurmConfig(configObj);
                         } else if (type === 'skypilot') {
                           parseSkypilotConfig(configObj);
+                        } else if (type === 'dstack') {
+                          parseDstackConfig(configObj);
                         }
                       } catch (e) {
                         // Ignore parse errors

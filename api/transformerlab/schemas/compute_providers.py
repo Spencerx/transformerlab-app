@@ -12,6 +12,7 @@ class ProviderConfigBase(BaseModel):
     # SkyPilot-specific config
     server_url: Optional[str] = None
     api_token: Optional[str] = None
+    dstack_project: Optional[str] = None
     default_env_vars: Dict[str, str] = Field(default_factory=dict)
     default_entrypoint_run: Optional[str] = None
 
@@ -84,8 +85,13 @@ def mask_sensitive_config(config: Dict[str, Any], provider_type: str) -> Dict[st
     """
     masked = config.copy()
 
-    # Mask API tokens
-    if "api_token" in masked and masked["api_token"]:
+    # Mask API tokens for providers that should not expose raw credentials.
+    # dstack is intentionally excluded so edits can round-trip the token.
+    if (
+        "api_token" in masked
+        and masked["api_token"]
+        and provider_type != ProviderType.DSTACK.value
+    ):
         masked["api_token"] = "***"
 
     # Mask any other sensitive fields
