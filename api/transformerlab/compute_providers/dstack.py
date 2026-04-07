@@ -61,11 +61,6 @@ class DstackProvider(ComputeProvider):
                 timeout=timeout,
                 stream=stream,
             )
-            print("RESPONSE", response)
-            print("RESPONSE", response.content)
-            print("RESPONSE", response.json())
-            print("RESPONSE", response.text)
-            print("RESPONSE", response.status_code)
             response.raise_for_status()
 
             return response
