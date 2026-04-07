@@ -1,4 +1,4 @@
-name: CLI Live API Route Contract
+name: CLI Live API Server Tests
 
 on:
   push:
@@ -50,11 +50,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v4
-
       - name: Install API dependencies
         run: |
+          pip install uv
           uv pip install --system pytest pytest-asyncio jsonschema requests httpx
           # Minimal api/pyproject.toml only; drop SDK pin so ../lab-sdk editable install wins
           sed -i.bak '/^  "transformerlab==/d' pyproject.toml
@@ -91,8 +89,14 @@ jobs:
 
       - name: Start API server and wait for ready
         run: |
-          ./run.sh -c &
+          ./run.sh -c > /tmp/api-server.log 2>&1 &
           python scripts/wait_for_server.py --timeout 120 --interval 2
+
+      - name: Print API server logs on failure
+        if: failure()
+        run: |
+          echo "===== API SERVER LOGS ====="
+          cat /tmp/api-server.log || true
 
       - name: Run live CLI route-contract smoke test
         env:
