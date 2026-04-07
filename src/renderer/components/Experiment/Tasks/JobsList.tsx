@@ -19,10 +19,17 @@ import {
   FileTextIcon,
   DatabaseIcon,
   FolderOpenIcon,
+  BookmarkIcon,
+  MoreVerticalIcon,
+  EyeOffIcon,
+  EyeIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
+import {
+  isDeletableJobRecordStatus,
+  isTerminalJobStatus,
+} from 'renderer/lib/utils';
 import JobProgress from './JobProgress';
-import { isTerminalJobStatus } from 'renderer/lib/utils';
 
 export interface LaunchProgressInfo {
   phase?: string;
@@ -53,6 +60,8 @@ interface JobsListProps {
   selectMode?: boolean;
   selectedJobIds?: string[];
   onToggleJobSelected?: (jobId: string) => void;
+  onToggleFavorite?: (jobId: string, currentValue: boolean) => void;
+  onToggleHidden?: (jobId: string, currentValue: boolean) => void;
 }
 
 const JobsList: React.FC<JobsListProps> = ({
@@ -78,7 +87,13 @@ const JobsList: React.FC<JobsListProps> = ({
   selectMode = false,
   selectedJobIds = [],
   onToggleJobSelected,
+  onToggleFavorite,
+  onToggleHidden,
 }) => {
+  const showTrackioForStatus = (status?: string): boolean => {
+    return String(status || '') === 'RUNNING' || isTerminalJobStatus(status);
+  };
+
   const formatJobConfig = (job: any) => {
     const jobData = job?.job_data || {};
 
@@ -144,7 +159,10 @@ const JobsList: React.FC<JobsListProps> = ({
         <>
           {clusterName && (
             <Typography level="title-sm" fontWeight="bold">
-              {clusterName}
+              {clusterName}{' '}
+              {job?.job_data?.favorite && (
+                <BookmarkIcon size={16} fill="currentColor" />
+              )}
               <br />
             </Typography>
           )}
@@ -213,7 +231,10 @@ const JobsList: React.FC<JobsListProps> = ({
             const displayJobId =
               String(job?.short_id ?? '').trim() || fullJobId.slice(0, 8);
             return (
-              <tr key={job.id}>
+              <tr
+                key={job.id}
+                style={job?.job_data?.hidden ? { opacity: 0.45 } : undefined}
+              >
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
                   {selectMode &&
                     job?.job_data?.eval_results &&
@@ -278,26 +299,27 @@ const JobsList: React.FC<JobsListProps> = ({
                     )}
 
                     {(job?.job_data?.trackio_db_artifact_path ||
-                      job?.job_data?.trackio_project_name) && (
-                      <Button
-                        size="sm"
-                        variant="plain"
-                        onClick={() => onViewTrackio?.(String(job?.id))}
-                        startDecorator={<LineChartIcon />}
-                      >
-                        <Box
-                          sx={{
-                            display: {
-                              xs: 'none',
-                              sm: 'none',
-                              md: 'inline-flex',
-                            },
-                          }}
+                      job?.job_data?.trackio_project_name) &&
+                      showTrackioForStatus(job?.status) && (
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          onClick={() => onViewTrackio?.(String(job?.id))}
+                          startDecorator={<LineChartIcon />}
                         >
-                          Trackio
-                        </Box>
-                      </Button>
-                    )}
+                          <Box
+                            sx={{
+                              display: {
+                                xs: 'none',
+                                sm: 'none',
+                                md: 'inline-flex',
+                              },
+                            }}
+                          >
+                            Trackio
+                          </Box>
+                        </Button>
+                      )}
 
                     {!hideOutputButton && (
                       <Button
@@ -514,9 +536,9 @@ const JobsList: React.FC<JobsListProps> = ({
                     {!job?.placeholder && (
                       <IconButton
                         variant="plain"
-                        disabled={!isTerminalJobStatus(job?.status)}
+                        disabled={!isDeletableJobRecordStatus(job?.status)}
                         onClick={() => {
-                          if (!isTerminalJobStatus(job?.status)) {
+                          if (!isDeletableJobRecordStatus(job?.status)) {
                             return;
                           }
                           onDeleteJob?.(job.id);
@@ -524,6 +546,58 @@ const JobsList: React.FC<JobsListProps> = ({
                       >
                         <Trash2Icon style={{ cursor: 'pointer' }} />
                       </IconButton>
+                    )}
+                    {!job?.placeholder && (
+                      <Dropdown>
+                        <MenuButton
+                          slots={{ root: IconButton }}
+                          slotProps={{
+                            root: { variant: 'plain', color: 'neutral' },
+                          }}
+                          sx={{ minWidth: 0 }}
+                        >
+                          <MoreVerticalIcon size={16} />
+                        </MenuButton>
+                        <Menu>
+                          <MenuItem
+                            onClick={() =>
+                              onToggleFavorite?.(
+                                String(job.id),
+                                !!job?.job_data?.favorite,
+                              )
+                            }
+                          >
+                            {job?.job_data?.favorite ? (
+                              <>
+                                <BookmarkIcon size={16} fill="currentColor" />{' '}
+                                Unfavorite
+                              </>
+                            ) : (
+                              <>
+                                <BookmarkIcon size={16} /> Favorite
+                              </>
+                            )}
+                          </MenuItem>
+                          <MenuItem
+                            onClick={() =>
+                              onToggleHidden?.(
+                                String(job.id),
+                                !!job?.job_data?.hidden,
+                              )
+                            }
+                          >
+                            {job?.job_data?.hidden ? (
+                              <>
+                                <EyeIcon size={16} /> Unhide
+                              </>
+                            ) : (
+                              <>
+                                <EyeOffIcon size={16} /> Hide
+                              </>
+                            )}
+                          </MenuItem>
+                        </Menu>
+                      </Dropdown>
                     )}
                   </ButtonGroup>
                 </td>

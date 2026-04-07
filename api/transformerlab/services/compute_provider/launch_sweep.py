@@ -20,6 +20,11 @@ from transformerlab.services.compute_provider.launch_credentials import (
     generate_gcp_credentials_setup,
     get_aws_credentials_from_file,
 )
+from transformerlab.services.compute_provider.trackio_launch import (
+    apply_trackio_launch_env,
+    build_trackio_run_name,
+    resolve_trackio_project_name,
+)
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.github_utils import read_github_pat_from_workspace, generate_github_clone_setup
@@ -176,6 +181,22 @@ async def launch_sweep_jobs(
                 env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
                 env_vars["_TFL_USER_ID"] = user_id
 
+                trackio_project_name_for_child: str | None = None
+                trackio_run_name_for_child: str | None = None
+                if request.enable_trackio:
+                    st_project_name = resolve_trackio_project_name(request.experiment_id, request.trackio_project_name)
+                    child_job_short_id = job_service.get_short_job_id(child_job_id)
+                    st_run_name = build_trackio_run_name(request.task_name, child_job_short_id)
+                    trackio_project_name_for_child = st_project_name
+                    trackio_run_name_for_child = st_run_name
+                    await apply_trackio_launch_env(
+                        env_vars,
+                        job_id=child_job_id,
+                        experiment_id=request.experiment_id,
+                        project_name=st_project_name,
+                        run_name=st_run_name,
+                    )
+
                 tfl_storage_uri = None
                 try:
                     storage_root = await storage.root_uri()
@@ -311,6 +332,10 @@ async def launch_sweep_jobs(
                 }
                 if request.file_mounts is True and request.task_id:
                     child_job_data["task_id"] = request.task_id
+                if trackio_project_name_for_child is not None:
+                    child_job_data["trackio_project_name"] = trackio_project_name_for_child
+                if trackio_run_name_for_child is not None:
+                    child_job_data["trackio_run_name"] = trackio_run_name_for_child
 
                 child_job_updates = {key: value for key, value in child_job_data.items() if value is not None}
                 if child_job_updates:

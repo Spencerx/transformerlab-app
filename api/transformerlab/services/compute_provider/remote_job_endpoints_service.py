@@ -11,6 +11,11 @@ from transformerlab.compute_providers.models import ClusterConfig
 from transformerlab.schemas.compute_providers import ResumeFromCheckpointRequest
 from transformerlab.services import job_service, quota_service
 from transformerlab.services.compute_provider.cluster_naming import sanitize_cluster_basename
+from transformerlab.services.compute_provider.trackio_launch import (
+    apply_trackio_launch_env,
+    build_trackio_run_name,
+    resolve_trackio_project_name,
+)
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
 from transformerlab.shared.github_utils import generate_github_clone_setup, read_github_pat_from_workspace
 from transformerlab.shared.models.models import ProviderType
@@ -195,6 +200,28 @@ async def resume_remote_job_from_checkpoint(
     if user:
         env_vars["_TFL_USER_ID"] = str(user.id)
 
+    # Preserve Trackio behavior on checkpoint resumes, but remap job-specific paths
+    # to the new job id so resumed runs do not write into the old job's local dir.
+    trackio_project_name_for_job: str | None = None
+    trackio_run_name_for_job: str | None = None
+    old_trackio_project_name = (job_data.get("trackio_project_name") or "").strip()
+    old_trackio_auto = str(env_vars.get("TLAB_TRACKIO_AUTO_INIT", "")).lower() == "true"
+    if old_trackio_auto or old_trackio_project_name:
+        project_name = resolve_trackio_project_name(
+            experiment_id,
+            old_trackio_project_name or str(env_vars.get("TLAB_TRACKIO_PROJECT_NAME", "")).strip(),
+        )
+        trackio_run_name = build_trackio_run_name(job_data.get("task_name"), new_job_short_id)
+        trackio_project_name_for_job = project_name
+        trackio_run_name_for_job = trackio_run_name
+        await apply_trackio_launch_env(
+            env_vars,
+            job_id=new_job_id,
+            experiment_id=experiment_id,
+            project_name=project_name,
+            run_name=trackio_run_name,
+        )
+
     tfl_storage_uri = None
     try:
         storage_root = await storage.root_uri()
@@ -264,6 +291,10 @@ async def resume_remote_job_from_checkpoint(
         "team_id": team_id,
         "start_time": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()),
     }
+    if trackio_project_name_for_job is not None:
+        launch_job_data["trackio_project_name"] = trackio_project_name_for_job
+    if trackio_run_name_for_job is not None:
+        launch_job_data["trackio_run_name"] = trackio_run_name_for_job
 
     await job_service.job_update_job_data_insert_key_values(
         new_job_id, {k: v for k, v in launch_job_data.items() if v is not None}, experiment_id

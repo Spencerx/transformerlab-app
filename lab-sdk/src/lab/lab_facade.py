@@ -153,14 +153,17 @@ class Lab:
                 existing_run = context_vars.current_run.get()
                 if existing_run is None:
                     if trackio_project_name_env:
-                        # Shared project: use temp dir, seed from shared path, init with project + run name
+                        # Shared project: metrics dir should be set by compute launch (TRACKIO_DIR) before
+                        # trackio is imported; fall back for local/scripts without a provider.
                         job_id_env = os.environ.get("_TFL_JOB_ID", "unknown")
-                        temp_dir = f"/tmp/trackio/{job_id_env}"
-                        os.makedirs(temp_dir, exist_ok=True)
-                        os.environ["TRACKIO_DIR"] = temp_dir
+                        trackio_dir = (os.environ.get("TRACKIO_DIR") or "").strip()
+                        if not trackio_dir:
+                            trackio_dir = dirs.get_trackio_dir(job_id_env)
+                        os.makedirs(trackio_dir, exist_ok=True)
+                        os.environ.setdefault("TRACKIO_DIR", trackio_dir)
                         _run_async(
                             self._seed_trackio_shared_path_async(
-                                experiment_id or "", trackio_project_name_env, temp_dir
+                                experiment_id or "", trackio_project_name_env, trackio_dir
                             )
                         )
                         trackio.init(
@@ -170,7 +173,13 @@ class Lab:
                         self._trackio_managed = True
                         logger.info(f"📊 Trackio auto-init enabled for shared project '{trackio_project_name_env}'")
                     else:
-                        # Legacy: per-job project name
+                        # Legacy: per-job project name (still avoid Trackio default under HF cache).
+                        job_id_env = os.environ.get("_TFL_JOB_ID", "unknown")
+                        trackio_dir = (os.environ.get("TRACKIO_DIR") or "").strip()
+                        if not trackio_dir:
+                            trackio_dir = dirs.get_trackio_dir(job_id_env)
+                        os.makedirs(trackio_dir, exist_ok=True)
+                        os.environ.setdefault("TRACKIO_DIR", trackio_dir)
                         project_name = str(experiment_id or "TransformerLab")
                         trackio.init(project=project_name)
                         self._trackio_managed = True
@@ -708,8 +717,9 @@ class Lab:
                     if "is_image" in config:
                         is_image = config["is_image"]
 
-                # Use the existing save_dataset method with job_id parameter
-                output_path = await self.async_save_dataset(
+                # Delegate entirely to async_save_dataset which handles saving,
+                # metadata, and generated_datasets tracking.
+                return await self.async_save_dataset(
                     df=df,
                     dataset_id=dataset_id,
                     additional_metadata=additional_metadata if additional_metadata else None,
@@ -717,28 +727,6 @@ class Lab:
                     is_image=is_image,
                     job_id=job_id,
                 )
-
-                # Extract the actual dataset_id with prefix from the path
-                # The dataset_id with prefix is used in the path/filename
-                dataset_id_with_prefix = f"{job_id}_{dataset_id}"
-
-                # Track dataset_id in job_data
-                try:
-                    job_data = await self._job.get_job_data()
-                    generated_datasets_list = []
-                    if isinstance(job_data, dict):
-                        existing = job_data.get("generated_datasets", [])
-                        if isinstance(existing, list):
-                            generated_datasets_list = existing
-                    generated_datasets_list.append(dataset_id_with_prefix)
-                    await self._job.update_job_data_field("generated_datasets", generated_datasets_list)
-                except Exception:
-                    pass
-
-                await self._job.log_info(
-                    f"Dataset saved to '{output_path}' and registered as generated dataset '{dataset_id_with_prefix}'"
-                )  # type: ignore[union-attr]
-                return output_path
 
             # Handle file path input for datasets
             else:
@@ -809,24 +797,28 @@ class Lab:
                 else:
                     await storage.copy_file(src, dest)
 
-                # Track in job_data
+                # Track in job_data (mirrors async_save_dataset tracking)
                 try:
+                    await self._job.update_job_data_field("dataset_id", base_name)  # type: ignore[union-attr]
                     job_data = await self._job.get_job_data()
-                    dataset_list = []
+                    dataset_list: list = []
                     if isinstance(job_data, dict):
                         existing = job_data.get("generated_datasets", [])
                         if isinstance(existing, list):
                             dataset_list = existing
-                    dataset_list.append(dest)
-                    await self._job.update_job_data_field("generated_datasets", dataset_list)
+                    if base_name not in dataset_list:
+                        dataset_list.append(base_name)
+                    await self._job.update_job_data_field("generated_datasets", dataset_list)  # type: ignore[union-attr]
                 except Exception:
-                    pass
+                    logger.warning("Warning: Failed to track dataset in job_data", exc_info=True)
 
-                await self._job.log_info(f"Dataset saved to '{dest}'")  # type: ignore[union-attr]
+                await self._job.log_info(  # type: ignore[union-attr]
+                    f"Dataset saved to '{dest}' and registered as generated dataset '{base_name}'"
+                )
                 return dest
 
         # Handle DataFrame input when type="evals"
-        if type == "eval" and hasattr(source_path, "to_csv"):
+        if type == "evals" and hasattr(source_path, "to_csv"):
             # Normalize input: convert Hugging Face datasets.Dataset to pandas DataFrame
             df = source_path
             try:
@@ -1338,10 +1330,22 @@ class Lab:
         # Track dataset on the job for provenance
         try:
             await self._job.update_job_data_field("dataset_id", dataset_id_with_prefix)  # type: ignore[union-attr]
+            # Also track in generated_datasets list for consistency with save_artifact(type="dataset")
+            job_data = await self._job.get_job_data()  # type: ignore[union-attr]
+            generated_datasets_list: list = []
+            if isinstance(job_data, dict):
+                existing = job_data.get("generated_datasets", [])
+                if isinstance(existing, list):
+                    generated_datasets_list = existing
+            if dataset_id_with_prefix not in generated_datasets_list:
+                generated_datasets_list.append(dataset_id_with_prefix)
+            await self._job.update_job_data_field("generated_datasets", generated_datasets_list)  # type: ignore[union-attr]
         except Exception:
             logger.warning("Warning: Failed to track dataset in job_data", exc_info=True)
 
-        logger.info(f"Dataset saved to '{output_path}' and registered as generated dataset '{dataset_id_with_prefix}'")
+        await self._job.log_info(  # type: ignore[union-attr]
+            f"Dataset saved to '{output_path}' and registered as generated dataset '{dataset_id_with_prefix}'"
+        )
         return output_path
 
     def save_checkpoint(self, source_path: str, name: Optional[str] = None) -> str:
