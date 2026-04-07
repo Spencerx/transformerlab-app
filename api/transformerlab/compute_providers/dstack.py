@@ -198,10 +198,39 @@ class DstackProvider(ComputeProvider):
             json_data={"plan": {"run_spec": run_spec}, "force": False},
         )
         data = response.json()
-        response_run_spec = data.get("run_spec") if isinstance(data, dict) else {}
-        run_name = (
-            (response_run_spec or {}).get("run_name") if isinstance(response_run_spec, dict) else None
-        ) or data.get("run_name", cluster_name)
+        if not isinstance(data, dict):
+            logger.debug(
+                "dstack launch returned non-dict response; falling back to requested cluster name",
+                extra={"cluster_name": cluster_name, "response_type": type(data).__name__},
+            )
+            return {"run_name": cluster_name, "status": None}
+
+        response_run_spec = data.get("run_spec")
+        if response_run_spec is None:
+            logger.debug(
+                "dstack launch response missing run_spec",
+                extra={"cluster_name": cluster_name, "response_keys": list(data.keys())},
+            )
+            response_run_spec_dict: Dict[str, Any] = {}
+        elif not isinstance(response_run_spec, dict):
+            logger.debug(
+                "dstack launch response run_spec is not a dict",
+                extra={
+                    "cluster_name": cluster_name,
+                    "run_spec_type": type(response_run_spec).__name__,
+                },
+            )
+            response_run_spec_dict = {}
+        else:
+            response_run_spec_dict = response_run_spec
+
+        run_name = response_run_spec_dict.get("run_name") or data.get("run_name")
+        if not run_name:
+            logger.debug(
+                "dstack launch response missing run_name; using requested cluster name",
+                extra={"cluster_name": cluster_name},
+            )
+            run_name = cluster_name
         return {"run_name": run_name, "status": data.get("status")}
 
     def stop_cluster(self, cluster_name: str) -> Dict[str, Any]:
