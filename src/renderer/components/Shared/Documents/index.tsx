@@ -59,6 +59,9 @@ import {
 import * as chatAPI from '../../../lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 
+const hasDisplayableSize = (size: unknown): size is number =>
+  typeof size === 'number' && Number.isFinite(size) && size > 0;
+
 function RowMenu({ experimentInfo, filename, foldername, mutate, row }) {
   return (
     <Dropdown>
@@ -69,7 +72,9 @@ function RowMenu({ experimentInfo, filename, foldername, mutate, row }) {
         <MoreHorizRoundedIcon size="16px" />
       </MenuButton>
       <Menu size="sm" sx={{ minWidth: 140 }}>
-        <MenuItem disabled>Size: {formatBytes(row?.size)}</MenuItem>
+        <MenuItem disabled>
+          Size: {hasDisplayableSize(row?.size) ? formatBytes(row.size) : '--'}
+        </MenuItem>
         {/* <MenuItem disabled>Rename</MenuItem> */}
         <Divider />
         <MenuItem
@@ -126,7 +131,7 @@ function File({
       {fullPage && (
         <>
           <td>
-            <Typography level="body-xs">{row?.date}</Typography>
+            <Typography level="body-xs">{row?.date || '--'}</Typography>
           </td>
           <td>
             <Chip
@@ -151,11 +156,9 @@ function File({
             </Chip>
           </td>
           <td>
-            {row?.size && (
-              <Typography level="body-xs" color="neutral">
-                {formatBytes(row?.size)}
-              </Typography>
-            )}
+            <Typography level="body-xs" color="neutral">
+              {hasDisplayableSize(row?.size) ? formatBytes(row.size) : '--'}
+            </Typography>
           </td>
         </>
       )}
@@ -212,7 +215,7 @@ function Folder({
       {fullPage && (
         <>
           <td>
-            <Typography level="body-xs">{row?.date}</Typography>
+            <Typography level="body-xs">{row?.date || '--'}</Typography>
           </td>
           <td>
             <Chip
@@ -237,16 +240,9 @@ function Folder({
             </Chip>
           </td>
           <td>
-            {row?.size == 0 ? (
-              <></>
-            ) : (
-              row?.size &&
-              row?.size != 0 && (
-                <Typography level="body-xs" color="neutral">
-                  {formatBytes(row?.size)}
-                </Typography>
-              )
-            )}
+            <Typography level="body-xs" color="neutral">
+              {hasDisplayableSize(row?.size) ? formatBytes(row.size) : '--'}
+            </Typography>
           </td>
         </>
       )}
