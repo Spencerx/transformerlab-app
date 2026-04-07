@@ -77,6 +77,7 @@ interface VersionEntry {
 interface GroupSummary {
   group_name: string;
   asset_type: string;
+  title: string;
   description: string;
   version_count: number;
   latest_version_label: string | null;
@@ -415,6 +416,7 @@ function EditGroupModal({
   group: GroupSummary;
   mutateGroups: () => void;
 }) {
+  const [name, setName] = useState(group.title || group.group_name);
   const [description, setDescription] = useState(group.description || '');
   const [saving, setSaving] = useState(false);
 
@@ -429,7 +431,7 @@ function EditGroupModal({
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ description }),
+          body: JSON.stringify({ title: name, description }),
         },
       );
       mutateGroups();
@@ -447,6 +449,10 @@ function EditGroupModal({
         <ModalClose />
         <DialogTitle>Edit Dataset Group</DialogTitle>
         <Stack spacing={2} sx={{ mt: 1 }}>
+          <FormControl>
+            <FormLabel>Name</FormLabel>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </FormControl>
           <FormControl>
             <FormLabel>Description</FormLabel>
             <Textarea
@@ -647,7 +653,7 @@ export default function DatasetRegistry() {
                       <Stack direction="row" alignItems="center" gap={1.5}>
                         <DatabaseIcon size={18} />
                         <Typography level="title-md" fontWeight="lg">
-                          {group.group_name}
+                          {group.title || group.group_name}
                         </Typography>
                         <Chip size="sm" variant="soft" color="neutral">
                           {group.version_count} version
