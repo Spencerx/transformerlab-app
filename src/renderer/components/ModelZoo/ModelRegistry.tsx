@@ -74,6 +74,7 @@ interface VersionEntry {
 }
 
 interface GroupSummary {
+  group_id: string;
   group_name: string;
   asset_type: string;
   version_count: number;
@@ -153,7 +154,7 @@ function RegistrySkeleton() {
 function VersionRow({
   v,
   assetType,
-  groupName,
+  groupId,
   updatingVersion,
   selectingVersion,
   isCurrentFoundation,
@@ -164,7 +165,7 @@ function VersionRow({
 }: {
   v: VersionEntry;
   assetType: string;
-  groupName: string;
+  groupId: string;
   updatingVersion: string | null;
   selectingVersion: string | null;
   isCurrentFoundation: boolean;
@@ -288,14 +289,14 @@ function VersionRow({
 // ─── Expanded group content ──────────────────────────────────────────────────
 
 function GroupVersionsTable({
-  groupName,
+  groupId,
   assetType,
   mutateGroups,
   experimentInfo,
   experimentInfoMutate,
   currentFoundation,
 }: {
-  groupName: string;
+  groupId: string;
   assetType: string;
   mutateGroups: () => void;
   experimentInfo: any;
@@ -310,7 +311,7 @@ function GroupVersionsTable({
     isLoading,
     mutate,
   } = useSWR(
-    chatAPI.Endpoints.AssetVersions.ListVersions(assetType, groupName),
+    chatAPI.Endpoints.AssetVersions.ListVersions(assetType, groupId),
     fetcher,
   );
 
@@ -320,7 +321,7 @@ function GroupVersionsTable({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.SetTag(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         {
@@ -344,7 +345,7 @@ function GroupVersionsTable({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.ClearTag(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         { method: 'DELETE' },
@@ -361,7 +362,7 @@ function GroupVersionsTable({
   const handleDeleteVersion = async (versionLabel: string) => {
     if (
       !window.confirm(
-        `Delete version ${versionLabel} from group "${groupName}"? This will not delete the underlying model.`,
+        `Delete version ${versionLabel} from this group? This will not delete the underlying model.`,
       )
     ) {
       return;
@@ -371,7 +372,7 @@ function GroupVersionsTable({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.DeleteVersion(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         { method: 'DELETE' },
@@ -509,7 +510,7 @@ function GroupVersionsTable({
             key={v.id}
             v={v}
             assetType={assetType}
-            groupName={groupName}
+            groupId={groupId}
             updatingVersion={updatingVersion}
             selectingVersion={selectingVersion}
             isCurrentFoundation={currentFoundation === v.asset_id}
@@ -541,17 +542,17 @@ export default function ModelRegistry() {
     mutate: mutateGroups,
   } = useSWR(chatAPI.Endpoints.AssetVersions.ListGroups('model'), fetcher);
 
-  const handleDeleteGroup = async (groupName: string) => {
+  const handleDeleteGroup = async (groupId: string, displayName: string) => {
     if (
       !window.confirm(
-        `Delete group "${groupName}" and ALL its versions? The underlying models will not be deleted.`,
+        `Delete group "${displayName}" and ALL its versions? The underlying models will not be deleted.`,
       )
     ) {
       return;
     }
     try {
       await fetchWithAuth(
-        chatAPI.Endpoints.AssetVersions.DeleteGroup('model', groupName),
+        chatAPI.Endpoints.AssetVersions.DeleteGroup('model', groupId),
         { method: 'DELETE' },
       );
       mutateGroups();
@@ -560,13 +561,13 @@ export default function ModelRegistry() {
     }
   };
 
-  const toggleGroup = (groupName: string) => {
+  const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(groupName)) {
-        next.delete(groupName);
+      if (next.has(groupId)) {
+        next.delete(groupId);
       } else {
-        next.add(groupName);
+        next.add(groupId);
       }
       return next;
     });
@@ -717,12 +718,12 @@ export default function ModelRegistry() {
             }}
           >
             {filteredGroups.map((group) => {
-              const isExpanded = expandedGroups.has(group.group_name);
+              const isExpanded = expandedGroups.has(group.group_id);
               return (
                 <Accordion
-                  key={group.group_name}
+                  key={group.group_id}
                   expanded={isExpanded}
-                  onChange={() => toggleGroup(group.group_name)}
+                  onChange={() => toggleGroup(group.group_id)}
                   sx={{
                     borderRadius: 'md',
                     border: '1px solid',
@@ -768,7 +769,7 @@ export default function ModelRegistry() {
                   <AccordionDetails sx={{ px: 2, pb: 2 }}>
                     {isExpanded && (
                       <GroupVersionsTable
-                        groupName={group.group_name}
+                        groupId={group.group_id}
                         assetType="model"
                         mutateGroups={mutateGroups}
                         experimentInfo={experimentInfo}

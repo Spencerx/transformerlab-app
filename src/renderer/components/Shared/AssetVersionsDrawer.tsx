@@ -47,7 +47,7 @@ import { fetcher } from '../../lib/transformerlab-api-sdk';
 interface AssetVersionEntry {
   id: string;
   asset_type: string;
-  group_name: string;
+  group_id: string;
   version_label: string;
   asset_id: string;
   tag: string | null;
@@ -65,7 +65,7 @@ interface AssetVersionsDrawerProps {
   open: boolean;
   onClose: () => void;
   assetType: 'model' | 'dataset';
-  groupName: string;
+  groupId: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -188,13 +188,13 @@ function EvalsEditor({
 function VersionDetailPanel({
   entry,
   assetType,
-  groupName,
+  groupId,
   onBack,
   onMutate,
 }: {
   entry: AssetVersionEntry;
   assetType: string;
-  groupName: string;
+  groupId: string;
   onBack: () => void;
   onMutate: () => void;
 }) {
@@ -273,7 +273,7 @@ function VersionDetailPanel({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.UpdateVersion(
           assetType,
-          groupName,
+          groupId,
           entry.version_label,
         ),
         {
@@ -292,7 +292,7 @@ function VersionDetailPanel({
     }
   }, [
     assetType,
-    groupName,
+    groupId,
     entry.version_label,
     title,
     description,
@@ -323,7 +323,7 @@ function VersionDetailPanel({
         await fetchWithAuth(
           chatAPI.Endpoints.AssetVersions.SetTag(
             assetType,
-            groupName,
+            groupId,
             entry.version_label,
           ),
           {
@@ -336,7 +336,7 @@ function VersionDetailPanel({
         await fetchWithAuth(
           chatAPI.Endpoints.AssetVersions.ClearTag(
             assetType,
-            groupName,
+            groupId,
             entry.version_label,
           ),
           { method: 'DELETE' },
@@ -663,7 +663,7 @@ export default function AssetVersionsDrawer({
   open,
   onClose,
   assetType,
-  groupName,
+  groupId,
 }: AssetVersionsDrawerProps) {
   const [updatingVersion, setUpdatingVersion] = useState<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
@@ -673,8 +673,8 @@ export default function AssetVersionsDrawer({
     isLoading,
     mutate,
   } = useSWR(
-    open && groupName
-      ? chatAPI.Endpoints.AssetVersions.ListVersions(assetType, groupName)
+    open && groupId
+      ? chatAPI.Endpoints.AssetVersions.ListVersions(assetType, groupId)
       : null,
     fetcher,
   );
@@ -682,7 +682,7 @@ export default function AssetVersionsDrawer({
   // Reset selection when drawer closes or group changes
   useEffect(() => {
     if (!open) setSelectedVersion(null);
-  }, [open, groupName]);
+  }, [open, groupId]);
 
   const handleSetTag = async (versionLabel: string, tag: string) => {
     setUpdatingVersion(versionLabel);
@@ -690,7 +690,7 @@ export default function AssetVersionsDrawer({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.SetTag(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         {
@@ -713,7 +713,7 @@ export default function AssetVersionsDrawer({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.ClearTag(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         { method: 'DELETE' },
@@ -729,7 +729,7 @@ export default function AssetVersionsDrawer({
   const handleDeleteVersion = async (versionLabel: string) => {
     if (
       !window.confirm(
-        `Delete version ${versionLabel} from group "${groupName}"? This will not delete the underlying ${assetType}.`,
+        `Delete version ${versionLabel} from group "${groupId}"? This will not delete the underlying ${assetType}.`,
       )
     ) {
       return;
@@ -739,7 +739,7 @@ export default function AssetVersionsDrawer({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.DeleteVersion(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         { method: 'DELETE' },
@@ -792,7 +792,7 @@ export default function AssetVersionsDrawer({
             <Stack direction="row" alignItems="center" gap={1}>
               <TagIcon size={20} />
               <Typography level="title-lg">
-                {typeLabel} Versions: <b>{groupName}</b>
+                {typeLabel} Versions: <b>{groupId}</b>
               </Typography>
             </Stack>
           </DialogTitle>
@@ -814,7 +814,7 @@ export default function AssetVersionsDrawer({
         <VersionDetailPanel
           entry={selectedEntry}
           assetType={assetType}
-          groupName={groupName}
+          groupId={groupId}
           onBack={() => setSelectedVersion(null)}
           onMutate={() => mutate()}
         />

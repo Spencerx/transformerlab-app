@@ -75,9 +75,9 @@ interface VersionEntry {
 }
 
 interface GroupSummary {
+  group_id: string;
   group_name: string;
   asset_type: string;
-  title: string;
   description: string;
   version_count: number;
   latest_version_label: string | null;
@@ -263,10 +263,10 @@ function VersionRow({
 // ─── Expanded group versions table ───────────────────────────────────────────
 
 function GroupVersionsTable({
-  groupName,
+  groupId,
   mutateGroups,
 }: {
-  groupName: string;
+  groupId: string;
   mutateGroups: () => void;
 }) {
   const [updatingVersion, setUpdatingVersion] = useState<string | null>(null);
@@ -277,7 +277,7 @@ function GroupVersionsTable({
     isLoading,
     mutate,
   } = useSWR(
-    chatAPI.Endpoints.AssetVersions.ListVersions(assetType, groupName),
+    chatAPI.Endpoints.AssetVersions.ListVersions(assetType, groupId),
     fetcher,
   );
 
@@ -287,7 +287,7 @@ function GroupVersionsTable({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.SetTag(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         {
@@ -311,7 +311,7 @@ function GroupVersionsTable({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.ClearTag(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         { method: 'DELETE' },
@@ -328,7 +328,7 @@ function GroupVersionsTable({
   const handleDeleteVersion = async (versionLabel: string) => {
     if (
       !window.confirm(
-        `Delete version ${versionLabel} from group "${groupName}"? This will not delete the underlying dataset.`,
+        `Delete version ${versionLabel} from group "${groupId}"? This will not delete the underlying dataset.`,
       )
     ) {
       return;
@@ -338,7 +338,7 @@ function GroupVersionsTable({
       await fetchWithAuth(
         chatAPI.Endpoints.AssetVersions.DeleteVersion(
           assetType,
-          groupName,
+          groupId,
           versionLabel,
         ),
         { method: 'DELETE' },
@@ -416,7 +416,7 @@ function EditGroupModal({
   group: GroupSummary;
   mutateGroups: () => void;
 }) {
-  const [name, setName] = useState(group.title || group.group_name);
+  const [name, setName] = useState(group.group_name);
   const [description, setDescription] = useState(group.description || '');
   const [saving, setSaving] = useState(false);
 
@@ -424,14 +424,11 @@ function EditGroupModal({
     setSaving(true);
     try {
       await fetchWithAuth(
-        chatAPI.Endpoints.AssetVersions.UpdateGroup(
-          'dataset',
-          group.group_name,
-        ),
+        chatAPI.Endpoints.AssetVersions.UpdateGroup('dataset', group.group_id),
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: name, description }),
+          body: JSON.stringify({ name: name, description }),
         },
       );
       mutateGroups();
@@ -484,17 +481,17 @@ export default function DatasetRegistry() {
     mutate: mutateGroups,
   } = useSWR(chatAPI.Endpoints.AssetVersions.ListGroups('dataset'), fetcher);
 
-  const handleDeleteGroup = async (groupName: string) => {
+  const handleDeleteGroup = async (groupId: string) => {
     if (
       !window.confirm(
-        `Delete group "${groupName}" and ALL its versions? The underlying datasets will not be deleted.`,
+        `Delete group "${groupId}" and ALL its versions? The underlying datasets will not be deleted.`,
       )
     ) {
       return;
     }
     try {
       await fetchWithAuth(
-        chatAPI.Endpoints.AssetVersions.DeleteGroup('dataset', groupName),
+        chatAPI.Endpoints.AssetVersions.DeleteGroup('dataset', groupId),
         { method: 'DELETE' },
       );
       mutateGroups();
@@ -653,7 +650,7 @@ export default function DatasetRegistry() {
                       <Stack direction="row" alignItems="center" gap={1.5}>
                         <DatabaseIcon size={18} />
                         <Typography level="title-md" fontWeight="lg">
-                          {group.title || group.group_name}
+                          {group.group_name}
                         </Typography>
                         <Chip size="sm" variant="soft" color="neutral">
                           {group.version_count} version
@@ -688,7 +685,7 @@ export default function DatasetRegistry() {
                   <AccordionDetails sx={{ px: 2, pb: 2 }}>
                     {isExpanded && (
                       <GroupVersionsTable
-                        groupName={group.group_name}
+                        groupId={group.group_id}
                         mutateGroups={mutateGroups}
                       />
                     )}
