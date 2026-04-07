@@ -31,6 +31,7 @@ def _mock_response(json_data, status_code=200):
 
 # --- check() ---
 
+
 class TestCheck:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_returns_true_on_success(self, mock_request, provider):
@@ -40,11 +41,13 @@ class TestCheck:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_returns_false_on_connection_error(self, mock_request, provider):
         import requests as req_lib
+
         mock_request.side_effect = req_lib.exceptions.ConnectionError("unreachable")
         assert provider.check() is False
 
 
 # --- _parse_accelerators() ---
+
 
 class TestParseAccelerators:
     def test_name_and_count(self, provider):
@@ -63,6 +66,7 @@ class TestParseAccelerators:
 
 
 # --- _build_run_spec() ---
+
 
 class TestBuildRunSpec:
     def test_task_type_default(self, provider):
@@ -134,23 +138,28 @@ class TestBuildRunSpec:
 
 # --- _map_status() ---
 
+
 class TestMapStatus:
-    @pytest.mark.parametrize("dstack_status,expected", [
-        ("PENDING", ClusterState.INIT),
-        ("SUBMITTED", ClusterState.INIT),
-        ("PROVISIONING", ClusterState.INIT),
-        ("RUNNING", ClusterState.UP),
-        ("TERMINATING", ClusterState.STOPPED),
-        ("TERMINATED", ClusterState.DOWN),
-        ("DONE", ClusterState.DOWN),
-        ("FAILED", ClusterState.FAILED),
-        ("WEIRD_UNKNOWN", ClusterState.UNKNOWN),
-    ])
+    @pytest.mark.parametrize(
+        "dstack_status,expected",
+        [
+            ("PENDING", ClusterState.INIT),
+            ("SUBMITTED", ClusterState.INIT),
+            ("PROVISIONING", ClusterState.INIT),
+            ("RUNNING", ClusterState.UP),
+            ("TERMINATING", ClusterState.STOPPED),
+            ("TERMINATED", ClusterState.DOWN),
+            ("DONE", ClusterState.DOWN),
+            ("FAILED", ClusterState.FAILED),
+            ("WEIRD_UNKNOWN", ClusterState.UNKNOWN),
+        ],
+    )
     def test_status_mapping(self, provider, dstack_status, expected):
         assert provider._map_status(dstack_status) == expected
 
 
 # --- launch_cluster() ---
+
 
 class TestLaunchCluster:
     @patch("transformerlab.compute_providers.dstack.requests.request")
@@ -173,6 +182,7 @@ class TestLaunchCluster:
 
 # --- stop_cluster() ---
 
+
 class TestStopCluster:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_posts_to_stop_endpoint(self, mock_request, provider):
@@ -186,6 +196,7 @@ class TestStopCluster:
 
 
 # --- get_cluster_status() ---
+
 
 class TestGetClusterStatus:
     @patch("transformerlab.compute_providers.dstack.requests.request")
@@ -204,26 +215,30 @@ class TestGetClusterStatus:
 
 # --- get_job_logs() ---
 
+
 class TestGetJobLogs:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_returns_waiting_when_no_submission_id(self, mock_request, provider):
-        mock_request.return_value = _mock_response({
-            "run_name": "j", "status": "PROVISIONING", "latest_job_submission": None
-        })
+        mock_request.return_value = _mock_response(
+            {"run_name": "j", "status": "PROVISIONING", "latest_job_submission": None}
+        )
         logs = provider.get_job_logs("j", "j")
         assert "Waiting" in logs
 
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_decodes_base64_log_messages(self, mock_request, provider):
         import base64
+
         encoded = base64.b64encode(b"Hello from training\n").decode()
         # First call: get run; Second call: poll logs
         mock_request.side_effect = [
-            _mock_response({
-                "run_name": "j",
-                "status": "RUNNING",
-                "latest_job_submission": {"id": "aaaaaaaa-0000-0000-0000-000000000000"},
-            }),
+            _mock_response(
+                {
+                    "run_name": "j",
+                    "status": "RUNNING",
+                    "latest_job_submission": {"id": "aaaaaaaa-0000-0000-0000-000000000000"},
+                }
+            ),
             _mock_response({"logs": [{"message": encoded}]}),
         ]
         logs = provider.get_job_logs("j", "j")
@@ -232,11 +247,13 @@ class TestGetJobLogs:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_returns_waiting_when_log_list_empty(self, mock_request, provider):
         mock_request.side_effect = [
-            _mock_response({
-                "run_name": "j",
-                "status": "RUNNING",
-                "latest_job_submission": {"id": "aaaaaaaa-0000-0000-0000-000000000000"},
-            }),
+            _mock_response(
+                {
+                    "run_name": "j",
+                    "status": "RUNNING",
+                    "latest_job_submission": {"id": "aaaaaaaa-0000-0000-0000-000000000000"},
+                }
+            ),
             _mock_response({"logs": []}),
         ]
         logs = provider.get_job_logs("j", "j")
@@ -244,6 +261,7 @@ class TestGetJobLogs:
 
 
 # --- _parse_accelerators() invalid count ---
+
 
 class TestParseAcceleratorsInvalid:
     def test_invalid_count_raises_value_error(self, provider):
@@ -253,6 +271,7 @@ class TestParseAcceleratorsInvalid:
 
 # --- _build_run_spec() empty command guard ---
 
+
 class TestBuildRunSpecEmptyGuard:
     def test_raises_if_no_run_and_no_setup(self, provider):
         config = ClusterConfig(run=None)
@@ -261,6 +280,7 @@ class TestBuildRunSpecEmptyGuard:
 
 
 # --- submit_job() ---
+
 
 class TestSubmitJob:
     @patch("transformerlab.compute_providers.dstack.requests.request")
@@ -280,6 +300,7 @@ class TestSubmitJob:
 
 # --- cancel_job() ---
 
+
 class TestCancelJob:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_delegates_to_stop_cluster(self, mock_request, provider):
@@ -291,6 +312,7 @@ class TestCancelJob:
 
 
 # --- list_jobs() ---
+
 
 class TestListJobs:
     @patch("transformerlab.compute_providers.dstack.requests.request")
@@ -304,12 +326,14 @@ class TestListJobs:
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_returns_empty_list_on_error(self, mock_request, provider):
         import requests as req_lib
+
         mock_request.side_effect = req_lib.exceptions.ConnectionError("down")
         jobs = provider.list_jobs("j")
         assert jobs == []
 
 
 # --- get_cluster_resources() ---
+
 
 class TestGetClusterResources:
     @patch("transformerlab.compute_providers.dstack.requests.request")
