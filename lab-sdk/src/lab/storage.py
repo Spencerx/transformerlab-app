@@ -512,7 +512,44 @@ def _resolve_protocol(path: str, fs=None) -> Optional[str]:
     return None
 
 
-def _build_uncached_fs(protocol: str) -> "fsspec.AbstractFileSystem":
+def _extract_storage_options(protocol: str, fs=None) -> dict:
+    """Extract storage options from an existing filesystem or fall back to module-level env vars.
+
+    When *fs* is provided, attempts to read credentials (e.g. AWS profile)
+    from the filesystem's own config so that the uncached instance
+    authenticates identically.  Falls back to module-level defaults
+    (_AWS_PROFILE, _GCP_PROJECT, etc.) when *fs* is None or when its
+    config cannot be inspected.
+    """
+    storage_options: dict = {}
+    if protocol == "s3":
+        if fs is not None:
+            # Try to get profile from filesystem config
+            if hasattr(fs, "config_kwargs") and fs.config_kwargs:
+                config = fs.config_kwargs
+                if "profile" in config:
+                    storage_options["profile"] = config["profile"]
+                elif "aws_access_key_id" in config:
+                    # Explicit credentials — don't overlay a profile
+                    pass
+                elif _AWS_PROFILE:
+                    storage_options["profile"] = _AWS_PROFILE
+            elif hasattr(fs, "anon") and not fs.anon:
+                if _AWS_PROFILE:
+                    storage_options["profile"] = _AWS_PROFILE
+            elif _AWS_PROFILE:
+                storage_options["profile"] = _AWS_PROFILE
+        elif _AWS_PROFILE:
+            storage_options["profile"] = _AWS_PROFILE
+    elif protocol in ("gcs", "gs"):
+        if _GCP_PROJECT:
+            storage_options["project"] = _GCP_PROJECT
+    elif protocol == "abfs" and STORAGE_PROVIDER == "azure":
+        storage_options.update(_get_storage_options())
+    return storage_options
+
+
+def _build_uncached_fs(protocol: str, fs=None) -> "fsspec.AbstractFileSystem":
     """Create a single uncached filesystem for *protocol*.
 
     File-level and listing caches are disabled so every read hits the remote
@@ -525,12 +562,7 @@ def _build_uncached_fs(protocol: str) -> "fsspec.AbstractFileSystem":
         "default_fill_cache": False,
         "use_listings_cache": False,
     }
-    if protocol == "s3" and _AWS_PROFILE:
-        fs_kwargs["profile"] = _AWS_PROFILE
-    elif protocol in ("gcs", "gs") and _GCP_PROJECT:
-        fs_kwargs["project"] = _GCP_PROJECT
-    elif protocol == "abfs" and STORAGE_PROVIDER == "azure":
-        fs_kwargs.update(_get_storage_options())
+    fs_kwargs.update(_extract_storage_options(protocol, fs=fs))
 
     return fsspec.filesystem(protocol, **fs_kwargs)
 
@@ -562,7 +594,7 @@ async def _get_uncached_filesystem(path: str, fs=None):
         cached = _uncached_fs_cache.get(protocol)
         if cached is not None:
             return cached
-        uncached = _build_uncached_fs(protocol)
+        uncached = _build_uncached_fs(protocol, fs=fs)
         _uncached_fs_cache[protocol] = uncached
         return uncached
 
