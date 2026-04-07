@@ -173,6 +173,32 @@ def add_task_from_github(repo_url: str, experiment_id: str) -> None:
             json_data={"github_repo_url": repo_url},
         )
 
+    if response.status_code == 404:
+        # Unified backend returns 404 when task.yaml is missing in the repo/path.
+        # Mirror the UI behavior by offering to create a default task.yaml.
+        try:
+            detail = response.json().get("detail", "")
+        except Exception:
+            detail = response.text
+        if "task.yaml" in str(detail).lower():
+            if cli_state.output_format != "json":
+                console.print(
+                    "[warning]task.yaml was not found in the repository.[/warning]\n"
+                    "You can create a task using a default task.yaml template."
+                )
+                should_retry = typer.confirm("Create task with default task.yaml?", default=True)
+            else:
+                should_retry = True
+            if should_retry:
+                with console.status(
+                    "[bold success]Creating task with default task.yaml...[/bold success]",
+                    spinner="dots",
+                ):
+                    response = api.post_json(
+                        f"/experiment/{experiment_id}/task/create",
+                        json_data={"github_repo_url": repo_url, "create_if_missing": True},
+                    )
+
     if response.status_code == 200:
         result = response.json()
         task_id = result.get("id")
