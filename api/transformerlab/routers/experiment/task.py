@@ -46,6 +46,7 @@ from transformerlab.schemas.task import (
     TaskFilesResponse,
 )
 from pydantic import ValidationError
+from fastapi.responses import PlainTextResponse, JSONResponse
 
 router = APIRouter(prefix="/task", tags=["task"])
 
@@ -932,6 +933,120 @@ async def add_task(
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error creating task: {str(e)}")
+
+
+@router.post("/create", summary="Unified task creation endpoint")
+async def create_task(
+    experimentId: str,
+    request: Request,
+    user_and_team=Depends(get_user_and_team),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    Unified creation for blank, GitHub, and uploaded directory sources.
+
+    Accepts:
+    - JSON: { "source": "blank" } to create a blank task template.
+    - JSON: { "github_repo_url": "...", "github_repo_dir": "...", "github_repo_branch": "...", "create_if_missing": bool }
+    - Multipart/form-data: directory_zip=<zip>
+    """
+    content_type = (request.headers.get("content-type") or "").lower()
+    task_id: Optional[str] = None
+
+    if "application/json" in content_type:
+        body = await request.json()
+        if (body.get("source") or "").strip().lower() == "blank":
+            task_id = await task_service.create_task_from_blank(
+                experimentId,
+                user_and_team,
+                session,
+                _resolve_provider,
+            )
+            await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+            return {"id": task_id}
+
+        github_repo_url = (body.get("github_repo_url") or "").strip()
+        github_repo_dir = (body.get("github_repo_dir") or "").strip() or None
+        github_repo_branch = (body.get("github_repo_branch") or "").strip() or None
+        create_if_missing = body.get("create_if_missing", False)
+        if not github_repo_url:
+            raise HTTPException(status_code=400, detail="github_repo_url is required for git source")
+        task_id = await task_service.create_task_from_github(
+            experimentId,
+            github_repo_url,
+            github_repo_dir,
+            github_repo_branch,
+            create_if_missing,
+            user_and_team,
+            session,
+            _resolve_provider,
+            fetch_task_yaml_from_github,
+            _parse_yaml_to_task_data,
+        )
+
+    elif "multipart/form-data" in content_type:
+        form = await request.form()
+        zip_file = form.get("directory_zip")
+        if not zip_file or not getattr(zip_file, "filename", None):
+            raise HTTPException(status_code=400, detail="directory_zip file is required")
+        zip_content = await zip_file.read()
+        task_id = await task_service.create_task_from_directory_zip(
+            experimentId,
+            zip_content,
+            user_and_team,
+            session,
+            _resolve_provider,
+            _parse_yaml_to_task_data,
+        )
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Use application/json (blank/git) or multipart/form-data (directory_zip).",
+        )
+
+    if task_id is None:
+        raise HTTPException(status_code=400, detail="Unable to create task from request payload")
+    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    return {"id": task_id}
+
+
+@router.get("/{task_id}/yaml", summary="Get task.yaml from the task directory")
+async def get_task_yaml(experimentId: str, task_id: str):
+    task = await task_service.task_get_by_id(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    content = await task_service.read_task_yaml(task_id)
+    return PlainTextResponse(content, media_type="text/plain")
+
+
+@router.put("/{task_id}/yaml", summary="Save task.yaml and sync index.json")
+async def update_task_yaml(experimentId: str, task_id: str, request: Request):
+    body = (await request.body()).decode("utf-8")
+    task = await task_service.task_get_by_id(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    await task_service.write_task_yaml(task_id, body)
+    task_data = _parse_yaml_to_task_data(body)
+    task_data.pop("id", None)
+    success = await task_service.update_task_from_yaml(task_id, task_data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Task not found")
+    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    return {"message": "OK"}
+
+
+@router.post("/validate", summary="Validate task.yaml content without saving")
+async def validate_task_yaml(request: Request):
+    body = (await request.body()).decode("utf-8")
+    try:
+        _parse_yaml_to_task_data(body)
+    except HTTPException as e:
+        raise e
+    except yaml.YAMLError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error validating task.yaml: {str(e)}")
+    return JSONResponse({"valid": True})
 
 
 @router.get("/delete_all", summary="Wipe all tasks")

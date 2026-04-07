@@ -93,15 +93,15 @@ Endpoints.Task = {
   FetchTaskJson: (experimentId: string, url: string) =>
     `${API_URL()}experiment/${experimentId}/task/fetch_task_json?url=${encodeURIComponent(url)}`,
   FromDirectory: (experimentId: string) =>
-    `${API_URL()}experiment/${experimentId}/task2/from_directory`,
+    `${API_URL()}experiment/${experimentId}/task/create`,
   BlankFromYaml: (experimentId: string) =>
-    `${API_URL()}experiment/${experimentId}/task2/blank`,
+    `${API_URL()}experiment/${experimentId}/task/create`,
   GetYaml: (experimentId: string, taskId: string) =>
-    `${API_URL()}experiment/${experimentId}/task2/${taskId}/yaml`,
+    `${API_URL()}experiment/${experimentId}/task/${taskId}/yaml`,
   UpdateYaml: (experimentId: string, taskId: string) =>
-    `${API_URL()}experiment/${experimentId}/task2/${taskId}/yaml`,
+    `${API_URL()}experiment/${experimentId}/task/${taskId}/yaml`,
   ValidateYaml: (experimentId: string) =>
-    `${API_URL()}experiment/${experimentId}/task2/validate`,
+    `${API_URL()}experiment/${experimentId}/task/validate`,
   ListFiles: (experimentId: string, taskId: string) =>
     `${API_URL()}experiment/${experimentId}/task/${taskId}/files`,
   GetFile: (experimentId: string, taskId: string, filePath: string) =>

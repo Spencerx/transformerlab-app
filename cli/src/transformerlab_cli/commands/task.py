@@ -93,7 +93,7 @@ def add_task_from_directory(task_directory_path: str, experiment_id: str, dry_ru
     # Validate against server-side task.yaml schema (run, resources, etc.)
     with console.status("[bold success]Validating task.yaml...[/bold success]", spinner="dots"):
         response = api.post_text(
-            f"/experiment/{experiment_id}/task2/validate",
+            f"/experiment/{experiment_id}/task/validate",
             text=task_yaml_content,
         )
     if response.status_code != 200:
@@ -147,7 +147,7 @@ def add_task_from_directory(task_directory_path: str, experiment_id: str, dry_ru
 
     with console.status("[bold success]Creating task...[/bold success]", spinner="dots"):
         response = api.post(
-            f"/experiment/{experiment_id}/task2/from_directory",
+            f"/experiment/{experiment_id}/task/create",
             files={"directory_zip": ("task.zip", zip_buffer, "application/zip")},
         )
 
@@ -169,8 +169,8 @@ def add_task_from_github(repo_url: str, experiment_id: str) -> None:
     """Add a task from a GitHub repository URL."""
     with console.status("[bold success]Creating task from GitHub...[/bold success]", spinner="dots"):
         response = api.post_json(
-            f"/experiment/{experiment_id}/task2/from_directory",
-            json_data={"git_url": repo_url},
+            f"/experiment/{experiment_id}/task/create",
+            json_data={"github_repo_url": repo_url},
         )
 
     if response.status_code == 200:
