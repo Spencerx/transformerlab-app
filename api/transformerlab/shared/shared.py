@@ -109,16 +109,16 @@ reset = "\033[0m"
 def get_media_type(filename: str) -> str:
     """
     Determine the media type from a file extension.
-    
+
     Args:
         filename (str): The filename or path to determine media type for.
-        
+
     Returns:
-        str: The media type string (e.g., 'application/pdf', 'text/plain'), 
+        str: The media type string (e.g., 'application/pdf', 'text/plain'),
              defaults to 'application/octet-stream' for unknown types.
     """
     _, ext = os.path.splitext(filename.lower())
-    
+
     media_type_map = {
         ".pdf": "application/pdf",
         ".txt": "text/plain",
@@ -137,7 +137,7 @@ def get_media_type(filename: str) -> str:
         ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         ".zip": "application/zip",
     }
-    
+
     return media_type_map.get(ext, "application/octet-stream")
 
 

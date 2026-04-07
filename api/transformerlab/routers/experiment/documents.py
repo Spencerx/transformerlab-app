@@ -76,6 +76,7 @@ async def document_view(experimentId: str, document_name: str, folder: str = Non
             raise HTTPException(status_code=404, detail=f"Document '{document_name}' not found")
 
         # Determine media type from extension
+        _, ext = os.path.splitext(document_name.lower())
         media_type = get_media_type(document_name)
 
         # For text-like files, read and return directly
