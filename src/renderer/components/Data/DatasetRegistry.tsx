@@ -20,14 +20,10 @@ import {
   Box,
   Chip,
   CircularProgress,
-  Divider,
-  Drawer,
-  DialogTitle,
   FormControl,
   FormLabel,
   IconButton,
   Input,
-  ModalClose,
   Option,
   Select,
   Sheet,
@@ -38,16 +34,13 @@ import {
   Typography,
 } from '@mui/joy';
 import {
-  BriefcaseIcon,
   ChevronDownIcon,
   DatabaseIcon,
-  InfoIcon,
   RotateCcwIcon,
   SearchIcon,
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import Markdown from 'react-markdown';
 import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
 import { fetchWithAuth } from 'renderer/lib/authContext';
 import * as chatAPI from '../../lib/transformerlab-api-sdk';
@@ -145,238 +138,6 @@ function RegistrySkeleton() {
   );
 }
 
-// ─── Version Info Drawer ─────────────────────────────────────────────────────
-
-function VersionInfoDrawer({
-  open,
-  onClose,
-  entry,
-}: {
-  open: boolean;
-  onClose: () => void;
-  entry: VersionEntry | null;
-}) {
-  if (!entry) return null;
-
-  return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={onClose}
-      size="lg"
-      slotProps={{
-        content: {
-          sx: {
-            width: { xs: '100vw', sm: 540 },
-            display: 'flex',
-            flexDirection: 'column',
-          },
-        },
-      }}
-    >
-      <Sheet sx={{ p: 2.5, pb: 1.5 }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-        >
-          <DialogTitle>
-            <Typography level="title-lg">
-              Version Details: <b>{entry.version_label}</b>
-            </Typography>
-          </DialogTitle>
-          <ModalClose />
-        </Stack>
-      </Sheet>
-      <Divider />
-      <Box sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-        <Stack spacing={2}>
-          {/* Title */}
-          {entry.title && (
-            <Box>
-              <Typography
-                level="body-xs"
-                textTransform="uppercase"
-                fontWeight="lg"
-                sx={{ mb: 0.5 }}
-              >
-                Title
-              </Typography>
-              <Typography level="body-md">{entry.title}</Typography>
-            </Box>
-          )}
-
-          {/* Description */}
-          {entry.description && (
-            <Box>
-              <Typography
-                level="body-xs"
-                textTransform="uppercase"
-                fontWeight="lg"
-                sx={{ mb: 0.5 }}
-              >
-                Description
-              </Typography>
-              <Typography level="body-sm">{entry.description}</Typography>
-            </Box>
-          )}
-
-          {/* Long description (markdown) */}
-          {entry.long_description && (
-            <Box>
-              <Typography
-                level="body-xs"
-                textTransform="uppercase"
-                fontWeight="lg"
-                sx={{ mb: 0.5 }}
-              >
-                Details
-              </Typography>
-              <Box sx={{ '& p': { margin: 0 }, '& img': { maxWidth: '100%' } }}>
-                <Markdown>{entry.long_description}</Markdown>
-              </Box>
-            </Box>
-          )}
-
-          {/* Cover image */}
-          {entry.cover_image && (
-            <Box>
-              <Typography
-                level="body-xs"
-                textTransform="uppercase"
-                fontWeight="lg"
-                sx={{ mb: 0.5 }}
-              >
-                Cover Image
-              </Typography>
-              <img
-                src={entry.cover_image}
-                alt="Cover"
-                style={{ maxWidth: '100%', borderRadius: 8 }}
-              />
-            </Box>
-          )}
-
-          {/* Dataset ID */}
-          <Box>
-            <Typography
-              level="body-xs"
-              textTransform="uppercase"
-              fontWeight="lg"
-              sx={{ mb: 0.5 }}
-            >
-              Dataset ID
-            </Typography>
-            <Typography level="body-sm" fontFamily="monospace">
-              {entry.asset_id}
-            </Typography>
-          </Box>
-
-          {/* Tag */}
-          <Box>
-            <Typography
-              level="body-xs"
-              textTransform="uppercase"
-              fontWeight="lg"
-              sx={{ mb: 0.5 }}
-            >
-              Tag
-            </Typography>
-            {entry.tag ? (
-              <Chip
-                size="sm"
-                color={TAG_COLORS[entry.tag] || 'neutral'}
-                variant="soft"
-              >
-                {entry.tag}
-              </Chip>
-            ) : (
-              <Typography level="body-sm" color="neutral">
-                —
-              </Typography>
-            )}
-          </Box>
-
-          {/* Created */}
-          <Box>
-            <Typography
-              level="body-xs"
-              textTransform="uppercase"
-              fontWeight="lg"
-              sx={{ mb: 0.5 }}
-            >
-              Created
-            </Typography>
-            <Typography level="body-sm">
-              {entry.created_at
-                ? dayjs(entry.created_at).format('MMM D, YYYY h:mm A')
-                : '—'}
-            </Typography>
-          </Box>
-
-          {/* Source Job */}
-          <Box>
-            <Typography
-              level="body-xs"
-              textTransform="uppercase"
-              fontWeight="lg"
-              sx={{ mb: 0.5 }}
-            >
-              Source Job
-            </Typography>
-            {entry.job_id ? (
-              <Chip size="sm" variant="outlined" color="neutral">
-                <BriefcaseIcon size={12} />
-                &nbsp;Job {entry.job_id}
-              </Chip>
-            ) : (
-              <Typography level="body-sm" color="neutral">
-                —
-              </Typography>
-            )}
-          </Box>
-
-          {/* Evals */}
-          {entry.evals && Object.keys(entry.evals).length > 0 && (
-            <Box>
-              <Typography
-                level="body-xs"
-                textTransform="uppercase"
-                fontWeight="lg"
-                sx={{ mb: 0.5 }}
-              >
-                Evaluations
-              </Typography>
-              <Table size="sm" sx={{ '& td, & th': { py: 0.5 } }}>
-                <thead>
-                  <tr>
-                    <th>Metric</th>
-                    <th>Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(entry.evals).map(([key, val]) => (
-                    <tr key={key}>
-                      <td>
-                        <Typography level="body-sm" fontFamily="monospace">
-                          {key}
-                        </Typography>
-                      </td>
-                      <td>
-                        <Typography level="body-sm">{String(val)}</Typography>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Box>
-          )}
-        </Stack>
-      </Box>
-    </Drawer>
-  );
-}
-
 // ─── Version row (inline in the accordion) ───────────────────────────────────
 
 function VersionRow({
@@ -385,14 +146,12 @@ function VersionRow({
   onSetTag,
   onClearTag,
   onDelete,
-  onInfo,
 }: {
   v: VersionEntry;
   updatingVersion: string | null;
   onSetTag: (versionLabel: string, tag: string) => void;
   onClearTag: (versionLabel: string) => void;
   onDelete: (versionLabel: string) => void;
-  onInfo: (version: VersionEntry) => void;
 }) {
   return (
     <tr key={v.id}>
@@ -479,14 +238,8 @@ function VersionRow({
           {v.created_at ? dayjs(v.created_at).fromNow() : '—'}
         </Typography>
       </td>
-      {/* Info + Delete (inline, no Actions header) */}
+      {/* Delete */}
       <td style={{ textAlign: 'right' }}>
-        <InfoIcon
-          size={18}
-          style={{ cursor: 'pointer', verticalAlign: 'middle' }}
-          onClick={() => onInfo(v)}
-        />
-        &nbsp;
         <Trash2Icon
           size={18}
           color="var(--joy-palette-danger-600)"
@@ -503,11 +256,9 @@ function VersionRow({
 function GroupVersionsTable({
   groupName,
   mutateGroups,
-  onOpenInfo,
 }: {
   groupName: string;
   mutateGroups: () => void;
-  onOpenInfo: (v: VersionEntry) => void;
 }) {
   const [updatingVersion, setUpdatingVersion] = useState<string | null>(null);
   const assetType = 'dataset';
@@ -636,7 +387,6 @@ function GroupVersionsTable({
             onSetTag={handleSetTag}
             onClearTag={handleClearTag}
             onDelete={handleDeleteVersion}
-            onInfo={onOpenInfo}
           />
         ))}
       </tbody>
@@ -649,10 +399,6 @@ function GroupVersionsTable({
 export default function DatasetRegistry() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchText, setSearchText] = useState('');
-  const [infoDrawerEntry, setInfoDrawerEntry] = useState<VersionEntry | null>(
-    null,
-  );
-
   const {
     data: groups,
     isLoading,
@@ -858,7 +604,6 @@ export default function DatasetRegistry() {
                       <GroupVersionsTable
                         groupName={group.group_name}
                         mutateGroups={mutateGroups}
-                        onOpenInfo={(v) => setInfoDrawerEntry(v)}
                       />
                     )}
                   </AccordionDetails>
@@ -868,13 +613,6 @@ export default function DatasetRegistry() {
           </AccordionGroup>
         )}
       </Box>
-
-      {/* ── Version Info Drawer ── */}
-      <VersionInfoDrawer
-        open={infoDrawerEntry !== null}
-        onClose={() => setInfoDrawerEntry(null)}
-        entry={infoDrawerEntry}
-      />
     </Sheet>
   );
 }
