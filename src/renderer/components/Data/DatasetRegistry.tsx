@@ -10,6 +10,8 @@
  */
 
 import { useState } from 'react';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import {
   Accordion,
   AccordionDetails,
@@ -51,6 +53,8 @@ import { fetchWithAuth } from 'renderer/lib/authContext';
 import * as chatAPI from '../../lib/transformerlab-api-sdk';
 import { fetcher } from '../../lib/transformerlab-api-sdk';
 
+dayjs.extend(relativeTime);
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface VersionEntry {
@@ -89,41 +93,6 @@ const TAG_COLORS: Record<
   production: 'success',
   draft: 'warning',
 };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatDate(isoString: string | null): string {
-  if (!isoString) return '—';
-  try {
-    const d = new Date(isoString);
-    return d.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return isoString;
-  }
-}
-
-function formatRelativeDate(isoString: string | null): string {
-  if (!isoString) return '—';
-  try {
-    const d = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 30) return `${diffDays}d ago`;
-    if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
-    return `${Math.floor(diffDays / 365)}y ago`;
-  } catch {
-    return isoString;
-  }
-}
 
 // ─── Skeleton loader (matches LocalModelsTable pattern) ──────────────────────
 
@@ -339,7 +308,9 @@ function VersionInfoDrawer({
               Created
             </Typography>
             <Typography level="body-sm">
-              {formatDate(entry.created_at)}
+              {entry.created_at
+                ? dayjs(entry.created_at).format('MMM D, YYYY h:mm A')
+                : '—'}
             </Typography>
           </Box>
 
@@ -460,15 +431,14 @@ function VersionRow({
             color={TAG_COLORS[v.tag] || 'neutral'}
             variant="soft"
             endDecorator={
-              <IconButton
+              <a
                 size="sm"
                 variant="plain"
                 color="neutral"
                 onClick={() => onClearTag(v.version_label)}
-                sx={{ '--IconButton-size': '18px', ml: 0.5 }}
               >
                 <XIcon size={12} />
-              </IconButton>
+              </a>
             }
           >
             {v.tag}
@@ -494,7 +464,6 @@ function VersionRow({
         {v.job_id ? (
           <Tooltip title={`Job ${v.job_id}`}>
             <Chip size="sm" variant="outlined" color="neutral">
-              <BriefcaseIcon size={12} />
               &nbsp;{String(v.job_id).slice(0, 6)}
             </Chip>
           </Tooltip>
@@ -507,7 +476,7 @@ function VersionRow({
       {/* Created */}
       <td>
         <Typography level="body-xs">
-          {formatRelativeDate(v.created_at)}
+          {v.created_at ? dayjs(v.created_at).fromNow() : '—'}
         </Typography>
       </td>
       {/* Info + Delete (inline, no Actions header) */}
@@ -646,29 +615,16 @@ function GroupVersionsTable({
   }
 
   return (
-    <Table
-      size="sm"
-      stickyHeader
-      hoverRow
-      sx={{
-        '--TableCell-headBackground': (theme: any) =>
-          theme.vars.palette.background.level1,
-        '--Table-headerUnderlineThickness': '1px',
-        '--TableRow-hoverBackground': (theme: any) =>
-          theme.vars.palette.background.level1,
-        '& thead th': { textAlign: 'left' },
-        '& tbody td': { verticalAlign: 'middle' },
-      }}
-    >
+    <Table size="sm" stickyHeader hoverRow>
       <thead>
         <tr>
-          <th style={{ width: 200, padding: 12 }}>Name</th>
-          <th style={{ width: 200, padding: 12 }}>Dataset ID</th>
-          <th style={{ width: 70, padding: 12 }}>Version</th>
-          <th style={{ width: 120, padding: 12 }}>Tag</th>
-          <th style={{ width: 80, padding: 12 }}>Job</th>
-          <th style={{ width: 90, padding: 12 }}>Created</th>
-          <th style={{ width: 60, padding: 12 }}> </th>
+          <th style={{ width: 200 }}>Name</th>
+          <th style={{ width: 200 }}>Dataset ID</th>
+          <th style={{ width: 70 }}>Version</th>
+          <th style={{ width: 120 }}>Tag</th>
+          <th style={{ width: 80 }}>Job</th>
+          <th style={{ width: 90 }}>Created</th>
+          <th style={{ width: 60 }}>&nbsp;</th>
         </tr>
       </thead>
       <tbody>
@@ -891,9 +847,9 @@ export default function DatasetRegistry() {
                       </Stack>
 
                       {/* Right side: last updated */}
-                      <Typography level="body-xs" color="neutral">
+                      {/* <Typography level="body-xs" color="neutral">
                         {formatRelativeDate(group.latest_created_at)}
-                      </Typography>
+                      </Typography> */}
                     </Box>
                   </AccordionSummary>
 
