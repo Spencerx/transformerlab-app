@@ -61,7 +61,7 @@ const DEFAULT_CONFIGS = {
   "api_base_url": "https://rest.runpod.io/v1"
 }`,
   dstack: `{
-  "server_url": "<Your dstack server URL e.g. https://sky.dstack.ai>",
+  "server_url": "<Your dstack server URL e.g. http://0.0.0.0:3000>",
   "api_token": "<Your dstack API token>",
   "dstack_project": "<Your dstack project name>"
 }`,
