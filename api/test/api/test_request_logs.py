@@ -15,6 +15,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from transformerlab.compute_providers.base import ComputeProvider
 from transformerlab.compute_providers.models import ClusterStatus, ResourceInfo
 
+try:
+    from transformerlab.compute_providers import skypilot as _skypilot_mod  # noqa: F401
+
+    _skypilot_importable = True
+except (ImportError, AttributeError):
+    _skypilot_importable = False
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -109,6 +116,7 @@ class TestBaseProviderGetRequestLogs:
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(not _skypilot_importable, reason="skypilot module not importable in this environment")
 class TestSkyPilotGetRequestLogs:
     @patch("transformerlab.compute_providers.skypilot.SKYPILOT_AVAILABLE", True)
     def test_returns_response_text(self):
