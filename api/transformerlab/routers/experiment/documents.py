@@ -1,4 +1,5 @@
 import datetime
+import logging
 import os
 import tempfile
 import zipfile
@@ -9,9 +10,11 @@ from fastapi.responses import StreamingResponse
 from werkzeug.utils import secure_filename
 from urllib.parse import urlparse
 
-from transformerlab.shared.shared import slugify
+from transformerlab.shared.shared import slugify, get_media_type
 
 from lab import Experiment, storage
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 FOLDER_MARKER_FILE = ".keep"
@@ -73,26 +76,7 @@ async def document_view(experimentId: str, document_name: str, folder: str = Non
             raise HTTPException(status_code=404, detail=f"Document '{document_name}' not found")
 
         # Determine media type from extension
-        _, ext = os.path.splitext(document_name.lower())
-        media_type_map = {
-            ".pdf": "application/pdf",
-            ".txt": "text/plain",
-            ".md": "text/plain",
-            ".csv": "text/csv",
-            ".json": "application/json",
-            ".jsonl": "application/json",
-            ".xml": "text/xml",
-            ".html": "text/html",
-            ".epub": "application/epub+zip",
-            ".ipynb": "application/json",
-            ".mbox": "text/plain",
-            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".ppt": "application/vnd.ms-powerpoint",
-            ".pptm": "application/vnd.ms-powerpoint.presentation.macroEnabled.12",
-            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            ".zip": "application/zip",
-        }
-        media_type = media_type_map.get(ext, "application/octet-stream")
+        media_type = get_media_type(document_name)
 
         # For text-like files, read and return directly
         text_types = {".txt", ".md", ".csv", ".json", ".jsonl", ".xml", ".html", ".mbox", ".ipynb"}
@@ -101,8 +85,8 @@ async def document_view(experimentId: str, document_name: str, folder: str = Non
                 async with await storage.open(file_location, "r", encoding="utf-8") as f:
                     content = await f.read()
                 return Response(content, media_type=media_type)
-            except Exception:
-                pass  # Fall through to binary streaming
+            except Exception as e:
+                logger.warning(f"Failed to read file as text, falling back to binary: {e}")
 
         # For binary files (PDF, DOCX, etc.), stream the content
         async def generate():
@@ -122,8 +106,8 @@ async def document_view(experimentId: str, document_name: str, folder: str = Non
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error retrieving document: {e}")
-        raise HTTPException(status_code=500, detail=f"Error retrieving document: {str(e)}")
+        logger.error(f"Error retrieving document: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error retrieving document")
 
 
 @router.get("/list", summary="List available documents.")

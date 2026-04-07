@@ -41,6 +41,7 @@ import {
   SearchIcon,
   FilterIcon as FilterAltIcon,
   MoreVerticalIcon as MoreHorizRoundedIcon,
+  XIcon,
 } from 'lucide-react';
 
 import {
@@ -580,7 +581,7 @@ export default function Documents({ fullPage = false, fixedFolder = '' }) {
             color="danger"
             onClick={() => setUploadError(null)}
           >
-            ×
+            <XIcon size="18" />
           </IconButton>
         </Alert>
       )}
