@@ -460,6 +460,8 @@ class LocalProvider(ComputeProvider):
             venv_path,
             # uv manages its own Python installations here; the dylib must be readable.
             os.path.join(real_home, ".local", "share", "uv"),
+            # uv binary lives here on user installs (e.g. ~/.local/bin/uv).
+            os.path.join(real_home, ".local", "bin"),
             # lab-sdk is installed as an editable install; the .pth file points back to
             # this source tree, so the sandbox must be able to read it at import time.
             _lab_sdk_dir or "",
