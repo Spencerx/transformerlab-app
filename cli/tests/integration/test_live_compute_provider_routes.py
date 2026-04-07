@@ -34,9 +34,23 @@ def _auth_headers(client: httpx.Client) -> dict[str, str]:
     teams_response = client.get(f"{BASE_URL}/users/me/teams", headers=auth_headers)
     assert teams_response.status_code == 200, teams_response.text
 
-    teams = teams_response.json()
-    assert teams, "Expected at least one team for the test user"
-    team_id = teams[0]["id"]
+    teams_payload = teams_response.json()
+    teams_list: list[dict]
+    if isinstance(teams_payload, list):
+        teams_list = teams_payload
+    elif isinstance(teams_payload, dict):
+        # Different API versions can return a wrapped object.
+        if isinstance(teams_payload.get("teams"), list):
+            teams_list = teams_payload["teams"]
+        elif isinstance(teams_payload.get("data"), list):
+            teams_list = teams_payload["data"]
+        else:
+            teams_list = []
+    else:
+        teams_list = []
+
+    assert teams_list, f"Expected at least one team for the test user, got: {teams_payload!r}"
+    team_id = teams_list[0]["id"]
 
     return {**auth_headers, "X-Team-Id": str(team_id)}
 
