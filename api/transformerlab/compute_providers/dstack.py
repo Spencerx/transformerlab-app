@@ -200,9 +200,7 @@ class DstackProvider(ComputeProvider):
         data = response.json()
         response_run_spec = data.get("run_spec") if isinstance(data, dict) else {}
         run_name = (
-            (response_run_spec or {}).get("run_name")
-            if isinstance(response_run_spec, dict)
-            else None
+            (response_run_spec or {}).get("run_name") if isinstance(response_run_spec, dict) else None
         ) or data.get("run_name", cluster_name)
         return {"run_name": run_name, "status": data.get("status")}
 

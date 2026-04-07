@@ -647,9 +647,7 @@ async def launch_template_on_provider(
 
     # For dstack fleet-based runs, do not pass explicit resource requirements.
     # The provider will schedule by fleet and build resources accordingly.
-    dstack_fleet_selected = (
-        provider.type == ProviderType.DSTACK.value and bool(provider_config_dict.get("fleet_name"))
-    )
+    dstack_fleet_selected = provider.type == ProviderType.DSTACK.value and bool(provider_config_dict.get("fleet_name"))
 
     cluster_config = ClusterConfig(
         cluster_name=formatted_cluster_name,
