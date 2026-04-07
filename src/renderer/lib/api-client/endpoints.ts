@@ -504,6 +504,8 @@ Endpoints.AssetVersions = {
     `${API_URL()}asset_versions/groups?asset_type=${assetType}`,
   DeleteGroup: (assetType: string, groupName: string) =>
     `${API_URL()}asset_versions/groups/${assetType}/${groupName}`,
+  UpdateGroup: (assetType: string, groupName: string) =>
+    `${API_URL()}asset_versions/groups/${assetType}/${groupName}`,
   CreateVersion: () => `${API_URL()}asset_versions/versions`,
   ListVersions: (assetType: string, groupName: string) =>
     `${API_URL()}asset_versions/versions/${assetType}/${groupName}`,

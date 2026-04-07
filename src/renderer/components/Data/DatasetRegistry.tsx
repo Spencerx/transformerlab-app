@@ -18,24 +18,31 @@ import {
   AccordionGroup,
   AccordionSummary,
   Box,
+  Button,
   Chip,
   CircularProgress,
+  DialogTitle,
   FormControl,
   FormLabel,
   IconButton,
   Input,
+  Modal,
+  ModalClose,
+  ModalDialog,
   Option,
   Select,
   Sheet,
   Skeleton,
   Stack,
   Table,
+  Textarea,
   Tooltip,
   Typography,
 } from '@mui/joy';
 import {
   ChevronDownIcon,
   DatabaseIcon,
+  PencilIcon,
   RotateCcwIcon,
   SearchIcon,
   Trash2Icon,
@@ -70,6 +77,8 @@ interface VersionEntry {
 interface GroupSummary {
   group_name: string;
   asset_type: string;
+  title: string;
+  description: string;
   version_count: number;
   latest_version_label: string | null;
   latest_tag: string | null;
@@ -394,11 +403,84 @@ function GroupVersionsTable({
   );
 }
 
+// ─── Edit Group Modal ───────────────────────────────────────────────────────
+
+function EditGroupModal({
+  open,
+  onClose,
+  group,
+  mutateGroups,
+}: {
+  open: boolean;
+  onClose: () => void;
+  group: GroupSummary;
+  mutateGroups: () => void;
+}) {
+  const [title, setTitle] = useState(group.title || '');
+  const [description, setDescription] = useState(group.description || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetchWithAuth(
+        chatAPI.Endpoints.AssetVersions.UpdateGroup(
+          'dataset',
+          group.group_name,
+        ),
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, description }),
+        },
+      );
+      mutateGroups();
+      onClose();
+    } catch (err) {
+      console.error('Failed to update group:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <ModalDialog sx={{ width: 480 }}>
+        <ModalClose />
+        <DialogTitle>Edit Dataset Group</DialogTitle>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <FormControl>
+            <FormLabel>Title</FormLabel>
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={group.group_name}
+            />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Description</FormLabel>
+            <Textarea
+              minRows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe this dataset group…"
+            />
+          </FormControl>
+          <Button loading={saving} onClick={handleSave}>
+            Save
+          </Button>
+        </Stack>
+      </ModalDialog>
+    </Modal>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function DatasetRegistry() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchText, setSearchText] = useState('');
+  const [editingGroup, setEditingGroup] = useState<GroupSummary | null>(null);
   const {
     data: groups,
     isLoading,
@@ -592,10 +674,18 @@ export default function DatasetRegistry() {
                         )}
                       </Stack>
 
-                      {/* Right side: last updated */}
-                      {/* <Typography level="body-xs" color="neutral">
-                        {formatRelativeDate(group.latest_created_at)}
-                      </Typography> */}
+                      {/* Right side: edit icon */}
+                      <IconButton
+                        size="sm"
+                        variant="plain"
+                        color="neutral"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingGroup(group);
+                        }}
+                      >
+                        <PencilIcon size={16} />
+                      </IconButton>
                     </Box>
                   </AccordionSummary>
 
@@ -613,6 +703,15 @@ export default function DatasetRegistry() {
           </AccordionGroup>
         )}
       </Box>
+
+      {editingGroup && (
+        <EditGroupModal
+          open
+          onClose={() => setEditingGroup(null)}
+          group={editingGroup}
+          mutateGroups={mutateGroups}
+        />
+      )}
     </Sheet>
   );
 }

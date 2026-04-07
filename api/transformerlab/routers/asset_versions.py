@@ -38,6 +38,11 @@ class SetTagRequest(BaseModel):
     tag: str
 
 
+class UpdateGroupRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+
 class UpdateVersionRequest(BaseModel):
     description: Optional[str] = None
     title: Optional[str] = None
@@ -69,6 +74,24 @@ async def delete_group(asset_type: str, group_name: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"status": "success", "deleted_count": count}
+
+
+@router.patch(
+    "/groups/{asset_type}/{group_name}",
+    summary="Update group-level metadata (title, description).",
+)
+async def update_group(asset_type: str, group_name: str, body: UpdateGroupRequest):
+    raw = body.model_dump(exclude_unset=True)
+    kwargs = {}
+    for field in ("title", "description"):
+        if field in raw:
+            kwargs[field] = raw[field]
+
+    try:
+        result = await asset_version_service.update_group(asset_type, group_name, **kwargs)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return result
 
 
 # ─── Version CRUD ─────────────────────────────────────────────────────────────

@@ -85,6 +85,7 @@ async def _read_index(asset_type: str, group_name: str) -> dict:
     if data is None:
         data = {
             "name": group_name,
+            "title": "",
             "created_at": datetime.now(timezone.utc).isoformat(),
             "description": "",
             "cover_image": None,
@@ -221,6 +222,7 @@ async def list_groups(asset_type: str) -> list[dict]:
             continue
 
         group_name = entry_name
+        index = await _read_index(asset_type, group_name)
         versions = await _read_versions(asset_type, group_name)
         tags = [v["tag"] for v in versions if v.get("tag")]
 
@@ -228,6 +230,8 @@ async def list_groups(asset_type: str) -> list[dict]:
             {
                 "group_name": group_name,
                 "asset_type": asset_type,
+                "title": index.get("title", ""),
+                "description": index.get("description", ""),
                 "version_count": len(versions),
                 "latest_version_label": versions[-1].get("version_label") if versions else None,
                 "tags": tags,
@@ -236,6 +240,27 @@ async def list_groups(asset_type: str) -> list[dict]:
 
     groups.sort(key=lambda g: g["group_name"])
     return groups
+
+
+async def update_group(
+    asset_type: str,
+    group_name: str,
+    *,
+    title: Optional[str] = ...,
+    description: Optional[str] = ...,
+) -> dict:
+    """Update group-level metadata (title, description) in the index."""
+    _validate_asset_type(asset_type)
+
+    index = await _read_index(asset_type, group_name)
+
+    if title is not ...:
+        index["title"] = title
+    if description is not ...:
+        index["description"] = description
+
+    await _write_index(asset_type, group_name, index)
+    return index
 
 
 async def list_versions(asset_type: str, group_name: str) -> list[dict]:
