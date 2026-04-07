@@ -505,7 +505,9 @@ def _resolve_protocol(path: str, fs=None) -> Optional[str]:
     # Path looks local but the workspace may be remote.
     tfl_uri = _current_tfl_storage_uri.get() or os.getenv("TFL_STORAGE_URI")
     if tfl_uri and tfl_uri.startswith(_REMOTE_PATH_PREFIXES):
-        return tfl_uri.split("://", 1)[0]
+        raw = tfl_uri.split("://", 1)[0]
+        # Normalize "gs" → "gcs" so we don't create duplicate cache entries
+        return "gcs" if raw == "gs" else raw
 
     return None
 
