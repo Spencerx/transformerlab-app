@@ -657,7 +657,7 @@ export default function DatasetRegistry() {
                       <Stack direction="row" alignItems="center" gap={1.5}>
                         <DatabaseIcon size={18} />
                         <Typography level="title-md" fontWeight="lg">
-                          {group.group_name}
+                          {group.title || group.group_name}
                         </Typography>
                         <Chip size="sm" variant="soft" color="neutral">
                           {group.version_count} version
