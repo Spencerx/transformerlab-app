@@ -477,7 +477,13 @@ export default function ProviderDetailsModal({
         setConfig(JSON.stringify(configObj, null, 2));
       }
     }
-  }, [buildSlurmConfig, buildSkypilotConfig, buildDstackConfig, type, providerId]);
+  }, [
+    buildSlurmConfig,
+    buildSkypilotConfig,
+    buildDstackConfig,
+    type,
+    providerId,
+  ]);
 
   // Local provider setup: poll background setup status and keep modal open until done.
   const pollLocalSetupStatus = (providerIdForSetup: string) => {
@@ -760,7 +766,7 @@ export default function ProviderDetailsModal({
                   <Option value="skypilot">Skypilot</Option>
                   <Option value="slurm">SLURM</Option>
                   <Option value="runpod">Runpod</Option>
-                  <Option value="dstack">dstack</Option>
+                  <Option value="dstack">dstack (beta) </Option>
                   {!hasLocalProvider && !providerId && (
                     <Option value="local">Local (beta)</Option>
                   )}
@@ -1111,62 +1117,64 @@ export default function ProviderDetailsModal({
                 type !== 'skypilot' &&
                 type !== 'dstack' &&
                 type !== 'local' && (
-                <FormControl sx={{ mt: 1 }}>
-                  <FormLabel>Configuration</FormLabel>
-                  <Textarea
-                    value={
-                      typeof config === 'string'
-                        ? config
-                        : JSON.stringify(config)
-                    }
-                    onChange={(event) => setConfig(event.currentTarget.value)}
-                    placeholder="JSON sent to provider"
-                    minRows={5}
-                    maxRows={10}
-                  />
-                </FormControl>
-              )}
+                  <FormControl sx={{ mt: 1 }}>
+                    <FormLabel>Configuration</FormLabel>
+                    <Textarea
+                      value={
+                        typeof config === 'string'
+                          ? config
+                          : JSON.stringify(config)
+                      }
+                      onChange={(event) => setConfig(event.currentTarget.value)}
+                      placeholder="JSON sent to provider"
+                      minRows={5}
+                      maxRows={10}
+                    />
+                  </FormControl>
+                )}
 
               {/* Show JSON for SLURM or SkyPilot providers in edit mode for advanced users */}
               {(type === 'slurm' || type === 'skypilot' || type === 'dstack') &&
                 providerId && (
-                <FormControl sx={{ mt: 1 }}>
-                  <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
-                  <Textarea
-                    value={
-                      typeof config === 'string'
-                        ? config
-                        : JSON.stringify(config)
-                    }
-                    onChange={(event) => {
-                      setConfig(event.currentTarget.value);
-                      // Try to parse and update form fields
-                      try {
-                        const configObj = JSON.parse(event.currentTarget.value);
-                        if (type === 'slurm') {
-                          parseSlurmConfig(configObj);
-                        } else if (type === 'skypilot') {
-                          parseSkypilotConfig(configObj);
-                        } else if (type === 'dstack') {
-                          parseDstackConfig(configObj);
-                        }
-                      } catch (e) {
-                        // Ignore parse errors
+                  <FormControl sx={{ mt: 1 }}>
+                    <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
+                    <Textarea
+                      value={
+                        typeof config === 'string'
+                          ? config
+                          : JSON.stringify(config)
                       }
-                    }}
-                    placeholder="JSON sent to provider"
-                    minRows={3}
-                    maxRows={5}
-                  />
-                  <Typography
-                    level="body-sm"
-                    sx={{ mt: 0.5, color: 'text.tertiary' }}
-                  >
-                    Edit JSON directly for advanced configuration. Changes will
-                    sync to form fields above.
-                  </Typography>
-                </FormControl>
-              )}
+                      onChange={(event) => {
+                        setConfig(event.currentTarget.value);
+                        // Try to parse and update form fields
+                        try {
+                          const configObj = JSON.parse(
+                            event.currentTarget.value,
+                          );
+                          if (type === 'slurm') {
+                            parseSlurmConfig(configObj);
+                          } else if (type === 'skypilot') {
+                            parseSkypilotConfig(configObj);
+                          } else if (type === 'dstack') {
+                            parseDstackConfig(configObj);
+                          }
+                        } catch (e) {
+                          // Ignore parse errors
+                        }
+                      }}
+                      placeholder="JSON sent to provider"
+                      minRows={3}
+                      maxRows={5}
+                    />
+                    <Typography
+                      level="body-sm"
+                      sx={{ mt: 0.5, color: 'text.tertiary' }}
+                    >
+                      Edit JSON directly for advanced configuration. Changes
+                      will sync to form fields above.
+                    </Typography>
+                  </FormControl>
+                )}
             </>
           )}
         </DialogContent>
