@@ -101,8 +101,9 @@ class TestBuildRunSpec:
     def test_fleet_name_path(self, provider):
         config = ClusterConfig(run="train.py", provider_config={"fleet_name": "my-fleet"})
         spec = provider._build_run_spec("fleet-run", config)
-        assert spec["configuration"].get("fleet_name") == "my-fleet"
-        assert "resources" not in spec["configuration"]
+        cfg = spec["configuration"]
+        assert cfg.get("fleets") == ["my-fleet"]
+        assert "resources" not in cfg
 
     def test_setup_script_prepended(self, provider):
         config = ClusterConfig(run="python train.py", setup="pip install mylib")
@@ -163,13 +164,15 @@ class TestMapStatus:
 
 class TestLaunchCluster:
     @patch("transformerlab.compute_providers.dstack.requests.request")
-    def test_posts_to_submit_endpoint(self, mock_request, provider):
-        mock_request.return_value = _mock_response({"run_name": "my-job", "status": "SUBMITTED"})
+    def test_posts_to_apply_endpoint(self, mock_request, provider):
+        mock_request.return_value = _mock_response({"run_spec": {"run_name": "my-job"}, "status": "SUBMITTED"})
         config = ClusterConfig(run="python train.py")
         result = provider.launch_cluster("my-job", config)
         call_kwargs = mock_request.call_args
-        assert call_kwargs[1]["url"] == "http://localhost:3000/api/project/test-project/runs/submit"
+        assert call_kwargs[1]["url"] == "http://localhost:3000/api/project/test-project/runs/apply"
         assert call_kwargs[0][0] == "POST"
+        assert call_kwargs[1]["json"]["plan"]["run_spec"]["run_name"] == "my-job"
+        assert call_kwargs[1]["json"]["force"] is False
         assert result["run_name"] == "my-job"
 
     @patch("transformerlab.compute_providers.dstack.requests.request")
@@ -294,8 +297,8 @@ class TestSubmitJob:
         )
         provider.submit_job("j", job_config)
         body = mock_request.call_args[1]["json"]
-        cfg = body["run_spec"]["configuration"]
-        assert cfg.get("fleet_name") == "my-fleet"
+        cfg = body["plan"]["run_spec"]["configuration"]
+        assert cfg.get("fleets") == ["my-fleet"]
 
 
 # --- cancel_job() ---

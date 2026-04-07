@@ -65,6 +65,19 @@ class DstackProvider(ComputeProvider):
 
             return response
 
+        except requests.exceptions.HTTPError as exc:
+            response = exc.response
+            status = response.status_code if response is not None else "unknown"
+            body = ""
+            if response is not None:
+                try:
+                    body = response.text.strip()
+                except Exception:
+                    body = ""
+            body_suffix = f" response: {body}" if body else ""
+            raise RuntimeError(
+                f"dstack API request failed ({method} {endpoint}) with status {status}.{body_suffix}"
+            ) from exc
         except requests.exceptions.ConnectionError as exc:
             raise ConnectionError(f"dstack server at {self.server_url} is unreachable: {exc}") from exc
 
@@ -82,17 +95,14 @@ class DstackProvider(ComputeProvider):
             raise ValueError(f"Invalid accelerator format '{accelerators}': count must be an integer (e.g. 'A100:2')")
         return {"name": [gpu_name], "count": {"min": count, "max": count}}
 
-    def _build_resources(self, config: ClusterConfig) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+    def _build_resources(self, config: ClusterConfig) -> Optional[Dict[str, Any]]:
         """
-        Return (resources_spec, fleet_name).
+        Build dstack resources spec.
 
-        If a fleet_name is set in provider_config, skip resource spec
-        and return the fleet name to embed directly in the configuration.
+        If fleet_name is present in provider_config, resources are omitted and
+        fleet selection is sent via the top-level "fleets" task configuration
+        field in _build_run_spec().
         """
-        fleet_name = config.provider_config.get("fleet_name")
-        if fleet_name:
-            return None, fleet_name
-
         resources: Dict[str, Any] = {}
         gpu_spec = self._parse_accelerators(config.accelerators)
         if gpu_spec:
@@ -104,12 +114,13 @@ class DstackProvider(ComputeProvider):
         if config.disk_size is not None:
             resources["disk"] = {"size": f"{config.disk_size}GB"}
 
-        return resources or None, None
+        return resources or None
 
     def _build_run_spec(self, run_name: str, config: ClusterConfig) -> Dict[str, Any]:
         """Build the dstack RunSpec dict from a TLab ClusterConfig."""
-        resources, fleet_name = self._build_resources(config)
+        resources = self._build_resources(config)
         run_type = config.provider_config.get("run_type", "task")
+        fleet_name = (config.provider_config.get("fleet_name") or "").strip()
 
         # Merge env vars: provider defaults < job-level (job wins on conflict)
         env_vars: Dict[str, str] = {
@@ -136,10 +147,10 @@ class DstackProvider(ComputeProvider):
             if run_command:
                 configuration["init"] = [run_command]
 
-        if resources:
+        if resources and not fleet_name:
             configuration["resources"] = resources
         if fleet_name:
-            configuration["fleet_name"] = fleet_name
+            configuration["fleets"] = [fleet_name]
 
         ssh_key_pub = config.provider_config.get("ssh_key_pub", self.extra_config.get("ssh_key_pub", ""))
 
@@ -183,11 +194,17 @@ class DstackProvider(ComputeProvider):
         run_spec = self._build_run_spec(cluster_name, config)
         response = self._make_request(
             "POST",
-            f"/api/project/{self.project_name}/runs/submit",
-            json_data={"run_spec": run_spec},
+            f"/api/project/{self.project_name}/runs/apply",
+            json_data={"plan": {"run_spec": run_spec}, "force": False},
         )
         data = response.json()
-        return {"run_name": data.get("run_name", cluster_name), "status": data.get("status")}
+        response_run_spec = data.get("run_spec") if isinstance(data, dict) else {}
+        run_name = (
+            (response_run_spec or {}).get("run_name")
+            if isinstance(response_run_spec, dict)
+            else None
+        ) or data.get("run_name", cluster_name)
+        return {"run_name": run_name, "status": data.get("status")}
 
     def stop_cluster(self, cluster_name: str) -> Dict[str, Any]:
         self._make_request(
