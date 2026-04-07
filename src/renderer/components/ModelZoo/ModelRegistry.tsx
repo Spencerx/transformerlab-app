@@ -775,13 +775,6 @@ export default function ModelRegistry() {
                           </Chip>
                         )}
                       </Stack>
-
-                      {/* Right side: last updated */}
-                      <Typography level="body-xs" color="neutral">
-                        {group.latest_created_at
-                          ? dayjs(group.latest_created_at).fromNow()
-                          : '—'}
-                      </Typography>
                     </Box>
                   </AccordionSummary>
 
