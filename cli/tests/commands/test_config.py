@@ -233,9 +233,6 @@ def test_config_get_missing_key_json_format(tmp_config_dir):
 
 def test_check_configs_missing_keys_json(tmp_config_dir):
     """check_configs with missing required keys outputs JSON error in json mode."""
-    import transformerlab_cli.util.config as config_mod
-    from transformerlab_cli.util.config import check_configs
-
     config_dir, config_file = tmp_config_dir
     with _patch_config_paths(config_dir, config_file):
         # No config file written — all required keys missing
