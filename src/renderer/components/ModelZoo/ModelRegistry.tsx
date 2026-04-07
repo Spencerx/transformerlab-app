@@ -489,31 +489,18 @@ function GroupVersionsTable({
   }
 
   return (
-    <Table
-      size="sm"
-      stickyHeader
-      hoverRow
-      sx={{
-        '--TableCell-headBackground': (theme: any) =>
-          theme.vars.palette.background.level1,
-        '--Table-headerUnderlineThickness': '1px',
-        '--TableRow-hoverBackground': (theme: any) =>
-          theme.vars.palette.background.level1,
-        '& thead th': { textAlign: 'left' },
-        '& tbody td': { verticalAlign: 'middle' },
-      }}
-    >
+    <Table size="sm" stickyHeader hoverRow>
       <thead>
         <tr>
-          <th style={{ width: 180, padding: 12 }}>Name</th>
-          <th style={{ width: 140, padding: 12 }}>Architecture</th>
-          <th style={{ width: 70, padding: 12 }}>Params</th>
-          <th style={{ width: 160, padding: 12 }}>Model ID</th>
-          <th style={{ width: 70, padding: 12 }}>Version</th>
-          <th style={{ width: 120, padding: 12 }}>Tag</th>
-          <th style={{ width: 80, padding: 12 }}>Job</th>
-          <th style={{ width: 90, padding: 12 }}>Created</th>
-          <th style={{ width: 60, padding: 12 }}> </th>
+          <th style={{ width: 180 }}>Name</th>
+          <th style={{ width: 140 }}>Architecture</th>
+          <th style={{ width: 70 }}>Params</th>
+          <th style={{ width: 160 }}>Model ID</th>
+          <th style={{ width: 70 }}>Version</th>
+          <th style={{ width: 120 }}>Tag</th>
+          <th style={{ width: 80 }}>Job</th>
+          <th style={{ width: 90 }}>Created</th>
+          <th style={{ width: 60 }}>&nbsp;</th>
         </tr>
       </thead>
       <tbody>
