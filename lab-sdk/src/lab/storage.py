@@ -543,11 +543,7 @@ def _extract_storage_options(protocol: str, fs=None) -> dict:
                 ):
                     if key in config:
                         storage_options[key] = config[key]
-                if (
-                    "profile" not in storage_options
-                    and "aws_access_key_id" not in storage_options
-                    and _AWS_PROFILE
-                ):
+                if "profile" not in storage_options and "aws_access_key_id" not in storage_options and _AWS_PROFILE:
                     storage_options["profile"] = _AWS_PROFILE
             elif hasattr(fs, "anon") and not fs.anon:
                 if _AWS_PROFILE:
