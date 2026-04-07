@@ -133,10 +133,10 @@ _AZURE_SAS_TOKEN = os.getenv("AZURE_STORAGE_SAS_TOKEN")
 # Common prefixes that represent remote storage locations handled by this module
 _REMOTE_PATH_PREFIXES: tuple[str, ...] = ("s3://", "gs://", "gcs://", "abfs://")
 
-# Module-level cache for "uncached" filesystem instances (one per protocol).
-# These have file-level caching disabled (no Etag/listing cache) but reuse the
-# same underlying connection pool so we don't leak boto3 sessions.
-_uncached_fs_cache: dict[str, "fsspec.AbstractFileSystem"] = {}
+# Module-level cache for "uncached" filesystem instances.
+# Keyed by (protocol, normalized credential/storage options), so we avoid
+# mixing auth contexts while still reusing long-lived connection pools.
+_uncached_fs_cache: dict[tuple[str, tuple[tuple[str, str], ...]], "fsspec.AbstractFileSystem"] = {}
 _uncached_fs_lock = threading.Lock()
 
 
@@ -524,15 +524,30 @@ def _extract_storage_options(protocol: str, fs=None) -> dict:
     storage_options: dict = {}
     if protocol == "s3":
         if fs is not None:
-            # Try to get profile from filesystem config
+            # Try to reuse explicit settings from filesystem config first.
             if hasattr(fs, "config_kwargs") and fs.config_kwargs:
                 config = fs.config_kwargs
                 if "profile" in config:
                     storage_options["profile"] = config["profile"]
-                elif "aws_access_key_id" in config:
-                    # Explicit credentials — don't overlay a profile
-                    pass
-                elif _AWS_PROFILE:
+                # Preserve explicit credential/session settings when present.
+                for key in (
+                    "aws_access_key_id",
+                    "aws_secret_access_key",
+                    "aws_session_token",
+                    "token",
+                    "endpoint_url",
+                    "region_name",
+                    "client_kwargs",
+                    "config_kwargs",
+                    "requester_pays",
+                ):
+                    if key in config:
+                        storage_options[key] = config[key]
+                if (
+                    "profile" not in storage_options
+                    and "aws_access_key_id" not in storage_options
+                    and _AWS_PROFILE
+                ):
                     storage_options["profile"] = _AWS_PROFILE
             elif hasattr(fs, "anon") and not fs.anon:
                 if _AWS_PROFILE:
@@ -549,7 +564,16 @@ def _extract_storage_options(protocol: str, fs=None) -> dict:
     return storage_options
 
 
-def _build_uncached_fs(protocol: str, fs=None) -> "fsspec.AbstractFileSystem":
+def _normalize_options_for_cache_key(storage_options: dict) -> tuple[tuple[str, str], ...]:
+    """Build a hashable, deterministic representation of storage options."""
+    normalized: list[tuple[str, str]] = []
+    for key in sorted(storage_options.keys()):
+        value = storage_options[key]
+        normalized.append((str(key), repr(value)))
+    return tuple(normalized)
+
+
+def _build_uncached_fs(protocol: str, storage_options: dict) -> "fsspec.AbstractFileSystem":
     """Create a single uncached filesystem for *protocol*.
 
     File-level and listing caches are disabled so every read hits the remote
@@ -562,7 +586,7 @@ def _build_uncached_fs(protocol: str, fs=None) -> "fsspec.AbstractFileSystem":
         "default_fill_cache": False,
         "use_listings_cache": False,
     }
-    fs_kwargs.update(_extract_storage_options(protocol, fs=fs))
+    fs_kwargs.update(storage_options)
 
     return fsspec.filesystem(protocol, **fs_kwargs)
 
@@ -584,18 +608,21 @@ async def _get_uncached_filesystem(path: str, fs=None):
         # Local filesystem — just return the regular cached instance.
         return await filesystem()
 
+    storage_options = _extract_storage_options(protocol, fs=fs)
+    cache_key = (protocol, _normalize_options_for_cache_key(storage_options))
+
     # Fast path: already cached (no lock needed for reads of a built-in dict).
-    cached = _uncached_fs_cache.get(protocol)
+    cached = _uncached_fs_cache.get(cache_key)
     if cached is not None:
         return cached
 
     with _uncached_fs_lock:
         # Double-check after acquiring the lock.
-        cached = _uncached_fs_cache.get(protocol)
+        cached = _uncached_fs_cache.get(cache_key)
         if cached is not None:
             return cached
-        uncached = _build_uncached_fs(protocol, fs=fs)
-        _uncached_fs_cache[protocol] = uncached
+        uncached = _build_uncached_fs(protocol, storage_options=storage_options)
+        _uncached_fs_cache[cache_key] = uncached
         return uncached
 
 
