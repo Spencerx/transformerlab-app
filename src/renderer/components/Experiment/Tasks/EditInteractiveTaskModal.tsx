@@ -402,7 +402,10 @@ export default function EditInteractiveTaskModal({
       // Persist model name to history before saving
       const modelName = configFieldValues['MODEL_NAME'];
       if (modelName?.trim() && interactiveType) {
-        saveModelToHistory(getModelHistoryKey(interactiveType), modelName.trim());
+        saveModelToHistory(
+          getModelHistoryKey(interactiveType),
+          modelName.trim(),
+        );
       }
 
       // The caller is responsible for actually persisting the changes via API.

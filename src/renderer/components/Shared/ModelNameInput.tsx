@@ -1,5 +1,10 @@
 import * as React from 'react';
-import { Autocomplete, AutocompleteOption, IconButton, Typography } from '@mui/joy';
+import {
+  Autocomplete,
+  AutocompleteOption,
+  IconButton,
+  Typography,
+} from '@mui/joy';
 import { XIcon } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
@@ -22,7 +27,9 @@ const TASK_TYPE_KEY_MAP: Record<string, string> = {
 };
 
 /** Derive the localStorage key for a given task type / gallery id. */
-export function getModelHistoryKey(taskTypeOrId: string | undefined | null): string {
+export function getModelHistoryKey(
+  taskTypeOrId: string | undefined | null,
+): string {
   if (!taskTypeOrId) return `${STORAGE_KEY_PREFIX}default`;
   const mapped = TASK_TYPE_KEY_MAP[taskTypeOrId];
   return `${STORAGE_KEY_PREFIX}${mapped ?? taskTypeOrId}`;
@@ -38,7 +45,8 @@ export function readModelHistory(storageKey: string): string[] {
     const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return parsed.filter((v) => typeof v === 'string');
+    if (Array.isArray(parsed))
+      return parsed.filter((v) => typeof v === 'string');
   } catch {
     // ignore corrupted data
   }
@@ -50,7 +58,10 @@ export function readModelHistory(storageKey: string): string[] {
  * - Deduplicates (moves existing entry to the front).
  * - Caps the list at MAX_HISTORY_SIZE.
  */
-export function saveModelToHistory(storageKey: string, modelName: string): void {
+export function saveModelToHistory(
+  storageKey: string,
+  modelName: string,
+): void {
   const trimmed = modelName.trim();
   if (!trimmed) return;
   try {
@@ -64,7 +75,10 @@ export function saveModelToHistory(storageKey: string, modelName: string): void 
 }
 
 /** Remove a single entry from the stored history. */
-export function removeModelFromHistory(storageKey: string, modelName: string): void {
+export function removeModelFromHistory(
+  storageKey: string,
+  modelName: string,
+): void {
   try {
     const current = readModelHistory(storageKey);
     const updated = current.filter((v) => v !== modelName);
@@ -163,7 +177,10 @@ export default function ModelNameInput({
           key={option}
           sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}
         >
-          <Typography level="body-sm" sx={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <Typography
+            level="body-sm"
+            sx={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}
+          >
             {option}
           </Typography>
           <IconButton
