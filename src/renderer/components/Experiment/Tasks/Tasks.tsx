@@ -1457,24 +1457,26 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         jobId={viewSweepResultsFromJob}
         setJobId={(jobId: string | null) => setViewSweepResultsFromJob(jobId)}
       />
-      <ViewOutputModalStreaming
-        jobId={viewOutputFromJob}
-        setJobId={(jobId: string | null) => setViewOutputFromJob(jobId)}
-        jobStatus={
-          jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.status ||
-          ''
-        }
-        tabs={
-          jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.job_data
-            ?.provider_type === 'skypilot'
-            ? ['output', 'provider', 'skypilot']
-            : ['output', 'provider']
-        }
-        skypilotRequestId={
-          jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.job_data
-            ?.provider_launch_result?.request_id || ''
-        }
-      />
+      {(() => {
+        const outputJob = jobs?.find(
+          (j: any) => String(j.id) === viewOutputFromJob,
+        );
+        return (
+          <ViewOutputModalStreaming
+            jobId={viewOutputFromJob}
+            setJobId={(jobId: string | null) => setViewOutputFromJob(jobId)}
+            jobStatus={outputJob?.status || ''}
+            tabs={
+              outputJob?.job_data?.provider_type === 'skypilot'
+                ? ['output', 'provider', 'skypilot']
+                : ['output', 'provider']
+            }
+            skypilotRequestId={
+              outputJob?.job_data?.provider_launch_result?.request_id || ''
+            }
+          />
+        );
+      })()}
       <ViewArtifactsModal
         open={viewArtifactsFromJob !== null}
         onClose={() => setViewArtifactsFromJob(null)}
