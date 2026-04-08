@@ -816,24 +816,35 @@ export default function ModelRegistry() {
                         pr: 1,
                       }}
                     >
-                      {/* Left side: Name + badges */}
-                      <Stack direction="row" alignItems="center" gap={1.5}>
-                        <PackageIcon size={18} />
-                        <Typography level="title-md" fontWeight="lg">
-                          {group.group_name}
-                        </Typography>
-                        <Chip size="sm" variant="soft" color="neutral">
-                          {group.version_count} version
-                          {group.version_count !== 1 ? 's' : ''}
-                        </Chip>
-                        {group.latest_tag && (
-                          <Chip
-                            size="sm"
-                            variant="soft"
-                            color={TAG_COLORS[group.latest_tag] || 'neutral'}
-                          >
-                            {group.latest_tag}
+                      {/* Left side: Name + badges + description */}
+                      <Stack gap={0.25}>
+                        <Stack direction="row" alignItems="center" gap={1.5}>
+                          <PackageIcon size={18} />
+                          <Typography level="title-md" fontWeight="lg">
+                            {group.group_name}
+                          </Typography>
+                          <Chip size="sm" variant="soft" color="neutral">
+                            {group.version_count} version
+                            {group.version_count !== 1 ? 's' : ''}
                           </Chip>
+                          {group.latest_tag && (
+                            <Chip
+                              size="sm"
+                              variant="soft"
+                              color={TAG_COLORS[group.latest_tag] || 'neutral'}
+                            >
+                              {group.latest_tag}
+                            </Chip>
+                          )}
+                        </Stack>
+                        {group.description && (
+                          <Typography
+                            level="body-xs"
+                            color="neutral"
+                            sx={{ pl: 4.5 }}
+                          >
+                            {group.description}
+                          </Typography>
                         )}
                       </Stack>
 
