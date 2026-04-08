@@ -186,7 +186,7 @@ class DstackProvider(ComputeProvider):
         }
         return mapping.get(cluster_state, JobState.UNKNOWN)
 
-    def _list_runs(self, limit: int) -> requests.Response:
+    def _list_runs(self, limit: int, timeout: int = 30) -> requests.Response:
         """List runs with compatibility fallbacks across dstack API variants."""
         errors: list[Exception] = []
         attempts: list[tuple[str, str, Dict[str, Any]]] = [
@@ -194,7 +194,7 @@ class DstackProvider(ComputeProvider):
         ]
         for method, endpoint, payload in attempts:
             try:
-                return self._make_request(method, endpoint, json_data=payload, timeout=30)
+                return self._make_request(method, endpoint, json_data=payload, timeout=timeout)
             except Exception as exc:
                 errors.append(exc)
                 if method == "POST":
@@ -392,7 +392,7 @@ class DstackProvider(ComputeProvider):
 
     def check(self) -> bool:
         try:
-            self._list_runs(limit=1)
+            self._list_runs(limit=1, timeout=10)
             return True
         except Exception:
             return False
