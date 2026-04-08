@@ -30,6 +30,7 @@ interface ViewArtifactsModalProps {
   renderContentOnly?: boolean;
   onCountLoaded?: (count: number) => void;
   onPreviewItem?: (item: { filename: string; jobId: string }) => void;
+  selectedFilename?: string | null;
 }
 
 interface Artifact {
@@ -45,6 +46,7 @@ export default function ViewArtifactsModal({
   renderContentOnly = false,
   onCountLoaded,
   onPreviewItem,
+  selectedFilename,
 }: ViewArtifactsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading: artifactsLoading } = useAPI(
@@ -491,9 +493,6 @@ export default function ViewArtifactsModal({
               <List
                 sx={{
                   overflow: 'auto',
-                  borderRadius: 'sm',
-                  border: '1px solid',
-                  borderColor: 'divider',
                   p: 0,
                 }}
               >
@@ -513,6 +512,11 @@ export default function ViewArtifactsModal({
                     }
                   >
                     <ListItemButton
+                      selected={
+                        selectedFilename
+                          ? selectedFilename === artifact.filename
+                          : selectedArtifact?.filename === artifact.filename
+                      }
                       onClick={() =>
                         canPreview(artifact.filename)
                           ? onPreviewItem
@@ -591,9 +595,6 @@ export default function ViewArtifactsModal({
                   sx={{
                     flex: 1,
                     overflow: 'auto',
-                    borderRadius: 'sm',
-                    border: '1px solid',
-                    borderColor: 'divider',
                   }}
                 >
                   {renderPreview()}

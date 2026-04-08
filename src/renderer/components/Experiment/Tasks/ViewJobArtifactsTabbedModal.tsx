@@ -169,6 +169,7 @@ export default function ViewJobArtifactsTabbedModal({
                   renderContentOnly
                   onCountLoaded={setArtifactsCount}
                   onPreviewItem={setPreviewItem}
+                  selectedFilename={previewItem?.filename ?? null}
                 />
               </section>
             </Stack>
