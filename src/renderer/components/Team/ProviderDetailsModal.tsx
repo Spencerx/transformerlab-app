@@ -1105,7 +1105,7 @@ export default function ProviderDetailsModal({
                       onChange={(event) =>
                         setDstackServerUrl(event.currentTarget.value)
                       }
-                      placeholder="https://sky.dstack.ai"
+                      placeholder="http://0.0.0.0:3000"
                       fullWidth
                     />
                   </FormControl>
