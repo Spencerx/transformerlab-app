@@ -11,10 +11,8 @@ from lab import Dataset, Experiment, storage
 from transformerlab.shared import shared
 from transformerlab.routers.experiment import (
     documents,
-    plugins,
     jobs,
     task as task_router,
-    tasks2 as tasks2_router,
 )
 from lab.dirs import get_workspace_dir
 
@@ -23,9 +21,7 @@ from werkzeug.utils import secure_filename
 router = APIRouter(prefix="/experiment")
 
 router.include_router(router=documents.router, prefix="/{experimentId}", tags=["documents"])
-router.include_router(router=plugins.router, prefix="/{id}", tags=["plugins"])
 router.include_router(router=jobs.router, prefix="/{experimentId}", tags=["jobs"])
-router.include_router(router=tasks2_router.router, prefix="/{experimentId}", tags=["task2"])
 router.include_router(router=task_router.router, prefix="/{experimentId}", tags=["task"])
 
 
