@@ -500,13 +500,13 @@ export default function DatasetRegistry() {
     }
   };
 
-  const toggleGroup = (groupName: string) => {
+  const toggleGroup = (groupId: string) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
-      if (next.has(groupName)) {
-        next.delete(groupName);
+      if (next.has(groupId)) {
+        next.delete(groupId);
       } else {
-        next.add(groupName);
+        next.add(groupId);
       }
       return next;
     });
@@ -621,12 +621,12 @@ export default function DatasetRegistry() {
             }}
           >
             {filteredGroups.map((group) => {
-              const isExpanded = expandedGroups.has(group.group_name);
+              const isExpanded = expandedGroups.has(group.group_id);
               return (
                 <Accordion
-                  key={group.group_name}
+                  key={group.group_id}
                   expanded={isExpanded}
-                  onChange={() => toggleGroup(group.group_name)}
+                  onChange={() => toggleGroup(group.group_id)}
                   sx={{
                     borderRadius: 'md',
                     border: '1px solid',
