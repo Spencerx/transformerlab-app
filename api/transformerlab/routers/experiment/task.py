@@ -100,13 +100,13 @@ def process_env_parameters_to_env_vars(config: dict) -> dict:
     return config
 
 
-@router.get("/list", summary="Returns all the tasks")
+@router.get("/list", summary="Returns all tasks for the given experiment")
 @cached(
-    key="tasks:list",
+    key="tasks:list:{experimentId}",
     ttl="300s",
-    tags=["tasks", "tasks:list"],
+    tags=["tasks", "tasks:list:{experimentId}"],
 )
-async def task_get_all():
+async def task_get_all(experimentId: str):
     tasks = await task_service.task_get_all()
     return tasks
 
@@ -476,8 +476,8 @@ async def update_task(experimentId: str, task_id: str, new_task: dict = Body()):
 async def delete_task(experimentId: str, task_id: str):
     success = await task_service.delete_task(task_id)
     if success:
-        # Best-effort invalidation: task detail + experiment-specific and global task lists.
-        await cache.invalidate(f"task:{experimentId}:{task_id}", f"tasks:list:{experimentId}", "tasks:list")
+        # Best-effort invalidation: task detail + this experiment's task lists.
+        await cache.invalidate(f"task:{experimentId}:{task_id}", f"tasks:list:{experimentId}")
         return {"message": "OK"}
     else:
         return {"message": "NOT FOUND"}
