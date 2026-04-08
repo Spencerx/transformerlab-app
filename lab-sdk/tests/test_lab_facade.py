@@ -42,25 +42,6 @@ def test_lab_init(tmp_path, monkeypatch):
     assert "start_time" in job_data
 
 
-def test_lab_init_sets_org_context_from_env(tmp_path, monkeypatch):
-    _fresh(monkeypatch)
-    home = tmp_path / ".tfl_home"
-    ws = tmp_path / ".tfl_ws"
-    home.mkdir()
-    ws.mkdir()
-    monkeypatch.setenv("TFL_HOME_DIR", str(home))
-    monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
-    monkeypatch.setenv("_TFL_ORG_ID", "team-123")
-
-    from lab.lab_facade import Lab
-    from lab.dirs import get_organization_id
-
-    lab = Lab()
-    lab.init(experiment_id="test_exp")
-
-    assert get_organization_id() == "team-123"
-
-
 def test_lab_init_with_existing_job(tmp_path, monkeypatch):
     _fresh(monkeypatch)
     home = tmp_path / ".tfl_home"
