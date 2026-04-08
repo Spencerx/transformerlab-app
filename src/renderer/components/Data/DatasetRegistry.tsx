@@ -431,7 +431,7 @@ function EditGroupModal({
           body: JSON.stringify({ name: name, description }),
         },
       );
-      mutateGroups();
+      await mutateGroups();
       onClose();
     } catch (err) {
       console.error('Failed to update group:', err);
