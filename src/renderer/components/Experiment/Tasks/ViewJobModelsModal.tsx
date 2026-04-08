@@ -6,7 +6,6 @@ import {
   ModalClose,
   Table,
   Box,
-  CircularProgress,
   Button,
   Stack,
   Alert,
@@ -30,6 +29,7 @@ interface ViewJobModelsModalProps {
   onClose: () => void;
   jobId: number | string | null;
   renderContentOnly?: boolean;
+  onCountLoaded?: (count: number) => void;
 }
 
 interface Model {
@@ -43,6 +43,7 @@ export default function ViewJobModelsModal({
   onClose,
   jobId,
   renderContentOnly = false,
+  onCountLoaded,
 }: ViewJobModelsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading, mutate } = useAPI('jobs', ['getJobModels'], {
@@ -109,6 +110,12 @@ export default function ViewJobModelsModal({
     : [];
 
   const models: Model[] = data?.models || [];
+
+  useEffect(() => {
+    if (!isLoading && data?.models) {
+      onCountLoaded?.(data.models.length);
+    }
+  }, [isLoading, data]);
 
   const handleSaveToRegistry = async (
     modelName: string,
@@ -232,20 +239,6 @@ export default function ViewJobModelsModal({
             flex: 1,
           }}
         >
-          <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
-            This job has{' '}
-            {models.length || (
-              <CircularProgress
-                sx={{
-                  '--CircularProgress-size': '18px',
-                  '--CircularProgress-trackThickness': '4px',
-                  '--CircularProgress-progressThickness': '2px',
-                }}
-              />
-            )}{' '}
-            model(s):
-          </Typography>
-
           {isLoading ? (
             <Typography level="body-md">Loading models...</Typography>
           ) : (

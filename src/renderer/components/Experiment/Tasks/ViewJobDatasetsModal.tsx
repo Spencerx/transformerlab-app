@@ -6,7 +6,6 @@ import {
   ModalClose,
   Table,
   Box,
-  CircularProgress,
   Button,
   Stack,
   Alert,
@@ -28,6 +27,7 @@ interface ViewJobDatasetsModalProps {
   onClose: () => void;
   jobId: number | string | null;
   renderContentOnly?: boolean;
+  onCountLoaded?: (count: number) => void;
 }
 
 interface Dataset {
@@ -41,6 +41,7 @@ export default function ViewJobDatasetsModal({
   onClose,
   jobId,
   renderContentOnly = false,
+  onCountLoaded,
 }: ViewJobDatasetsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading, mutate } = useAPI('jobs', ['getJobDatasets'], {
@@ -109,6 +110,12 @@ export default function ViewJobDatasetsModal({
     : [];
 
   const datasets: Dataset[] = data?.datasets || [];
+
+  useEffect(() => {
+    if (!isLoading && data?.datasets) {
+      onCountLoaded?.(data.datasets.length);
+    }
+  }, [isLoading, data]);
 
   const handleSaveToRegistry = async (
     datasetName: string,
@@ -232,20 +239,6 @@ export default function ViewJobDatasetsModal({
             flex: 1,
           }}
         >
-          <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
-            This job has{' '}
-            {datasets.length || (
-              <CircularProgress
-                sx={{
-                  '--CircularProgress-size': '18px',
-                  '--CircularProgress-trackThickness': '4px',
-                  '--CircularProgress-progressThickness': '2px',
-                }}
-              />
-            )}{' '}
-            dataset(s):
-          </Typography>
-
           {isLoading ? (
             <Typography level="body-md">Loading datasets...</Typography>
           ) : (

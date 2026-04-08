@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Modal,
   ModalDialog,
@@ -23,6 +24,13 @@ export default function ViewJobArtifactsTabbedModal({
   onClose,
   jobId,
 }: ViewJobArtifactsTabbedModalProps) {
+  const [modelsCount, setModelsCount] = useState<number | null>(null);
+  const [datasetsCount, setDatasetsCount] = useState<number | null>(null);
+  const [artifactsCount, setArtifactsCount] = useState<number | null>(null);
+
+  const countLabel = (count: number | null) =>
+    count !== null ? ` (${count})` : '';
+
   return (
     <Modal open={open} onClose={onClose}>
       <ModalDialog
@@ -48,13 +56,16 @@ export default function ViewJobArtifactsTabbedModal({
                 sx={{ mb: 1 }}
               >
                 <DatabaseIcon size={18} />
-                <Typography level="title-lg">Models</Typography>
+                <Typography level="title-lg">
+                  Models{countLabel(modelsCount)}
+                </Typography>
               </Stack>
               <ViewJobModelsModal
                 open={false}
                 onClose={() => {}}
                 jobId={jobId}
                 renderContentOnly
+                onCountLoaded={setModelsCount}
               />
             </section>
 
@@ -68,13 +79,16 @@ export default function ViewJobArtifactsTabbedModal({
                 sx={{ mb: 1 }}
               >
                 <FileTextIcon size={18} />
-                <Typography level="title-lg">Datasets</Typography>
+                <Typography level="title-lg">
+                  Datasets{countLabel(datasetsCount)}
+                </Typography>
               </Stack>
               <ViewJobDatasetsModal
                 open={false}
                 onClose={() => {}}
                 jobId={jobId}
                 renderContentOnly
+                onCountLoaded={setDatasetsCount}
               />
             </section>
 
@@ -88,13 +102,16 @@ export default function ViewJobArtifactsTabbedModal({
                 sx={{ mb: 1 }}
               >
                 <ArchiveIcon size={18} />
-                <Typography level="title-lg">Other Artifacts</Typography>
+                <Typography level="title-lg">
+                  Other Artifacts{countLabel(artifactsCount)}
+                </Typography>
               </Stack>
               <ViewArtifactsModal
                 open={false}
                 onClose={() => {}}
                 jobId={jobId}
                 renderContentOnly
+                onCountLoaded={setArtifactsCount}
               />
             </section>
           </Stack>

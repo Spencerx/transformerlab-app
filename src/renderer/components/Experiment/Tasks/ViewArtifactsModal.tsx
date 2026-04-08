@@ -25,6 +25,7 @@ interface ViewArtifactsModalProps {
   onClose: () => void;
   jobId: number | string | null;
   renderContentOnly?: boolean;
+  onCountLoaded?: (count: number) => void;
 }
 
 interface Artifact {
@@ -38,6 +39,7 @@ export default function ViewArtifactsModal({
   onClose,
   jobId,
   renderContentOnly = false,
+  onCountLoaded,
 }: ViewArtifactsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading: artifactsLoading } = useAPI(
@@ -55,6 +57,12 @@ export default function ViewArtifactsModal({
   const [isDownloading, setIsDownloading] = useState(false);
 
   let noArtifacts = false;
+
+  useEffect(() => {
+    if (!artifactsLoading && data?.artifacts) {
+      onCountLoaded?.(data.artifacts.length);
+    }
+  }, [artifactsLoading, data]);
 
   // Cleanup blob URLs when component unmounts or preview changes
   useEffect(() => {
@@ -472,20 +480,6 @@ export default function ViewArtifactsModal({
               overflow: 'hidden',
             }}
           >
-            <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
-              This job has{' '}
-              {data?.artifacts?.length || (
-                <CircularProgress
-                  sx={{
-                    '--CircularProgress-size': '18px',
-                    '--CircularProgress-trackThickness': '4px',
-                    '--CircularProgress-progressThickness': '2px',
-                  }}
-                />
-              )}{' '}
-              artifact(s):
-            </Typography>
-
             {artifactsLoading ? (
               <Typography level="body-md">Loading artifacts...</Typography>
             ) : (
