@@ -328,7 +328,7 @@ function GroupVersionsTable({
   const handleDeleteVersion = async (versionLabel: string) => {
     if (
       !window.confirm(
-        `Delete version ${versionLabel} from group "${groupId}"? This will not delete the underlying dataset.`,
+        `Delete version ${versionLabel} from this group? This will not delete the underlying dataset.`,
       )
     ) {
       return;
@@ -481,10 +481,10 @@ export default function DatasetRegistry() {
     mutate: mutateGroups,
   } = useSWR(chatAPI.Endpoints.AssetVersions.ListGroups('dataset'), fetcher);
 
-  const handleDeleteGroup = async (groupId: string) => {
+  const handleDeleteGroup = async (groupId: string, displayName: string) => {
     if (
       !window.confirm(
-        `Delete group "${groupId}" and ALL its versions? The underlying datasets will not be deleted.`,
+        `Delete group "${displayName}" and ALL its versions? The underlying datasets will not be deleted.`,
       )
     ) {
       return;
@@ -675,19 +675,31 @@ export default function DatasetRegistry() {
                         )}
                       </Stack>
 
-                      {/* Edit icon */}
-                      <IconButton
-                        size="sm"
-                        variant="plain"
-                        color="neutral"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingGroup(group);
-                        }}
-                        sx={{ flexShrink: 0 }}
-                      >
-                        <PencilIcon size={16} />
-                      </IconButton>
+                      {/* Edit + Delete icons */}
+                      <Stack direction="row" gap={0.5} sx={{ flexShrink: 0 }}>
+                        <IconButton
+                          size="sm"
+                          variant="plain"
+                          color="neutral"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingGroup(group);
+                          }}
+                        >
+                          <PencilIcon size={16} />
+                        </IconButton>
+                        <IconButton
+                          size="sm"
+                          variant="plain"
+                          color="danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGroup(group.group_id, group.group_name);
+                          }}
+                        >
+                          <Trash2Icon size={16} />
+                        </IconButton>
+                      </Stack>
                     </Stack>
                   </AccordionSummary>
 
@@ -708,6 +720,7 @@ export default function DatasetRegistry() {
 
       {editingGroup && (
         <EditGroupModal
+          key={editingGroup.group_id}
           open
           onClose={() => setEditingGroup(null)}
           group={editingGroup}
