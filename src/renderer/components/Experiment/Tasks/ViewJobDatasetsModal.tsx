@@ -257,15 +257,7 @@ export default function ViewJobDatasetsModal({
                 borderColor: 'divider',
               }}
             >
-              <Table stickyHeader>
-                <thead>
-                  <tr>
-                    <th style={{ width: '50px' }}>#</th>
-                    <th style={{ width: '50%' }}>Dataset Name</th>
-                    <th style={{ width: '20%' }}>Size</th>
-                    <th style={{ width: '30%' }}>Action</th>
-                  </tr>
-                </thead>
+              <Table>
                 <tbody>
                   {datasets.map((dataset, index) => (
                     <tr key={dataset.name}>

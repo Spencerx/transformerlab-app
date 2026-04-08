@@ -497,16 +497,7 @@ export default function ViewArtifactsModal({
                   borderColor: 'divider',
                 }}
               >
-                <Table stickyHeader>
-                  <thead>
-                    <tr>
-                      <th style={{ width: '50px' }}>#</th>
-                      <th>Artifact</th>
-                      {hasDate && <th>Date</th>}
-                      {hasSize && <th style={{ width: '100px' }}>Size</th>}
-                      <th style={{ width: '120px' }}>Actions</th>
-                    </tr>
-                  </thead>
+                <Table>
                   <tbody>
                     {data?.artifacts?.map(
                       (artifact: Artifact, index: number) => (

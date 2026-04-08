@@ -257,15 +257,7 @@ export default function ViewJobModelsModal({
                 borderColor: 'divider',
               }}
             >
-              <Table stickyHeader>
-                <thead>
-                  <tr>
-                    <th style={{ width: '50px' }}>#</th>
-                    <th style={{ width: '50%' }}>Model Name</th>
-                    <th style={{ width: '20%' }}>Size</th>
-                    <th style={{ width: '30%' }}>Action</th>
-                  </tr>
-                </thead>
+              <Table>
                 <tbody>
                   {models.map((model, index) => (
                     <tr key={model.name}>
