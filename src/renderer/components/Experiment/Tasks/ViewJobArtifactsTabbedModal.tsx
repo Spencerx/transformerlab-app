@@ -3,11 +3,9 @@ import {
   ModalDialog,
   ModalClose,
   Typography,
-  Tabs,
-  TabList,
-  Tab,
-  TabPanel,
+  Divider,
   Box,
+  Stack,
 } from '@mui/joy';
 import { DatabaseIcon, FileTextIcon, ArchiveIcon } from 'lucide-react';
 import ViewArtifactsModal from './ViewArtifactsModal';
@@ -18,14 +16,12 @@ interface ViewJobArtifactsTabbedModalProps {
   open: boolean;
   onClose: () => void;
   jobId: string | null;
-  defaultTab?: number;
 }
 
 export default function ViewJobArtifactsTabbedModal({
   open,
   onClose,
   jobId,
-  defaultTab = 0,
 }: ViewJobArtifactsTabbedModalProps) {
   return (
     <Modal open={open} onClose={onClose}>
@@ -42,60 +38,67 @@ export default function ViewJobArtifactsTabbedModal({
         <Typography level="h2" sx={{ mb: 2, mr: 4 }}>
           Artifacts for Job {jobId}
         </Typography>
-        <Tabs
-          defaultValue={defaultTab}
-          sx={{
-            flex: 1,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <TabList>
-            <Tab>
-              <DatabaseIcon size={16} />
-              <Box component="span" sx={{ ml: 0.5 }}>
-                Models
-              </Box>
-            </Tab>
-            <Tab>
-              <FileTextIcon size={16} />
-              <Box component="span" sx={{ ml: 0.5 }}>
-                Datasets
-              </Box>
-            </Tab>
-            <Tab>
-              <ArchiveIcon size={16} />
-              <Box component="span" sx={{ ml: 0.5 }}>
-                All Artifacts
-              </Box>
-            </Tab>
-          </TabList>
-          <TabPanel value={0} sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <ViewJobModelsModal
-              open={false}
-              onClose={() => {}}
-              jobId={jobId}
-              renderContentOnly
-            />
-          </TabPanel>
-          <TabPanel value={1} sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <ViewJobDatasetsModal
-              open={false}
-              onClose={() => {}}
-              jobId={jobId}
-              renderContentOnly
-            />
-          </TabPanel>
-          <TabPanel value={2} sx={{ flex: 1, overflow: 'auto', p: 2 }}>
-            <ViewArtifactsModal
-              open={false}
-              onClose={() => {}}
-              jobId={jobId}
-              renderContentOnly
-            />
-          </TabPanel>
-        </Tabs>
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <Stack spacing={3}>
+            <section>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{ mb: 1 }}
+              >
+                <DatabaseIcon size={18} />
+                <Typography level="title-lg">Models</Typography>
+              </Stack>
+              <ViewJobModelsModal
+                open={false}
+                onClose={() => {}}
+                jobId={jobId}
+                renderContentOnly
+              />
+            </section>
+
+            <Divider />
+
+            <section>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{ mb: 1 }}
+              >
+                <FileTextIcon size={18} />
+                <Typography level="title-lg">Datasets</Typography>
+              </Stack>
+              <ViewJobDatasetsModal
+                open={false}
+                onClose={() => {}}
+                jobId={jobId}
+                renderContentOnly
+              />
+            </section>
+
+            <Divider />
+
+            <section>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{ mb: 1 }}
+              >
+                <ArchiveIcon size={18} />
+                <Typography level="title-lg">Other Artifacts</Typography>
+              </Stack>
+              <ViewArtifactsModal
+                open={false}
+                onClose={() => {}}
+                jobId={jobId}
+                renderContentOnly
+              />
+            </section>
+          </Stack>
+        </Box>
       </ModalDialog>
     </Modal>
   );
