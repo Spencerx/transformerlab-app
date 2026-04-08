@@ -9,16 +9,7 @@ from typing import Any, Optional, Tuple
 # Prepended to interactive remote setup in the launch route so $SUDO is defined
 # without putting that logic in the gallery JSON. Setup content stays in the gallery.
 INTERACTIVE_SUDO_PREFIX = (
-    'SUDO=""; '
-    'if [ "$(id -u)" -ne 0 ]; then '
-    "  if sudo -n true 2>/dev/null; then "
-    '    SUDO="sudo"; '
-    "  else "
-    '    sudo_noop() { echo "Skipping privileged command (sudo unavailable): $*" >&2; return 0; }; '
-    '    SUDO="sudo_noop"; '
-    "  fi; "
-    "fi; "
-    "export DEBIAN_FRONTEND=noninteractive;"
+    'SUDO=""; if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; fi; export DEBIAN_FRONTEND=noninteractive;'
 )
 
 # Shell command to install ngrok (Debian/Bookworm). Uses $SUDO from INTERACTIVE_SUDO_PREFIX.
