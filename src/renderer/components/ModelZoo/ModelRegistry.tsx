@@ -21,16 +21,21 @@ import {
   Button,
   Chip,
   CircularProgress,
+  DialogTitle,
   FormControl,
   FormLabel,
   IconButton,
   Input,
+  Modal,
+  ModalClose,
+  ModalDialog,
   Option,
   Select,
   Sheet,
   Skeleton,
   Stack,
   Table,
+  Textarea,
   Tooltip,
   Typography,
 } from '@mui/joy';
@@ -39,6 +44,7 @@ import {
   CheckCircle2Icon,
   ChevronDownIcon,
   PackageIcon,
+  PencilIcon,
   PlayIcon,
   RotateCcwIcon,
   SearchIcon,
@@ -77,6 +83,7 @@ interface GroupSummary {
   group_id: string;
   group_name: string;
   asset_type: string;
+  description: string;
   version_count: number;
   latest_version_label: string | null;
   latest_tag: string | null;
@@ -525,12 +532,78 @@ function GroupVersionsTable({
   );
 }
 
+// ─── Edit Group Modal ───────────────────────────────────────────────────────
+
+function EditGroupModal({
+  open,
+  onClose,
+  group,
+  mutateGroups,
+}: {
+  open: boolean;
+  onClose: () => void;
+  group: GroupSummary;
+  mutateGroups: () => void;
+}) {
+  const [name, setName] = useState(group.group_name);
+  const [description, setDescription] = useState(group.description || '');
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await fetchWithAuth(
+        chatAPI.Endpoints.AssetVersions.UpdateGroup('model', group.group_id),
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        },
+      );
+      mutateGroups();
+      onClose();
+    } catch (err) {
+      console.error('Failed to update group:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose}>
+      <ModalDialog sx={{ width: 480 }}>
+        <ModalClose />
+        <DialogTitle>Edit Model Group</DialogTitle>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <FormControl>
+            <FormLabel>Name</FormLabel>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </FormControl>
+          <FormControl>
+            <FormLabel>Description</FormLabel>
+            <Textarea
+              minRows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe this model group…"
+            />
+          </FormControl>
+          <Button loading={saving} onClick={handleSave}>
+            Save
+          </Button>
+        </Stack>
+      </ModalDialog>
+    </Modal>
+  );
+}
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 export default function ModelRegistry() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchText, setSearchText] = useState('');
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [editingGroup, setEditingGroup] = useState<GroupSummary | null>(null);
   const { experimentInfo, experimentInfoMutate } = useExperimentInfo();
 
   const currentFoundation: string = experimentInfo?.config?.foundation || '';
@@ -763,6 +836,19 @@ export default function ModelRegistry() {
                           </Chip>
                         )}
                       </Stack>
+
+                      {/* Right side: edit icon */}
+                      <IconButton
+                        size="sm"
+                        variant="plain"
+                        color="neutral"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingGroup(group);
+                        }}
+                      >
+                        <PencilIcon size={16} />
+                      </IconButton>
                     </Box>
                   </AccordionSummary>
 
@@ -784,6 +870,15 @@ export default function ModelRegistry() {
           </AccordionGroup>
         )}
       </Box>
+
+      {editingGroup && (
+        <EditGroupModal
+          open
+          onClose={() => setEditingGroup(null)}
+          group={editingGroup}
+          mutateGroups={mutateGroups}
+        />
+      )}
     </Sheet>
   );
 }
