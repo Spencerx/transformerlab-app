@@ -11,7 +11,7 @@ github_repo_dir: demo-generate-task
 resources:
   cpus: 2
   memory: 4
-setup: "uv pip install transformerlab datasets;"
+setup: "uv pip install datasets;"
 run: "python ~/demo-generate-task/fake_generate.py"
 `;
 
@@ -122,7 +122,12 @@ test.describe('Dataset Generation Task', () => {
     await publishDialog
       .getByRole('textbox', { name: 'Version Name' })
       .fill(REGISTRY_VERSION_NAME);
-    await publishDialog.getByRole('button', { name: /Publish as/i }).click();
+    const publishButton = publishDialog.getByRole('button', {
+      name: /Publish as/i,
+    });
+    await publishButton.scrollIntoViewIfNeeded();
+    await expect(publishButton).toBeVisible({ timeout: 10000 });
+    await publishButton.click();
 
     // Wait for publish dialog to close and success state in dataset modal.
     await expect(publishDialog).toBeHidden({ timeout: 20000 });
