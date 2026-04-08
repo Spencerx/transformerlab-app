@@ -66,6 +66,7 @@ interface AssetVersionsDrawerProps {
   onClose: () => void;
   assetType: 'model' | 'dataset';
   groupId: string;
+  groupName?: string;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -664,6 +665,7 @@ export default function AssetVersionsDrawer({
   onClose,
   assetType,
   groupId,
+  groupName,
 }: AssetVersionsDrawerProps) {
   const [updatingVersion, setUpdatingVersion] = useState<string | null>(null);
   const [selectedVersion, setSelectedVersion] = useState<string | null>(null);
@@ -729,7 +731,7 @@ export default function AssetVersionsDrawer({
   const handleDeleteVersion = async (versionLabel: string) => {
     if (
       !window.confirm(
-        `Delete version ${versionLabel} from group "${groupId}"? This will not delete the underlying ${assetType}.`,
+        `Delete version ${versionLabel} from this group? This will not delete the underlying ${assetType}.`,
       )
     ) {
       return;
@@ -792,7 +794,7 @@ export default function AssetVersionsDrawer({
             <Stack direction="row" alignItems="center" gap={1}>
               <TagIcon size={20} />
               <Typography level="title-lg">
-                {typeLabel} Versions: <b>{groupId}</b>
+                {typeLabel} Versions: <b>{groupName || groupId}</b>
               </Typography>
             </Stack>
           </DialogTitle>
