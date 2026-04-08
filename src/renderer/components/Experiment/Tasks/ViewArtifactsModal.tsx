@@ -26,6 +26,7 @@ interface ViewArtifactsModalProps {
   jobId: number | string | null;
   renderContentOnly?: boolean;
   onCountLoaded?: (count: number) => void;
+  onPreviewItem?: (item: { filename: string; jobId: string }) => void;
 }
 
 interface Artifact {
@@ -40,6 +41,7 @@ export default function ViewArtifactsModal({
   jobId,
   renderContentOnly = false,
   onCountLoaded,
+  onPreviewItem,
 }: ViewArtifactsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading: artifactsLoading } = useAPI(
@@ -474,7 +476,7 @@ export default function ViewArtifactsModal({
           {/* Artifacts List */}
           <Box
             sx={{
-              flex: selectedArtifact ? '0 0 400px' : 1,
+              flex: !onPreviewItem && selectedArtifact ? '0 0 400px' : 1,
               display: 'flex',
               flexDirection: 'column',
               overflow: 'hidden',
@@ -531,7 +533,14 @@ export default function ViewArtifactsModal({
                                   size="sm"
                                   variant="plain"
                                   color="primary"
-                                  onClick={() => handleViewArtifact(artifact)}
+                                  onClick={() =>
+                                    onPreviewItem
+                                      ? onPreviewItem({
+                                          filename: artifact.filename,
+                                          jobId: String(jobId),
+                                        })
+                                      : handleViewArtifact(artifact)
+                                  }
                                   title="View"
                                 >
                                   <Eye size={16} />
@@ -557,8 +566,8 @@ export default function ViewArtifactsModal({
             )}
           </Box>
 
-          {/* Preview Pane */}
-          {selectedArtifact && (
+          {/* Preview Pane (only when not delegating to parent) */}
+          {!onPreviewItem && selectedArtifact && (
             <>
               <Divider orientation="vertical" />
               <Box

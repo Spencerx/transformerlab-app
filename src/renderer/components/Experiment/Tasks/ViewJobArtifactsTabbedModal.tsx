@@ -12,6 +12,7 @@ import { DatabaseIcon, FileTextIcon, ArchiveIcon } from 'lucide-react';
 import ViewArtifactsModal from './ViewArtifactsModal';
 import ViewJobDatasetsModal from './ViewJobDatasetsModal';
 import ViewJobModelsModal from './ViewJobModelsModal';
+import ArtifactPreviewPane, { PreviewableItem } from './ArtifactPreviewPane';
 
 interface ViewJobArtifactsTabbedModalProps {
   open: boolean;
@@ -27,6 +28,7 @@ export default function ViewJobArtifactsTabbedModal({
   const [modelsCount, setModelsCount] = useState<number | null>(null);
   const [datasetsCount, setDatasetsCount] = useState<number | null>(null);
   const [artifactsCount, setArtifactsCount] = useState<number | null>(null);
+  const [previewItem, setPreviewItem] = useState<PreviewableItem | null>(null);
 
   const countLabel = (count: number | null) =>
     count !== null ? ` (${count})` : '';
@@ -46,75 +48,89 @@ export default function ViewJobArtifactsTabbedModal({
         <Typography level="h2" sx={{ mb: 2, mr: 4 }}>
           Artifacts for Job {jobId}
         </Typography>
-        <Box sx={{ flex: 1, overflow: 'auto' }}>
-          <Stack spacing={3}>
-            <section>
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={1}
-                sx={{ mb: 1 }}
-              >
-                <DatabaseIcon size={18} />
-                <Typography level="title-lg">
-                  Models{countLabel(modelsCount)}
-                </Typography>
-              </Stack>
-              <ViewJobModelsModal
-                open={false}
-                onClose={() => {}}
-                jobId={jobId}
-                renderContentOnly
-                onCountLoaded={setModelsCount}
-              />
-            </section>
+        <Box sx={{ display: 'flex', flex: 1, gap: 2, overflow: 'hidden' }}>
+          {/* Left: scrollable sections */}
+          <Box sx={{ flex: 1, overflow: 'auto' }}>
+            <Stack spacing={3}>
+              <section>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  sx={{ mb: 1 }}
+                >
+                  <DatabaseIcon size={18} />
+                  <Typography level="title-lg">
+                    Models{countLabel(modelsCount)}
+                  </Typography>
+                </Stack>
+                <ViewJobModelsModal
+                  open={false}
+                  onClose={() => {}}
+                  jobId={jobId}
+                  renderContentOnly
+                  onCountLoaded={setModelsCount}
+                />
+              </section>
 
-            <Divider />
+              <Divider />
 
-            <section>
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={1}
-                sx={{ mb: 1 }}
-              >
-                <FileTextIcon size={18} />
-                <Typography level="title-lg">
-                  Datasets{countLabel(datasetsCount)}
-                </Typography>
-              </Stack>
-              <ViewJobDatasetsModal
-                open={false}
-                onClose={() => {}}
-                jobId={jobId}
-                renderContentOnly
-                onCountLoaded={setDatasetsCount}
-              />
-            </section>
+              <section>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  sx={{ mb: 1 }}
+                >
+                  <FileTextIcon size={18} />
+                  <Typography level="title-lg">
+                    Datasets{countLabel(datasetsCount)}
+                  </Typography>
+                </Stack>
+                <ViewJobDatasetsModal
+                  open={false}
+                  onClose={() => {}}
+                  jobId={jobId}
+                  renderContentOnly
+                  onCountLoaded={setDatasetsCount}
+                />
+              </section>
 
-            <Divider />
+              <Divider />
 
-            <section>
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={1}
-                sx={{ mb: 1 }}
-              >
-                <ArchiveIcon size={18} />
-                <Typography level="title-lg">
-                  Other Artifacts{countLabel(artifactsCount)}
-                </Typography>
-              </Stack>
-              <ViewArtifactsModal
-                open={false}
-                onClose={() => {}}
-                jobId={jobId}
-                renderContentOnly
-                onCountLoaded={setArtifactsCount}
-              />
-            </section>
-          </Stack>
+              <section>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  sx={{ mb: 1 }}
+                >
+                  <ArchiveIcon size={18} />
+                  <Typography level="title-lg">
+                    Other Artifacts{countLabel(artifactsCount)}
+                  </Typography>
+                </Stack>
+                <ViewArtifactsModal
+                  open={false}
+                  onClose={() => {}}
+                  jobId={jobId}
+                  renderContentOnly
+                  onCountLoaded={setArtifactsCount}
+                  onPreviewItem={setPreviewItem}
+                />
+              </section>
+            </Stack>
+          </Box>
+
+          <Divider orientation="vertical" />
+
+          {/* Right: always-visible preview pane */}
+          <Box sx={{ flex: 1, overflow: 'hidden' }}>
+            <ArtifactPreviewPane
+              item={previewItem}
+              onClose={() => setPreviewItem(null)}
+            />
+          </Box>
         </Box>
       </ModalDialog>
     </Modal>
