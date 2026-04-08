@@ -434,28 +434,30 @@ Endpoints.Users = {
 Endpoints.AssetVersions = {
   ListGroups: (assetType: string) =>
     `${API_URL()}asset_versions/groups?asset_type=${assetType}`,
-  DeleteGroup: (assetType: string, groupName: string) =>
-    `${API_URL()}asset_versions/groups/${assetType}/${groupName}`,
+  DeleteGroup: (assetType: string, groupId: string) =>
+    `${API_URL()}asset_versions/groups/${assetType}/${groupId}`,
+  UpdateGroup: (assetType: string, groupId: string) =>
+    `${API_URL()}asset_versions/groups/${assetType}/${groupId}`,
   CreateVersion: () => `${API_URL()}asset_versions/versions`,
-  ListVersions: (assetType: string, groupName: string) =>
-    `${API_URL()}asset_versions/versions/${assetType}/${groupName}`,
-  GetVersion: (assetType: string, groupName: string, versionLabel: string) =>
-    `${API_URL()}asset_versions/versions/${assetType}/${groupName}/${versionLabel}`,
-  DeleteVersion: (assetType: string, groupName: string, versionLabel: string) =>
-    `${API_URL()}asset_versions/versions/${assetType}/${groupName}/${versionLabel}`,
-  UpdateVersion: (assetType: string, groupName: string, versionLabel: string) =>
-    `${API_URL()}asset_versions/versions/${assetType}/${groupName}/${versionLabel}`,
-  SetTag: (assetType: string, groupName: string, versionLabel: string) =>
-    `${API_URL()}asset_versions/versions/${assetType}/${groupName}/${versionLabel}/tag`,
-  ClearTag: (assetType: string, groupName: string, versionLabel: string) =>
-    `${API_URL()}asset_versions/versions/${assetType}/${groupName}/${versionLabel}/tag`,
+  ListVersions: (assetType: string, groupId: string) =>
+    `${API_URL()}asset_versions/versions/${assetType}/${groupId}`,
+  GetVersion: (assetType: string, groupId: string, versionLabel: string) =>
+    `${API_URL()}asset_versions/versions/${assetType}/${groupId}/${versionLabel}`,
+  DeleteVersion: (assetType: string, groupId: string, versionLabel: string) =>
+    `${API_URL()}asset_versions/versions/${assetType}/${groupId}/${versionLabel}`,
+  UpdateVersion: (assetType: string, groupId: string, versionLabel: string) =>
+    `${API_URL()}asset_versions/versions/${assetType}/${groupId}/${versionLabel}`,
+  SetTag: (assetType: string, groupId: string, versionLabel: string) =>
+    `${API_URL()}asset_versions/versions/${assetType}/${groupId}/${versionLabel}/tag`,
+  ClearTag: (assetType: string, groupId: string, versionLabel: string) =>
+    `${API_URL()}asset_versions/versions/${assetType}/${groupId}/${versionLabel}/tag`,
   Resolve: (
     assetType: string,
-    groupName: string,
+    groupId: string,
     tag?: string,
     versionLabel?: string,
   ) => {
-    let url = `${API_URL()}asset_versions/resolve/${assetType}/${groupName}`;
+    let url = `${API_URL()}asset_versions/resolve/${assetType}/${groupId}`;
     const params: string[] = [];
     if (tag) params.push(`tag=${tag}`);
     if (versionLabel !== undefined)
