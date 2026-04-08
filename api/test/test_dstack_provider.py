@@ -38,8 +38,8 @@ class TestCheck:
         mock_request.return_value = _mock_response([])
         assert provider.check() is True
         call_kwargs = mock_request.call_args
-        assert call_kwargs[1]["url"] == "http://localhost:3000/api/project/test-project/runs/list"
-        assert call_kwargs[1]["json"] == {"only_active": False, "limit": 1}
+        assert call_kwargs[1]["url"] == "http://localhost:3000/api/runs/list"
+        assert call_kwargs[1]["json"] == {"project_name": "test-project", "only_active": False, "limit": 1}
 
     @patch("transformerlab.compute_providers.dstack.requests.request")
     def test_returns_false_on_connection_error(self, mock_request, provider):
@@ -206,13 +206,17 @@ class TestStopCluster:
 
 class TestListClusters:
     @patch("transformerlab.compute_providers.dstack.requests.request")
-    def test_posts_to_project_scoped_list_endpoint(self, mock_request, provider):
+    def test_posts_to_legacy_list_endpoint(self, mock_request, provider):
         mock_request.return_value = _mock_response([])
         provider.list_clusters()
         call_kwargs = mock_request.call_args
-        assert call_kwargs[1]["url"] == "http://localhost:3000/api/project/test-project/runs/list"
+        assert call_kwargs[1]["url"] == "http://localhost:3000/api/runs/list"
         assert call_kwargs[0][0] == "POST"
-        assert call_kwargs[1]["json"] == {"only_active": False, "limit": 100}
+        assert call_kwargs[1]["json"] == {
+            "project_name": "test-project",
+            "only_active": False,
+            "limit": 100,
+        }
 
 
 # --- get_cluster_status() ---
