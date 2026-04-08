@@ -186,6 +186,23 @@ class DstackProvider(ComputeProvider):
         }
         return mapping.get(cluster_state, JobState.UNKNOWN)
 
+    def _list_runs(self, limit: int) -> requests.Response:
+        """List runs with compatibility fallbacks across dstack API variants."""
+        errors: list[Exception] = []
+        attempts: list[tuple[str, str, Dict[str, Any]]] = [
+            ("POST", "/api/runs/list", {"project_name": self.project_name, "only_active": False, "limit": limit})
+        ]
+        for method, endpoint, payload in attempts:
+            try:
+                return self._make_request(method, endpoint, json_data=payload, timeout=30)
+            except Exception as exc:
+                errors.append(exc)
+                if method == "POST":
+                    message = str(exc)
+                    if "status 404" not in message and "status 405" not in message:
+                        raise
+        raise RuntimeError(f"Unable to list dstack runs after {len(attempts)} attempts. Last error: {errors[-1]}")
+
     # ------------------------------------------------------------------
     # ComputeProvider interface
     # ------------------------------------------------------------------
@@ -256,11 +273,7 @@ class DstackProvider(ComputeProvider):
         )
 
     def list_clusters(self) -> List[ClusterStatus]:
-        response = self._make_request(
-            "POST",
-            "/api/runs/list",
-            json_data={"project_name": self.project_name, "only_active": False, "limit": 100},
-        )
+        response = self._list_runs(limit=100)
         runs = response.json()
         return [
             ClusterStatus(
@@ -379,12 +392,7 @@ class DstackProvider(ComputeProvider):
 
     def check(self) -> bool:
         try:
-            self._make_request(
-                "POST",
-                "/api/runs/list",
-                json_data={"project_name": self.project_name, "only_active": False, "limit": 1},
-                timeout=10,
-            )
+            self._list_runs(limit=1)
             return True
         except Exception:
             return False
