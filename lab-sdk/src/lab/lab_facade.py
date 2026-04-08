@@ -88,6 +88,13 @@ class Lab:
         uses the environment variable value as the experiment_id.
         Otherwise, creates the experiment structure if needed and creates a new job.
         """
+        # When jobs run out-of-process (e.g. local/remote providers), the API
+        # passes org context through env vars. Rehydrate it before any storage
+        # access so Job/Experiment path resolution is org-scoped.
+        org_id = os.environ.get("_TFL_ORG_ID") or os.environ.get("_TFL_TEAM_ID")
+        if org_id:
+            dirs.set_organization_id(org_id)
+
         # Check if we should use experiment_id from environment variable
         # If experiment_id is the default "alpha" and _TFL_EXPERIMENT_ID is set, use the env var
         if not experiment_id:

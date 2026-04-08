@@ -180,6 +180,8 @@ async def launch_sweep_jobs(
                 env_vars["_TFL_JOB_ID"] = str(child_job_id)
                 env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
                 env_vars["_TFL_USER_ID"] = user_id
+                if team_id:
+                    env_vars["_TFL_ORG_ID"] = str(team_id)
 
                 trackio_project_name_for_child: str | None = None
                 trackio_run_name_for_child: str | None = None
