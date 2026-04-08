@@ -476,8 +476,8 @@ async def update_task(experimentId: str, task_id: str, new_task: dict = Body()):
 async def delete_task(experimentId: str, task_id: str):
     success = await task_service.delete_task(task_id)
     if success:
-        # Best-effort invalidation: task detail + this experiment's task lists.
-        await cache.invalidate(f"task:{experimentId}:{task_id}", f"tasks:list:{experimentId}")
+        # Best-effort invalidation: task detail + experiment-specific and global task lists.
+        await cache.invalidate(f"task:{experimentId}:{task_id}", f"tasks:list:{experimentId}", "tasks:list")
         return {"message": "OK"}
     else:
         return {"message": "NOT FOUND"}
