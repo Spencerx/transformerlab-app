@@ -807,19 +807,20 @@ export default function ModelRegistry() {
                     indicator={<ChevronDownIcon size={18} />}
                     sx={{ px: 2, py: 1.5 }}
                   >
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        width: '100%',
-                        pr: 1,
-                      }}
+                    <Stack
+                      direction="row"
+                      alignItems="flex-start"
+                      gap={1.5}
+                      sx={{ width: '100%', pr: 1 }}
                     >
-                      {/* Left side: Name + badges + description */}
-                      <Stack gap={0.25}>
+                      <PackageIcon
+                        size={18}
+                        style={{ marginTop: 3, flexShrink: 0 }}
+                      />
+
+                      {/* Title + description */}
+                      <Stack gap={0.25} sx={{ flex: 1, minWidth: 0 }}>
                         <Stack direction="row" alignItems="center" gap={1.5}>
-                          <PackageIcon size={18} />
                           <Typography level="title-md" fontWeight="lg">
                             {group.group_name}
                           </Typography>
@@ -838,17 +839,13 @@ export default function ModelRegistry() {
                           )}
                         </Stack>
                         {group.description && (
-                          <Typography
-                            level="body-xs"
-                            color="neutral"
-                            sx={{ pl: 4.5 }}
-                          >
+                          <Typography level="body-xs" color="neutral">
                             {group.description}
                           </Typography>
                         )}
                       </Stack>
 
-                      {/* Right side: edit icon */}
+                      {/* Edit icon */}
                       <IconButton
                         size="sm"
                         variant="plain"
@@ -857,10 +854,11 @@ export default function ModelRegistry() {
                           e.stopPropagation();
                           setEditingGroup(group);
                         }}
+                        sx={{ flexShrink: 0 }}
                       >
                         <PencilIcon size={16} />
                       </IconButton>
-                    </Box>
+                    </Stack>
                   </AccordionSummary>
 
                   <AccordionDetails sx={{ px: 2, pb: 2 }}>
