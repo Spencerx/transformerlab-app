@@ -291,9 +291,17 @@ async def update_group(
     """Update group-level metadata (name, description) in the index."""
     _validate_asset_type(asset_type)
 
+    type_dir = await _type_dir(asset_type)
+    gdir = storage.join(type_dir, group_id)
+    if not await storage.exists(storage.join(gdir, "index.json")):
+        raise ValueError(f"Group '{group_id}' not found")
+
     index = await _read_index(asset_type, group_id)
 
     if name is not ...:
+        existing_id = await _find_group_by_name(asset_type, name)
+        if existing_id is not None and existing_id != group_id:
+            raise ValueError(f"A group named '{name}' already exists")
         index["name"] = name
     if description is not ...:
         index["description"] = description
