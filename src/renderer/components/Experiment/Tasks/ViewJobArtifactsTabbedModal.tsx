@@ -7,8 +7,17 @@ import {
   Divider,
   Box,
   Stack,
+  Button,
 } from '@mui/joy';
-import { DatabaseIcon, FileTextIcon, ArchiveIcon } from 'lucide-react';
+import {
+  DatabaseIcon,
+  FileTextIcon,
+  ArchiveIcon,
+  Download,
+} from 'lucide-react';
+import { getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
+import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
+import { fetchWithAuth } from 'renderer/lib/authContext';
 import ViewArtifactsModal from './ViewArtifactsModal';
 import ViewJobDatasetsModal from './ViewJobDatasetsModal';
 import ViewJobModelsModal from './ViewJobModelsModal';
@@ -25,10 +34,38 @@ export default function ViewJobArtifactsTabbedModal({
   onClose,
   jobId,
 }: ViewJobArtifactsTabbedModalProps) {
+  const { experimentInfo } = useExperimentInfo();
   const [modelsCount, setModelsCount] = useState<number | null>(null);
   const [datasetsCount, setDatasetsCount] = useState<number | null>(null);
   const [artifactsCount, setArtifactsCount] = useState<number | null>(null);
   const [previewItem, setPreviewItem] = useState<PreviewableItem | null>(null);
+  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+
+  const handleDownloadAll = async () => {
+    if (!jobId) return;
+    try {
+      setIsDownloadingAll(true);
+      const downloadUrl = getAPIFullPath('jobs', ['downloadAllArtifacts'], {
+        experimentId: experimentInfo?.id,
+        jobId,
+      });
+      const response = await fetchWithAuth(downloadUrl);
+      if (!response.ok) throw new Error('Failed to download artifacts');
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `artifacts_job_${jobId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+    } catch (error) {
+      console.error('Download failed:', error);
+    } finally {
+      setIsDownloadingAll(false);
+    }
+  };
 
   const countLabel = (count: number | null) =>
     count !== null ? ` (${count})` : '';
@@ -109,6 +146,21 @@ export default function ViewJobArtifactsTabbedModal({
                   <Typography level="title-lg">
                     Other Artifacts{countLabel(artifactsCount)}
                   </Typography>
+                  {artifactsCount !== null && artifactsCount > 0 && (
+                    <Button
+                      size="sm"
+                      variant="soft"
+                      color="primary"
+                      startDecorator={
+                        !isDownloadingAll && <Download size={14} />
+                      }
+                      loading={isDownloadingAll}
+                      onClick={handleDownloadAll}
+                      sx={{ ml: 'auto' }}
+                    >
+                      Download All
+                    </Button>
+                  )}
                 </Stack>
                 <ViewArtifactsModal
                   open={false}

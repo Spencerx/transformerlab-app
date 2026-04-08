@@ -448,32 +448,32 @@ export default function ViewArtifactsModal({
 
   const content = (
     <>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 2 }}
-      >
-        {!noArtifacts && !artifactsLoading && (
-          <Button
-            startDecorator={!isDownloading && <Download size={16} />}
-            loading={isDownloading}
-            onClick={handleDownloadAllArtifacts}
-            variant="soft"
-            color="primary"
-            sx={{ ml: 'auto' }}
-          >
-            Download All
-          </Button>
-        )}
-      </Stack>
+      {!renderContentOnly && (
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 2 }}
+        >
+          {!noArtifacts && !artifactsLoading && (
+            <Button
+              startDecorator={!isDownloading && <Download size={16} />}
+              loading={isDownloading}
+              onClick={handleDownloadAllArtifacts}
+              variant="soft"
+              color="primary"
+              sx={{ ml: 'auto' }}
+            >
+              Download All
+            </Button>
+          )}
+        </Stack>
+      )}
 
       {noArtifacts ? (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography level="body-lg" color="neutral">
-            No artifacts found for this job.
-          </Typography>
-        </Box>
+        <Typography level="body-xs" color="neutral" sx={{ py: 1 }}>
+          No artifacts found.
+        </Typography>
       ) : (
         <Box sx={{ display: 'flex', gap: 2, flex: 1, overflow: 'hidden' }}>
           {/* Artifacts List */}

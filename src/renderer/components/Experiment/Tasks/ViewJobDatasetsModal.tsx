@@ -227,11 +227,9 @@ export default function ViewJobDatasetsModal({
       )}
 
       {noDatasetsFound ? (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography level="body-lg" color="neutral">
-            No datasets found for this job.
-          </Typography>
-        </Box>
+        <Typography level="body-xs" color="neutral" sx={{ py: 1 }}>
+          No datasets found.
+        </Typography>
       ) : (
         <Box
           sx={{

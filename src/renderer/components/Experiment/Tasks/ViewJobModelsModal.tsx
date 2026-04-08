@@ -227,11 +227,9 @@ export default function ViewJobModelsModal({
       )}
 
       {noModelsFound ? (
-        <Box sx={{ textAlign: 'center', py: 4 }}>
-          <Typography level="body-lg" color="neutral">
-            No models found for this job.
-          </Typography>
-        </Box>
+        <Typography level="body-xs" color="neutral" sx={{ py: 1 }}>
+          No models found.
+        </Typography>
       ) : (
         <Box
           sx={{
