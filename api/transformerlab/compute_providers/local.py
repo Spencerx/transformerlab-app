@@ -471,8 +471,8 @@ class LocalProvider(ComputeProvider):
             env["UV_CACHE_DIR"],
             _CONDA_ENV_DIR,
             venv_path,
-            # uv manages its own Python installations here; the dylib must be readable.
-            os.path.join(real_home, ".local", "share", "uv"),
+            # user-installed binaries and libs (e.g. ~/.local/bin/uv, ~/.local/share/uv).
+            os.path.join(real_home, ".local"),
             # lab-sdk is installed as an editable install; the .pth file points back to
             # this source tree, so the sandbox must be able to read it at import time.
             _lab_sdk_dir or "",

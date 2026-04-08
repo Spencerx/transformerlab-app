@@ -278,7 +278,6 @@ export default function InteractiveJobCard({
         <Box>
           <JobProgress
             job={job}
-            showLaunchResultInfo
             launchProgress={launchProgress}
             hideCircularLaunchProgressAtOrAbove={
               job.status === 'INTERACTIVE' ? 99 : undefined
