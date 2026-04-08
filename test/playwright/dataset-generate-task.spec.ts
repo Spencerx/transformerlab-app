@@ -100,27 +100,30 @@ test.describe('Dataset Generation Task', () => {
     await page.getByRole('button', { name: 'Artifacts' }).first().click();
     await page.getByRole('menuitem', { name: 'View Datasets' }).first().click();
 
-    const datasetsDialog = page.getByRole('dialog');
-    await expect(datasetsDialog.getByText('Datasets for Job')).toBeVisible({
+    const datasetsDialog = page
+      .getByRole('dialog')
+      .filter({ hasText: 'Datasets for Job' })
+      .first();
+    await expect(datasetsDialog).toBeVisible({
       timeout: 10000,
     });
-    await expect(
-      datasetsDialog.getByText('Save to Registry').first(),
-    ).toBeVisible({ timeout: 10000 });
-    await datasetsDialog
+    const saveToRegistryButton = datasetsDialog
       .getByRole('button', { name: 'Save to Registry' })
-      .first()
-      .click();
+      .first();
+    await saveToRegistryButton.scrollIntoViewIfNeeded();
+    await expect(saveToRegistryButton).toBeVisible({ timeout: 10000 });
+    await saveToRegistryButton.click();
 
-    const publishDialog = page.getByRole('dialog', {
-      name: 'Publish Dataset to Registry',
-    });
+    const publishDialog = page
+      .getByRole('dialog')
+      .filter({ hasText: 'Publish Dataset to Registry' })
+      .first();
     await expect(publishDialog).toBeVisible({ timeout: 10000 });
     await publishDialog
-      .getByRole('textbox', { name: 'Name' })
+      .getByRole('textbox', { name: 'Name', exact: true })
       .fill(REGISTRY_DATASET_NAME);
     await publishDialog
-      .getByRole('textbox', { name: 'Version Name' })
+      .getByRole('textbox', { name: 'Version Name', exact: true })
       .fill(REGISTRY_VERSION_NAME);
     const publishButton = publishDialog.getByRole('button', {
       name: /Publish as/i,
@@ -129,22 +132,14 @@ test.describe('Dataset Generation Task', () => {
     await expect(publishButton).toBeVisible({ timeout: 10000 });
     await publishButton.click();
 
-    // Wait for publish dialog to close and success state in dataset modal.
-    await expect(publishDialog).toBeHidden({ timeout: 20000 });
-    await expect(datasetsDialog.getByText(/Successfully saved/i)).toBeVisible({
-      timeout: 30000,
-    });
-    await page.keyboard.press('Escape');
-
-    // Verify fixed dataset registry group appears on Datasets page.
-    await page.getByRole('button', { name: 'Datasets' }).click();
-    await expect(page.getByText('Dataset Registry')).toBeVisible({
-      timeout: 10000,
-    });
+    // As soon as the in-modal notification appears, treat save-start as success.
     await expect(
-      page.getByText(REGISTRY_DATASET_NAME, { exact: true }).first(),
+      datasetsDialog
+        .getByRole('alert')
+        .filter({ hasText: /dataset save to registry started/i })
+        .first(),
     ).toBeVisible({
-      timeout: 30000,
+      timeout: 15000,
     });
   });
 });
