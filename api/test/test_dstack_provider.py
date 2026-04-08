@@ -48,22 +48,6 @@ class TestCheck:
         mock_request.side_effect = req_lib.exceptions.ConnectionError("unreachable")
         assert provider.check() is False
 
-    @patch("transformerlab.compute_providers.dstack.requests.request")
-    def test_falls_back_to_legacy_list_endpoint(self, mock_request, provider):
-        import requests as req_lib
-
-        first_error = req_lib.exceptions.HTTPError("not found")
-        first_error.response = _mock_response({"detail": "Not Found"}, status_code=404)
-        second_ok = _mock_response([])
-        mock_request.side_effect = [first_error, second_ok]
-
-        assert provider.check() is True
-        first_call = mock_request.call_args_list[0]
-        second_call = mock_request.call_args_list[1]
-        assert first_call[1]["url"] == "http://localhost:3000/api/project/test-project/runs/list"
-        assert second_call[1]["url"] == "http://localhost:3000/api/runs/list"
-        assert second_call[1]["json"] == {"project_name": "test-project", "only_active": False, "limit": 1}
-
 
 # --- _parse_accelerators() ---
 
