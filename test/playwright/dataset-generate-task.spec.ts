@@ -18,12 +18,27 @@ run: "python ~/demo-generate-task/fake_generate.py"
 async function replaceMonacoContents(page: Page, contents: string) {
   const editor = page.locator('.monaco-editor').first();
   await expect(editor).toBeVisible({ timeout: 10000 });
-  await editor.click();
+  await editor.click({ force: true });
 
-  // Replace all editor content with the task YAML.
-  const selectAllShortcut =
-    process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
-  await page.keyboard.press(selectAllShortcut);
+  // Prefer updating Monaco's model directly (more deterministic in E2E).
+  const updatedViaMonacoApi = await page.evaluate((nextContent) => {
+    const maybeMonaco = (window as any).monaco;
+    const models = maybeMonaco?.editor?.getModels?.();
+    if (!Array.isArray(models) || models.length === 0) {
+      return false;
+    }
+    models[0].setValue(nextContent);
+    return true;
+  }, contents);
+
+  if (updatedViaMonacoApi) {
+    return;
+  }
+
+  // Fallback when Monaco API is not exposed globally.
+  await page.keyboard.press('Meta+A');
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Backspace');
   await page.keyboard.type(contents);
 }
 
