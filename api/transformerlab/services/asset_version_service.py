@@ -24,6 +24,7 @@ Group directories are keyed by UUID so the display name is freely editable.
 """
 
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -31,6 +32,8 @@ from typing import Optional
 from lab import storage
 
 from transformerlab.shared.dirs import get_asset_groups_dir
+
+logger = logging.getLogger(__name__)
 
 
 VALID_ASSET_TYPES = {"model", "dataset"}
@@ -174,7 +177,11 @@ async def _list_group_ids(asset_type: str) -> list[str]:
 async def _find_group_by_name(asset_type: str, name: str) -> Optional[str]:
     """Look up a group_id by its display name.  Returns None if not found."""
     for gid in await _list_group_ids(asset_type):
-        index = await _read_index(asset_type, gid)
+        try:
+            index = await _read_index(asset_type, gid)
+        except (ValueError, OSError) as exc:
+            logger.warning("Skipping group %r (asset_type=%r): %s", gid, asset_type, exc)
+            continue
         if index.get("name") == name:
             return gid
     return None
@@ -268,8 +275,8 @@ async def list_groups(asset_type: str) -> list[dict]:
         try:
             index = await _read_index(asset_type, gid)
             versions = await _read_versions(asset_type, gid)
-        except Exception:
-            # Skip groups with invalid UUIDs or unreadable data
+        except (ValueError, OSError) as exc:
+            logger.warning("Skipping group %r (asset_type=%r): %s", gid, asset_type, exc)
             continue
         tags = [v["tag"] for v in versions if v.get("tag")]
 
@@ -557,7 +564,8 @@ async def get_groups_for_asset(asset_type: str, asset_id: str) -> list[dict]:
     for gid in await _list_group_ids(asset_type):
         try:
             versions = await _read_versions(asset_type, gid)
-        except Exception:
+        except (ValueError, OSError) as exc:
+            logger.warning("Skipping group %r (asset_type=%r): %s", gid, asset_type, exc)
             continue
         for v in versions:
             if v.get("asset_id") == asset_id:
@@ -578,7 +586,8 @@ async def get_all_asset_group_map(asset_type: str) -> dict[str, list[dict]]:
     for gid in await _list_group_ids(asset_type):
         try:
             versions = await _read_versions(asset_type, gid)
-        except Exception:
+        except (ValueError, OSError) as exc:
+            logger.warning("Skipping group %r (asset_type=%r): %s", gid, asset_type, exc)
             continue
         for v in versions:
             d = _version_to_dict(v, asset_type, gid)
