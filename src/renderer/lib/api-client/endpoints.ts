@@ -218,25 +218,6 @@ Endpoints.Models = {
     }`,
 };
 
-Endpoints.Plugins = {
-  Gallery: () => `${API_URL()}plugins/gallery`,
-  Info: (pluginId: string) => `${API_URL()}plugins/info?plugin_id=${pluginId}`,
-  Preview: (pluginId: string) =>
-    `${API_URL()}plugins/preview?pluginId=${pluginId}`,
-  List: () => `${API_URL()}plugins/list`,
-  RunPluginInstallScript: (pluginId: string) =>
-    `${API_URL()}plugins/${pluginId}/run_installer_script`,
-  SuggestLoader: (modelArchitecture: string) =>
-    `${API_URL()}plugins/suggest_loader?model_architecture=${encodeURIComponent(modelArchitecture)}`,
-};
-
-// Following is no longer needed as it is replaced with useAPI
-// Endpoints.Config = {
-//   Get: (key: string) => `${API_URL()}config/get/${key}`,
-//   Set: (key: string, value: string) =>
-//     `${API_URL()}config/set?k=${key}&v=${value}`,
-// };
-
 Endpoints.Documents = {
   List: (experimentId: string, currentFolder: string = '') =>
     `${API_URL()}experiment/${experimentId}/documents/list?folder=${
@@ -322,18 +303,6 @@ Endpoints.Experiment = {
   GetGenerationOutput: (experimentId: string, eval_name: string) =>
     `${API_URL()}experiment/${experimentId}/generations/get_output` +
     `?eval_name=${eval_name}`,
-  RunExport: (
-    id: string,
-    pluginName: string,
-    pluginArchitecture: string,
-    pluginParams: string,
-  ) => {
-    return `${API_URL()}experiment/${
-      id
-    }/export/run_exporter_script?plugin_name=${
-      pluginName
-    }&plugin_architecture=${pluginArchitecture}&plugin_params=${pluginParams}`;
-  },
   SaveConversation: (experimentId: String) =>
     `${API_URL()}experiment/${experimentId}/conversations/save`,
   GetConversations: (experimentId: string) =>
@@ -344,48 +313,6 @@ Endpoints.Experiment = {
         conversationId
       }`,
     ),
-  InstallPlugin: (pluginId: string) =>
-    `${API_URL()}plugins/gallery/${pluginId}/install`,
-  DeletePlugin: (pluginId: string) =>
-    `${API_URL()}plugins/delete_plugin?plugin_name=${pluginId}`,
-  ListScripts: (experimentId: string) =>
-    FULL_PATH(`experiment/${experimentId}/plugins/list`),
-  ListScriptsOfType: (
-    experimentId: string,
-    type: string,
-    filter: string | null = null,
-  ) =>
-    FULL_PATH(
-      `experiment/${experimentId}/plugins/list?type=${
-        type
-      }${filter ? `&filter=${filter}` : ''}`,
-    ),
-  ScriptListFiles: (experimentId: string, id: string) =>
-    `${API_URL()}experiment/${experimentId}/plugins/${id}/list_files`,
-  ScriptGetFile: (experimentId: string, pluginId: string, filename: string) =>
-    `${API_URL()}experiment/${experimentId}/plugins/${
-      pluginId
-    }/file_contents?filename=${filename}`,
-  ScriptNewFile: (experimentId: string, pluginId: string, filename: string) =>
-    `${API_URL()}experiment/${experimentId}/plugins/${
-      pluginId
-    }/create_new_file?filename=${filename}`,
-  ScriptDeleteFile: (
-    experimentId: string,
-    pluginId: string,
-    filename: string,
-  ) =>
-    `${API_URL()}experiment/${experimentId}/plugins/${
-      pluginId
-    }/delete_file?filename=${filename}`,
-  ScriptSaveFile: (experimentId: string, pluginId: string, filename: string) =>
-    `${API_URL()}experiment/${experimentId}/plugins/${
-      pluginId
-    }/save_file_contents?filename=${filename}`,
-  ScriptCreateNew: (experimentId: string, pluginId: string) =>
-    `${API_URL()}experiment/${experimentId}/plugins/new_plugin?pluginId=${
-      pluginId
-    }`,
   GetOutputFromJob: (experimentId: string, jobId: string) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/output`,
   GetTasksOutputFromJob: (experimentId: string, jobId: string) =>
@@ -409,6 +336,12 @@ Endpoints.Experiment = {
     live: boolean = false,
   ) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/provider_logs?tail_lines=${tailLines}&live=${live}`,
+  GetRequestLogs: (
+    experimentId: string,
+    jobId: string,
+    tailLines: number = 400,
+  ) =>
+    `${API_URL()}experiment/${experimentId}/jobs/${jobId}/request_logs?tail_lines=${tailLines}`,
   GetTunnelInfo: (
     experimentId: string,
     jobId: string,

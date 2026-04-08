@@ -165,6 +165,7 @@ _LINUX_BASE_RO_PATHS: tuple[str, ...] = (
     "/lib",
     "/lib64",
     "/etc",
+    "/run",
     "/var",
     "/opt",
 )
@@ -245,6 +246,20 @@ def wrap_command_with_bwrap(
     for p in extra_rw_paths or []:
         if p and os.path.exists(p):
             args += ["--bind", p, p]
+
+    # DNS resolution fix: /etc/resolv.conf is often a symlink into a systemd
+    # submount (e.g. /run/systemd/resolve/stub-resolv.conf).  Submounts are NOT
+    # included in a parent --ro-bind, so the symlink target is missing and DNS
+    # silently fails.  Explicitly bind the real file and any resolver submounts.
+    for dns_dir in ("/run/systemd/resolve", "/run/resolvconf"):
+        if os.path.isdir(dns_dir):
+            args += ["--ro-bind", dns_dir, dns_dir]
+
+    resolv_real = os.path.realpath("/etc/resolv.conf")
+    if os.path.isfile(resolv_real):
+        # Override whatever was mounted for /etc/resolv.conf (possibly a broken
+        # symlink) with a direct bind of the actual file.
+        args += ["--ro-bind", resolv_real, "/etc/resolv.conf"]
 
     args += cmd
     return args
