@@ -50,6 +50,14 @@ def _validate_asset_type(asset_type: str) -> None:
         raise ValueError(f"asset_type must be one of {VALID_ASSET_TYPES}, got '{asset_type}'")
 
 
+def _validate_group_id(group_id: str) -> None:
+    """Ensure group_id is a valid UUID to prevent path traversal."""
+    try:
+        uuid.UUID(group_id)
+    except ValueError:
+        raise ValueError(f"Invalid group_id: '{group_id}' is not a valid UUID")
+
+
 async def _type_dir(asset_type: str) -> str:
     """Return the type-level directory, creating it if needed."""
     root = await get_asset_groups_dir()
@@ -60,6 +68,7 @@ async def _type_dir(asset_type: str) -> str:
 
 async def _group_dir(asset_type: str, group_id: str) -> str:
     """Return the directory path for a specific group, creating parents as needed."""
+    _validate_group_id(group_id)
     type_dir = await _type_dir(asset_type)
     path = storage.join(type_dir, group_id)
     await storage.makedirs(path, exist_ok=True)
