@@ -4,13 +4,15 @@ import {
   ModalDialog,
   Typography,
   ModalClose,
-  Table,
   Box,
   Button,
   Stack,
   Alert,
-  Sheet,
   LinearProgress,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemContent,
 } from '@mui/joy';
 import { Save } from 'lucide-react';
 import { useAPI, getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
@@ -242,43 +244,44 @@ export default function ViewJobModelsModal({
           {isLoading ? (
             <Typography level="body-md">Loading models...</Typography>
           ) : (
-            <Sheet
+            <List
               sx={{
                 overflow: 'auto',
                 borderRadius: 'sm',
                 border: '1px solid',
                 borderColor: 'divider',
+                p: 0,
               }}
             >
-              <Table>
-                <tbody>
-                  {models.map((model) => (
-                    <tr key={model.name}>
-                      <td>
-                        <Typography level="title-sm">{model.name}</Typography>
-                      </td>
-                      <td>
-                        <Typography level="body-sm">
-                          {model.size ? formatBytes(model.size) : '-'}
+              {models.map((model) => (
+                <ListItem
+                  key={model.name}
+                  endAction={
+                    <Button
+                      size="sm"
+                      variant="outlined"
+                      onClick={() => setSaveDialogModel(model.name)}
+                      startDecorator={<Save size={16} />}
+                      loading={savingModel === model.name}
+                      disabled={savingModel !== null}
+                    >
+                      Save to Registry
+                    </Button>
+                  }
+                >
+                  <ListItemButton>
+                    <ListItemContent>
+                      <Typography level="title-sm">{model.name}</Typography>
+                      {model.size && (
+                        <Typography level="body-xs">
+                          {formatBytes(model.size)}
                         </Typography>
-                      </td>
-                      <td>
-                        <Button
-                          size="sm"
-                          variant="outlined"
-                          onClick={() => setSaveDialogModel(model.name)}
-                          startDecorator={<Save size={16} />}
-                          loading={savingModel === model.name}
-                          disabled={savingModel !== null}
-                        >
-                          Save to Registry
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Sheet>
+                      )}
+                    </ListItemContent>
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
           )}
         </Box>
       )}

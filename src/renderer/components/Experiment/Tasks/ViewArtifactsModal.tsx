@@ -4,7 +4,6 @@ import {
   ModalDialog,
   Typography,
   ModalClose,
-  Table,
   Box,
   CircularProgress,
   IconButton,
@@ -12,8 +11,12 @@ import {
   Button,
   Divider,
   Stack,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemContent,
 } from '@mui/joy';
-import { Eye, Download, X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { useAPI, getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { formatBytes } from 'renderer/lib/utils';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
@@ -485,75 +488,63 @@ export default function ViewArtifactsModal({
             {artifactsLoading ? (
               <Typography level="body-md">Loading artifacts...</Typography>
             ) : (
-              <Sheet
+              <List
                 sx={{
                   overflow: 'auto',
                   borderRadius: 'sm',
                   border: '1px solid',
                   borderColor: 'divider',
+                  p: 0,
                 }}
               >
-                <Table>
-                  <tbody>
-                    {data?.artifacts?.map((artifact: Artifact) => (
-                      <tr key={`artifact-${artifact.filename}`}>
-                        <td>
-                          <Typography level="title-sm">
-                            {artifact.filename}
-                          </Typography>
-                        </td>
-                        {hasDate && (
-                          <td>
-                            <Typography level="body-sm">
-                              {artifact.date
-                                ? new Date(artifact.date).toLocaleString()
-                                : '-'}
+                {data?.artifacts?.map((artifact: Artifact) => (
+                  <ListItem
+                    key={`artifact-${artifact.filename}`}
+                    endAction={
+                      <IconButton
+                        size="sm"
+                        variant="plain"
+                        color="neutral"
+                        onClick={() => handleDownloadArtifact(artifact)}
+                        title="Download"
+                      >
+                        <Download size={16} />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemButton
+                      onClick={() =>
+                        canPreview(artifact.filename)
+                          ? onPreviewItem
+                            ? onPreviewItem({
+                                filename: artifact.filename,
+                                jobId: String(jobId),
+                              })
+                            : handleViewArtifact(artifact)
+                          : undefined
+                      }
+                    >
+                      <ListItemContent>
+                        <Typography level="title-sm">
+                          {artifact.filename}
+                        </Typography>
+                        <Stack direction="row" spacing={2}>
+                          {hasDate && artifact.date && (
+                            <Typography level="body-xs">
+                              {new Date(artifact.date).toLocaleString()}
                             </Typography>
-                          </td>
-                        )}
-                        {hasSize && (
-                          <td>
-                            <Typography level="body-sm">
-                              {artifact.size ? formatBytes(artifact.size) : '-'}
+                          )}
+                          {hasSize && artifact.size && (
+                            <Typography level="body-xs">
+                              {formatBytes(artifact.size)}
                             </Typography>
-                          </td>
-                        )}
-                        <td>
-                          <Stack direction="row" spacing={0.5}>
-                            {canPreview(artifact.filename) && (
-                              <IconButton
-                                size="sm"
-                                variant="plain"
-                                color="primary"
-                                onClick={() =>
-                                  onPreviewItem
-                                    ? onPreviewItem({
-                                        filename: artifact.filename,
-                                        jobId: String(jobId),
-                                      })
-                                    : handleViewArtifact(artifact)
-                                }
-                                title="View"
-                              >
-                                <Eye size={16} />
-                              </IconButton>
-                            )}
-                            <IconButton
-                              size="sm"
-                              variant="plain"
-                              color="neutral"
-                              onClick={() => handleDownloadArtifact(artifact)}
-                              title="Download"
-                            >
-                              <Download size={16} />
-                            </IconButton>
-                          </Stack>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Sheet>
+                          )}
+                        </Stack>
+                      </ListItemContent>
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
             )}
           </Box>
 

@@ -4,13 +4,15 @@ import {
   ModalDialog,
   Typography,
   ModalClose,
-  Table,
   Box,
   Button,
   Stack,
   Alert,
-  Sheet,
   LinearProgress,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemContent,
 } from '@mui/joy';
 import { Save } from 'lucide-react';
 import { useAPI, getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
@@ -242,43 +244,44 @@ export default function ViewJobDatasetsModal({
           {isLoading ? (
             <Typography level="body-md">Loading datasets...</Typography>
           ) : (
-            <Sheet
+            <List
               sx={{
                 overflow: 'auto',
                 borderRadius: 'sm',
                 border: '1px solid',
                 borderColor: 'divider',
+                p: 0,
               }}
             >
-              <Table>
-                <tbody>
-                  {datasets.map((dataset) => (
-                    <tr key={dataset.name}>
-                      <td>
-                        <Typography level="title-sm">{dataset.name}</Typography>
-                      </td>
-                      <td>
-                        <Typography level="body-sm">
-                          {dataset.size ? formatBytes(dataset.size) : '-'}
+              {datasets.map((dataset) => (
+                <ListItem
+                  key={dataset.name}
+                  endAction={
+                    <Button
+                      size="sm"
+                      variant="outlined"
+                      onClick={() => setSaveDialogDataset(dataset.name)}
+                      startDecorator={<Save size={16} />}
+                      loading={savingDataset === dataset.name}
+                      disabled={savingDataset !== null}
+                    >
+                      Save to Registry
+                    </Button>
+                  }
+                >
+                  <ListItemButton>
+                    <ListItemContent>
+                      <Typography level="title-sm">{dataset.name}</Typography>
+                      {dataset.size && (
+                        <Typography level="body-xs">
+                          {formatBytes(dataset.size)}
                         </Typography>
-                      </td>
-                      <td>
-                        <Button
-                          size="sm"
-                          variant="outlined"
-                          onClick={() => setSaveDialogDataset(dataset.name)}
-                          startDecorator={<Save size={16} />}
-                          loading={savingDataset === dataset.name}
-                          disabled={savingDataset !== null}
-                        >
-                          Save to Registry
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
-            </Sheet>
+                      )}
+                    </ListItemContent>
+                  </ListItemButton>
+                </ListItem>
+              ))}
+            </List>
           )}
         </Box>
       )}
