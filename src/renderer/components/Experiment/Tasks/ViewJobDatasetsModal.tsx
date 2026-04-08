@@ -27,6 +27,7 @@ interface ViewJobDatasetsModalProps {
   open: boolean;
   onClose: () => void;
   jobId: number | string | null;
+  renderContentOnly?: boolean;
 }
 
 interface Dataset {
@@ -39,6 +40,7 @@ export default function ViewJobDatasetsModal({
   open,
   onClose,
   jobId,
+  renderContentOnly = false,
 }: ViewJobDatasetsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading, mutate } = useAPI('jobs', ['getJobDatasets'], {
@@ -190,6 +192,149 @@ export default function ViewJobDatasetsModal({
 
   const noDatasetsFound = !isLoading && datasets.length === 0;
 
+  const content = (
+    <>
+      {savingDataset && saveTaskJobId && (
+        <Alert color="primary" sx={{ mb: 2 }}>
+          <Stack spacing={1} sx={{ width: '100%' }}>
+            <Typography level="body-sm">
+              Publishing <strong>{savingDataset}</strong> to registry…
+            </Typography>
+            <LinearProgress />
+          </Stack>
+        </Alert>
+      )}
+
+      {saveSuccess && (
+        <Alert color="success" sx={{ mb: 2 }}>
+          {saveSuccess}
+        </Alert>
+      )}
+
+      {saveError && (
+        <Alert color="danger" sx={{ mb: 2 }}>
+          {saveError}
+        </Alert>
+      )}
+
+      {noDatasetsFound ? (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography level="body-lg" color="neutral">
+            No datasets found for this job.
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flex: 1,
+          }}
+        >
+          <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
+            This job has{' '}
+            {datasets.length || (
+              <CircularProgress
+                sx={{
+                  '--CircularProgress-size': '18px',
+                  '--CircularProgress-trackThickness': '4px',
+                  '--CircularProgress-progressThickness': '2px',
+                }}
+              />
+            )}{' '}
+            dataset(s):
+          </Typography>
+
+          {isLoading ? (
+            <Typography level="body-md">Loading datasets...</Typography>
+          ) : (
+            <Sheet
+              sx={{
+                overflow: 'auto',
+                borderRadius: 'sm',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Table stickyHeader>
+                <thead>
+                  <tr>
+                    <th style={{ width: '50px' }}>#</th>
+                    <th style={{ width: '50%' }}>Dataset Name</th>
+                    <th style={{ width: '20%' }}>Size</th>
+                    <th style={{ width: '30%' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datasets.map((dataset, index) => (
+                    <tr key={dataset.name}>
+                      <td>
+                        <Typography level="body-sm">
+                          {datasets.length - index}.
+                        </Typography>
+                      </td>
+                      <td>
+                        <Typography level="title-sm">{dataset.name}</Typography>
+                      </td>
+                      <td>
+                        <Typography level="body-sm">
+                          {dataset.size ? formatBytes(dataset.size) : '-'}
+                        </Typography>
+                      </td>
+                      <td>
+                        <Button
+                          size="sm"
+                          variant="outlined"
+                          onClick={() => setSaveDialogDataset(dataset.name)}
+                          startDecorator={<Save size={16} />}
+                          loading={savingDataset === dataset.name}
+                          disabled={savingDataset !== null}
+                        >
+                          Save to Registry
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Sheet>
+          )}
+        </Box>
+      )}
+    </>
+  );
+
+  const saveDialog = (
+    <SaveToRegistryDialog
+      open={saveDialogDataset !== null}
+      onClose={() => {
+        setSaveDialogDataset(null);
+        setAssetNameError(null);
+      }}
+      sourceName={saveDialogDataset || ''}
+      type="dataset"
+      existingNames={existingDatasetNames}
+      saving={savingDataset !== null}
+      jobId={jobId ?? undefined}
+      assetNameError={assetNameError}
+      onSave={(info) => {
+        if (saveDialogDataset) {
+          handleSaveToRegistry(saveDialogDataset, info);
+        }
+      }}
+    />
+  );
+
+  if (renderContentOnly) {
+    return (
+      <>
+        {content}
+        {saveDialog}
+      </>
+    );
+  }
+
   return (
     <>
       <Modal open={open} onClose={onClose}>
@@ -203,147 +348,17 @@ export default function ViewJobDatasetsModal({
           }}
         >
           <ModalClose />
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
+          <Typography
+            id="datasets-modal-title"
+            level="h2"
             sx={{ mb: 2, mr: 4 }}
           >
-            <Typography id="datasets-modal-title" level="h2">
-              Datasets for Job {jobId}
-            </Typography>
-          </Stack>
-
-          {savingDataset && saveTaskJobId && (
-            <Alert color="primary" sx={{ mb: 2 }}>
-              <Stack spacing={1} sx={{ width: '100%' }}>
-                <Typography level="body-sm">
-                  Publishing <strong>{savingDataset}</strong> to registry…
-                </Typography>
-                <LinearProgress />
-              </Stack>
-            </Alert>
-          )}
-
-          {saveSuccess && (
-            <Alert color="success" sx={{ mb: 2 }}>
-              {saveSuccess}
-            </Alert>
-          )}
-
-          {saveError && (
-            <Alert color="danger" sx={{ mb: 2 }}>
-              {saveError}
-            </Alert>
-          )}
-
-          {noDatasetsFound ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography level="body-lg" color="neutral">
-                No datasets found for this job.
-              </Typography>
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                flex: 1,
-              }}
-            >
-              <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
-                This job has{' '}
-                {datasets.length || (
-                  <CircularProgress
-                    sx={{
-                      '--CircularProgress-size': '18px',
-                      '--CircularProgress-trackThickness': '4px',
-                      '--CircularProgress-progressThickness': '2px',
-                    }}
-                  />
-                )}{' '}
-                dataset(s):
-              </Typography>
-
-              {isLoading ? (
-                <Typography level="body-md">Loading datasets...</Typography>
-              ) : (
-                <Sheet
-                  sx={{
-                    overflow: 'auto',
-                    borderRadius: 'sm',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Table stickyHeader>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '50px' }}>#</th>
-                        <th style={{ width: '50%' }}>Dataset Name</th>
-                        <th style={{ width: '20%' }}>Size</th>
-                        <th style={{ width: '30%' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {datasets.map((dataset, index) => (
-                        <tr key={dataset.name}>
-                          <td>
-                            <Typography level="body-sm">
-                              {datasets.length - index}.
-                            </Typography>
-                          </td>
-                          <td>
-                            <Typography level="title-sm">
-                              {dataset.name}
-                            </Typography>
-                          </td>
-                          <td>
-                            <Typography level="body-sm">
-                              {dataset.size ? formatBytes(dataset.size) : '-'}
-                            </Typography>
-                          </td>
-                          <td>
-                            <Button
-                              size="sm"
-                              variant="outlined"
-                              onClick={() => setSaveDialogDataset(dataset.name)}
-                              startDecorator={<Save size={16} />}
-                              loading={savingDataset === dataset.name}
-                              disabled={savingDataset !== null}
-                            >
-                              Save to Registry
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              )}
-            </Box>
-          )}
+            Datasets for Job {jobId}
+          </Typography>
+          {content}
         </ModalDialog>
       </Modal>
-      <SaveToRegistryDialog
-        open={saveDialogDataset !== null}
-        onClose={() => {
-          setSaveDialogDataset(null);
-          setAssetNameError(null);
-        }}
-        sourceName={saveDialogDataset || ''}
-        type="dataset"
-        existingNames={existingDatasetNames}
-        saving={savingDataset !== null}
-        jobId={jobId}
-        assetNameError={assetNameError}
-        onSave={(info) => {
-          if (saveDialogDataset) {
-            handleSaveToRegistry(saveDialogDataset, info);
-          }
-        }}
-      />
+      {saveDialog}
     </>
   );
 }

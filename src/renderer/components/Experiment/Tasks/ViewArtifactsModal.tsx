@@ -24,6 +24,7 @@ interface ViewArtifactsModalProps {
   open: boolean;
   onClose: () => void;
   jobId: number | string | null;
+  renderContentOnly?: boolean;
 }
 
 interface Artifact {
@@ -36,6 +37,7 @@ export default function ViewArtifactsModal({
   open,
   onClose,
   jobId,
+  renderContentOnly = false,
 }: ViewArtifactsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading: artifactsLoading } = useAPI(
@@ -431,6 +433,207 @@ export default function ViewArtifactsModal({
     }
   };
 
+  const content = (
+    <>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        sx={{ mb: 2 }}
+      >
+        {!noArtifacts && !artifactsLoading && (
+          <Button
+            startDecorator={!isDownloading && <Download size={16} />}
+            loading={isDownloading}
+            onClick={handleDownloadAllArtifacts}
+            variant="soft"
+            color="primary"
+            sx={{ ml: 'auto' }}
+          >
+            Download All
+          </Button>
+        )}
+      </Stack>
+
+      {noArtifacts ? (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography level="body-lg" color="neutral">
+            No artifacts found for this job.
+          </Typography>
+        </Box>
+      ) : (
+        <Box sx={{ display: 'flex', gap: 2, flex: 1, overflow: 'hidden' }}>
+          {/* Artifacts List */}
+          <Box
+            sx={{
+              flex: selectedArtifact ? '0 0 400px' : 1,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
+              This job has{' '}
+              {data?.artifacts?.length || (
+                <CircularProgress
+                  sx={{
+                    '--CircularProgress-size': '18px',
+                    '--CircularProgress-trackThickness': '4px',
+                    '--CircularProgress-progressThickness': '2px',
+                  }}
+                />
+              )}{' '}
+              artifact(s):
+            </Typography>
+
+            {artifactsLoading ? (
+              <Typography level="body-md">Loading artifacts...</Typography>
+            ) : (
+              <Sheet
+                sx={{
+                  overflow: 'auto',
+                  borderRadius: 'sm',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                }}
+              >
+                <Table stickyHeader>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '50px' }}>#</th>
+                      <th>Artifact</th>
+                      {hasDate && <th>Date</th>}
+                      {hasSize && <th style={{ width: '100px' }}>Size</th>}
+                      <th style={{ width: '120px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data?.artifacts?.map(
+                      (artifact: Artifact, index: number) => (
+                        <tr key={`artifact-${artifact.filename}`}>
+                          <td>
+                            <Typography level="body-sm">
+                              {(data?.artifacts?.length || 0) - index}.
+                            </Typography>
+                          </td>
+                          <td>
+                            <Typography level="title-sm">
+                              {artifact.filename}
+                            </Typography>
+                          </td>
+                          {hasDate && (
+                            <td>
+                              <Typography level="body-sm">
+                                {artifact.date
+                                  ? new Date(artifact.date).toLocaleString()
+                                  : '-'}
+                              </Typography>
+                            </td>
+                          )}
+                          {hasSize && (
+                            <td>
+                              <Typography level="body-sm">
+                                {artifact.size
+                                  ? formatBytes(artifact.size)
+                                  : '-'}
+                              </Typography>
+                            </td>
+                          )}
+                          <td>
+                            <Stack direction="row" spacing={0.5}>
+                              {canPreview(artifact.filename) && (
+                                <IconButton
+                                  size="sm"
+                                  variant="plain"
+                                  color="primary"
+                                  onClick={() => handleViewArtifact(artifact)}
+                                  title="View"
+                                >
+                                  <Eye size={16} />
+                                </IconButton>
+                              )}
+                              <IconButton
+                                size="sm"
+                                variant="plain"
+                                color="neutral"
+                                onClick={() => handleDownloadArtifact(artifact)}
+                                title="Download"
+                              >
+                                <Download size={16} />
+                              </IconButton>
+                            </Stack>
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </Table>
+              </Sheet>
+            )}
+          </Box>
+
+          {/* Preview Pane */}
+          {selectedArtifact && (
+            <>
+              <Divider orientation="vertical" />
+              <Box
+                sx={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden',
+                }}
+              >
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  sx={{ mb: 2 }}
+                >
+                  <Typography level="title-md">
+                    Preview: {selectedArtifact.filename}
+                  </Typography>
+                  <Stack direction="row" spacing={1}>
+                    <Button
+                      size="sm"
+                      variant="outlined"
+                      startDecorator={<Download size={16} />}
+                      onClick={() => handleDownloadArtifact(selectedArtifact)}
+                    >
+                      Download
+                    </Button>
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      onClick={closePreview}
+                    >
+                      <X size={16} />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+                <Sheet
+                  sx={{
+                    flex: 1,
+                    overflow: 'auto',
+                    borderRadius: 'sm',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  {renderPreview()}
+                </Sheet>
+              </Box>
+            </>
+          )}
+        </Box>
+      )}
+    </>
+  );
+
+  if (renderContentOnly) {
+    return content;
+  }
+
   return (
     <Modal open={open} onClose={onClose}>
       <ModalDialog
@@ -443,202 +646,10 @@ export default function ViewArtifactsModal({
         }}
       >
         <ModalClose />
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 2, mr: 4 }}
-        >
-          <Typography id="artifacts-modal-title" level="h2">
-            Artifacts for Job {jobId}
-          </Typography>
-          {!noArtifacts && !artifactsLoading && (
-            <Button
-              startDecorator={!isDownloading && <Download size={16} />}
-              loading={isDownloading}
-              onClick={handleDownloadAllArtifacts}
-              variant="soft"
-              color="primary"
-            >
-              Download All
-            </Button>
-          )}
-        </Stack>
-
-        {noArtifacts ? (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography level="body-lg" color="neutral">
-              No artifacts found for this job.
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ display: 'flex', gap: 2, flex: 1, overflow: 'hidden' }}>
-            {/* Artifacts List */}
-            <Box
-              sx={{
-                flex: selectedArtifact ? '0 0 400px' : 1,
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-              }}
-            >
-              <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
-                This job has{' '}
-                {data?.artifacts?.length || (
-                  <CircularProgress
-                    sx={{
-                      '--CircularProgress-size': '18px',
-                      '--CircularProgress-trackThickness': '4px',
-                      '--CircularProgress-progressThickness': '2px',
-                    }}
-                  />
-                )}{' '}
-                artifact(s):
-              </Typography>
-
-              {artifactsLoading ? (
-                <Typography level="body-md">Loading artifacts...</Typography>
-              ) : (
-                <Sheet
-                  sx={{
-                    overflow: 'auto',
-                    borderRadius: 'sm',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Table stickyHeader>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '50px' }}>#</th>
-                        <th>Artifact</th>
-                        {hasDate && <th>Date</th>}
-                        {hasSize && <th style={{ width: '100px' }}>Size</th>}
-                        <th style={{ width: '120px' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {data?.artifacts?.map(
-                        (artifact: Artifact, index: number) => (
-                          <tr key={`artifact-${artifact.filename}`}>
-                            <td>
-                              <Typography level="body-sm">
-                                {(data?.artifacts?.length || 0) - index}.
-                              </Typography>
-                            </td>
-                            <td>
-                              <Typography level="title-sm">
-                                {artifact.filename}
-                              </Typography>
-                            </td>
-                            {hasDate && (
-                              <td>
-                                <Typography level="body-sm">
-                                  {artifact.date
-                                    ? new Date(artifact.date).toLocaleString()
-                                    : '-'}
-                                </Typography>
-                              </td>
-                            )}
-                            {hasSize && (
-                              <td>
-                                <Typography level="body-sm">
-                                  {artifact.size
-                                    ? formatBytes(artifact.size)
-                                    : '-'}
-                                </Typography>
-                              </td>
-                            )}
-                            <td>
-                              <Stack direction="row" spacing={0.5}>
-                                {canPreview(artifact.filename) && (
-                                  <IconButton
-                                    size="sm"
-                                    variant="plain"
-                                    color="primary"
-                                    onClick={() => handleViewArtifact(artifact)}
-                                    title="View"
-                                  >
-                                    <Eye size={16} />
-                                  </IconButton>
-                                )}
-                                <IconButton
-                                  size="sm"
-                                  variant="plain"
-                                  color="neutral"
-                                  onClick={() =>
-                                    handleDownloadArtifact(artifact)
-                                  }
-                                  title="Download"
-                                >
-                                  <Download size={16} />
-                                </IconButton>
-                              </Stack>
-                            </td>
-                          </tr>
-                        ),
-                      )}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              )}
-            </Box>
-
-            {/* Preview Pane */}
-            {selectedArtifact && (
-              <>
-                <Divider orientation="vertical" />
-                <Box
-                  sx={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    alignItems="center"
-                    sx={{ mb: 2 }}
-                  >
-                    <Typography level="title-md">
-                      Preview: {selectedArtifact.filename}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                      <Button
-                        size="sm"
-                        variant="outlined"
-                        startDecorator={<Download size={16} />}
-                        onClick={() => handleDownloadArtifact(selectedArtifact)}
-                      >
-                        Download
-                      </Button>
-                      <IconButton
-                        size="sm"
-                        variant="plain"
-                        onClick={closePreview}
-                      >
-                        <X size={16} />
-                      </IconButton>
-                    </Stack>
-                  </Stack>
-                  <Sheet
-                    sx={{
-                      flex: 1,
-                      overflow: 'auto',
-                      borderRadius: 'sm',
-                      border: '1px solid',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    {renderPreview()}
-                  </Sheet>
-                </Box>
-              </>
-            )}
-          </Box>
-        )}
+        <Typography id="artifacts-modal-title" level="h2" sx={{ mb: 2, mr: 4 }}>
+          Artifacts for Job {jobId}
+        </Typography>
+        {content}
       </ModalDialog>
     </Modal>
   );

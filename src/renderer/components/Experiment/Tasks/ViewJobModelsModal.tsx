@@ -29,6 +29,7 @@ interface ViewJobModelsModalProps {
   open: boolean;
   onClose: () => void;
   jobId: number | string | null;
+  renderContentOnly?: boolean;
 }
 
 interface Model {
@@ -41,6 +42,7 @@ export default function ViewJobModelsModal({
   open,
   onClose,
   jobId,
+  renderContentOnly = false,
 }: ViewJobModelsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading, mutate } = useAPI('jobs', ['getJobModels'], {
@@ -190,6 +192,149 @@ export default function ViewJobModelsModal({
 
   const noModelsFound = !isLoading && models.length === 0;
 
+  const content = (
+    <>
+      {savingModel && saveTaskJobId && (
+        <Alert color="primary" sx={{ mb: 2 }}>
+          <Stack spacing={1} sx={{ width: '100%' }}>
+            <Typography level="body-sm">
+              Publishing <strong>{savingModel}</strong> to registry…
+            </Typography>
+            <LinearProgress />
+          </Stack>
+        </Alert>
+      )}
+
+      {saveSuccess && (
+        <Alert color="success" sx={{ mb: 2 }}>
+          {saveSuccess}
+        </Alert>
+      )}
+
+      {saveError && (
+        <Alert color="danger" sx={{ mb: 2 }}>
+          {saveError}
+        </Alert>
+      )}
+
+      {noModelsFound ? (
+        <Box sx={{ textAlign: 'center', py: 4 }}>
+          <Typography level="body-lg" color="neutral">
+            No models found for this job.
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            flex: 1,
+          }}
+        >
+          <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
+            This job has{' '}
+            {models.length || (
+              <CircularProgress
+                sx={{
+                  '--CircularProgress-size': '18px',
+                  '--CircularProgress-trackThickness': '4px',
+                  '--CircularProgress-progressThickness': '2px',
+                }}
+              />
+            )}{' '}
+            model(s):
+          </Typography>
+
+          {isLoading ? (
+            <Typography level="body-md">Loading models...</Typography>
+          ) : (
+            <Sheet
+              sx={{
+                overflow: 'auto',
+                borderRadius: 'sm',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Table stickyHeader>
+                <thead>
+                  <tr>
+                    <th style={{ width: '50px' }}>#</th>
+                    <th style={{ width: '50%' }}>Model Name</th>
+                    <th style={{ width: '20%' }}>Size</th>
+                    <th style={{ width: '30%' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {models.map((model, index) => (
+                    <tr key={model.name}>
+                      <td>
+                        <Typography level="body-sm">
+                          {models.length - index}.
+                        </Typography>
+                      </td>
+                      <td>
+                        <Typography level="title-sm">{model.name}</Typography>
+                      </td>
+                      <td>
+                        <Typography level="body-sm">
+                          {model.size ? formatBytes(model.size) : '-'}
+                        </Typography>
+                      </td>
+                      <td>
+                        <Button
+                          size="sm"
+                          variant="outlined"
+                          onClick={() => setSaveDialogModel(model.name)}
+                          startDecorator={<Save size={16} />}
+                          loading={savingModel === model.name}
+                          disabled={savingModel !== null}
+                        >
+                          Save to Registry
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            </Sheet>
+          )}
+        </Box>
+      )}
+    </>
+  );
+
+  const saveDialog = (
+    <SaveToRegistryDialog
+      open={saveDialogModel !== null}
+      onClose={() => {
+        setSaveDialogModel(null);
+        setAssetNameError(null);
+      }}
+      sourceName={saveDialogModel || ''}
+      type="model"
+      existingNames={existingModelNames}
+      saving={savingModel !== null}
+      jobId={jobId ?? undefined}
+      assetNameError={assetNameError}
+      onSave={(info) => {
+        if (saveDialogModel) {
+          handleSaveToRegistry(saveDialogModel, info);
+        }
+      }}
+    />
+  );
+
+  if (renderContentOnly) {
+    return (
+      <>
+        {content}
+        {saveDialog}
+      </>
+    );
+  }
+
   return (
     <>
       <Modal open={open} onClose={onClose}>
@@ -203,147 +348,13 @@ export default function ViewJobModelsModal({
           }}
         >
           <ModalClose />
-          <Stack
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{ mb: 2, mr: 4 }}
-          >
-            <Typography id="models-modal-title" level="h2">
-              Models for Job {jobId}
-            </Typography>
-          </Stack>
-
-          {savingModel && saveTaskJobId && (
-            <Alert color="primary" sx={{ mb: 2 }}>
-              <Stack spacing={1} sx={{ width: '100%' }}>
-                <Typography level="body-sm">
-                  Publishing <strong>{savingModel}</strong> to registry…
-                </Typography>
-                <LinearProgress />
-              </Stack>
-            </Alert>
-          )}
-
-          {saveSuccess && (
-            <Alert color="success" sx={{ mb: 2 }}>
-              {saveSuccess}
-            </Alert>
-          )}
-
-          {saveError && (
-            <Alert color="danger" sx={{ mb: 2 }}>
-              {saveError}
-            </Alert>
-          )}
-
-          {noModelsFound ? (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography level="body-lg" color="neutral">
-                No models found for this job.
-              </Typography>
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                display: 'flex',
-                flexDirection: 'column',
-                overflow: 'hidden',
-                flex: 1,
-              }}
-            >
-              <Typography level="body-md" sx={{ mt: 1, mb: 2 }}>
-                This job has{' '}
-                {models.length || (
-                  <CircularProgress
-                    sx={{
-                      '--CircularProgress-size': '18px',
-                      '--CircularProgress-trackThickness': '4px',
-                      '--CircularProgress-progressThickness': '2px',
-                    }}
-                  />
-                )}{' '}
-                model(s):
-              </Typography>
-
-              {isLoading ? (
-                <Typography level="body-md">Loading models...</Typography>
-              ) : (
-                <Sheet
-                  sx={{
-                    overflow: 'auto',
-                    borderRadius: 'sm',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <Table stickyHeader>
-                    <thead>
-                      <tr>
-                        <th style={{ width: '50px' }}>#</th>
-                        <th style={{ width: '50%' }}>Model Name</th>
-                        <th style={{ width: '20%' }}>Size</th>
-                        <th style={{ width: '30%' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {models.map((model, index) => (
-                        <tr key={model.name}>
-                          <td>
-                            <Typography level="body-sm">
-                              {models.length - index}.
-                            </Typography>
-                          </td>
-                          <td>
-                            <Typography level="title-sm">
-                              {model.name}
-                            </Typography>
-                          </td>
-                          <td>
-                            <Typography level="body-sm">
-                              {model.size ? formatBytes(model.size) : '-'}
-                            </Typography>
-                          </td>
-                          <td>
-                            <Button
-                              size="sm"
-                              variant="outlined"
-                              onClick={() => setSaveDialogModel(model.name)}
-                              startDecorator={<Save size={16} />}
-                              loading={savingModel === model.name}
-                              disabled={savingModel !== null}
-                            >
-                              Save to Registry
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </Table>
-                </Sheet>
-              )}
-            </Box>
-          )}
+          <Typography id="models-modal-title" level="h2" sx={{ mb: 2, mr: 4 }}>
+            Models for Job {jobId}
+          </Typography>
+          {content}
         </ModalDialog>
       </Modal>
-      <SaveToRegistryDialog
-        open={saveDialogModel !== null}
-        onClose={() => {
-          setSaveDialogModel(null);
-          setAssetNameError(null);
-        }}
-        sourceName={saveDialogModel || ''}
-        type="model"
-        existingNames={existingModelNames}
-        saving={savingModel !== null}
-        jobId={jobId}
-        assetNameError={assetNameError}
-        onSave={(info) => {
-          if (saveDialogModel) {
-            handleSaveToRegistry(saveDialogModel, info);
-          }
-        }}
-      />
+      {saveDialog}
     </>
   );
 }

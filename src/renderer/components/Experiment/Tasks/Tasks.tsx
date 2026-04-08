@@ -36,6 +36,7 @@ import PreviewDatasetModal from '../../Data/PreviewDatasetModal';
 import ViewSweepResultsModal from './ViewSweepResultsModal';
 import ViewJobDatasetsModal from './ViewJobDatasetsModal';
 import ViewJobModelsModal from './ViewJobModelsModal';
+import ViewJobArtifactsTabbedModal from './ViewJobArtifactsTabbedModal';
 import FileBrowserModal from './FileBrowserModal';
 import SafeJSONParse from '../../Shared/SafeJSONParse';
 import NewTaskModal2 from './NewTaskModal/NewTaskModal2';
@@ -85,6 +86,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     string | null
   >(null);
   const [viewJobModelsFromJob, setViewJobModelsFromJob] = useState<
+    string | null
+  >(null);
+  const [viewAllArtifactsFromJob, setViewAllArtifactsFromJob] = useState<
     string | null
   >(null);
   const [previewDatasetModal, setPreviewDatasetModal] = useState<{
@@ -1392,6 +1396,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewCheckpoints={(jobId) =>
             setViewCheckpointsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
           }
+          onViewAllArtifacts={(jobId) =>
+            setViewAllArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
+          }
           onViewArtifacts={(jobId) =>
             setViewArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
           }
@@ -1477,6 +1484,11 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           />
         );
       })()}
+      <ViewJobArtifactsTabbedModal
+        open={viewAllArtifactsFromJob !== null}
+        onClose={() => setViewAllArtifactsFromJob(null)}
+        jobId={viewAllArtifactsFromJob}
+      />
       <ViewArtifactsModal
         open={viewArtifactsFromJob !== null}
         onClose={() => setViewArtifactsFromJob(null)}
