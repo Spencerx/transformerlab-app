@@ -650,35 +650,6 @@ async def get_tunnel_info_for_job(
     }
 
 
-# Templates
-
-
-# @router.get("/template/{template_id}")
-# async def get_train_template(template_id: str):
-#     return await get_training_template(template_id)
-
-
-# @router.put("/template/update")
-# async def update_training_template(
-#     template_id: str,
-#     name: str,
-#     description: str,
-#     type: str,
-#     config: Annotated[str, Body(embed=True)],
-# ):
-#     try:
-#         configObject = json.loads(config)
-#         datasets = configObject["dataset_name"]
-#         job_service.update_training_template(template_id, name, description, type, datasets, config)
-#     except JSONDecodeError as e:
-#         print(f"JSON decode error: {e}")
-#         return {"status": "error", "message": "An error occurred while processing the request."}
-#     except Exception as e:
-#         print(f"Unexpected error: {e}")
-#         return {"status": "error", "message": "An internal error has occurred."}
-#     return {"status": "success"}
-
-
 @router.get("/{job_id}/stream_output")
 async def stream_job_output(job_id: str, experimentId: str, sweeps: bool = False):
     """
