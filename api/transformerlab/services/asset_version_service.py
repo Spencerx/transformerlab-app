@@ -256,13 +256,21 @@ async def create_version(
 
 
 async def list_groups(asset_type: str) -> list[dict]:
-    """List all groups for a given asset type with summary info."""
+    """List all groups for a given asset type with summary info.
+
+    Groups with invalid UUIDs or corrupt data are silently skipped so that
+    one bad directory does not prevent the entire listing from loading.
+    """
     _validate_asset_type(asset_type)
 
     groups: list[dict] = []
     for gid in await _list_group_ids(asset_type):
-        index = await _read_index(asset_type, gid)
-        versions = await _read_versions(asset_type, gid)
+        try:
+            index = await _read_index(asset_type, gid)
+            versions = await _read_versions(asset_type, gid)
+        except Exception:
+            # Skip groups with invalid UUIDs or unreadable data
+            continue
         tags = [v["tag"] for v in versions if v.get("tag")]
 
         groups.append(
@@ -547,7 +555,10 @@ async def get_groups_for_asset(asset_type: str, asset_id: str) -> list[dict]:
 
     results: list[dict] = []
     for gid in await _list_group_ids(asset_type):
-        versions = await _read_versions(asset_type, gid)
+        try:
+            versions = await _read_versions(asset_type, gid)
+        except Exception:
+            continue
         for v in versions:
             if v.get("asset_id") == asset_id:
                 results.append(_version_to_dict(v, asset_type, gid))
@@ -565,7 +576,10 @@ async def get_all_asset_group_map(asset_type: str) -> dict[str, list[dict]]:
 
     mapping: dict[str, list[dict]] = {}
     for gid in await _list_group_ids(asset_type):
-        versions = await _read_versions(asset_type, gid)
+        try:
+            versions = await _read_versions(asset_type, gid)
+        except Exception:
+            continue
         for v in versions:
             d = _version_to_dict(v, asset_type, gid)
             mapping.setdefault(d["asset_id"], []).append(d)
