@@ -252,13 +252,8 @@ export default function ViewJobModelsModal({
             >
               <Table>
                 <tbody>
-                  {models.map((model, index) => (
+                  {models.map((model) => (
                     <tr key={model.name}>
-                      <td>
-                        <Typography level="body-sm">
-                          {models.length - index}.
-                        </Typography>
-                      </td>
                       <td>
                         <Typography level="title-sm">{model.name}</Typography>
                       </td>

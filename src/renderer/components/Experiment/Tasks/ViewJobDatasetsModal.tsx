@@ -252,13 +252,8 @@ export default function ViewJobDatasetsModal({
             >
               <Table>
                 <tbody>
-                  {datasets.map((dataset, index) => (
+                  {datasets.map((dataset) => (
                     <tr key={dataset.name}>
-                      <td>
-                        <Typography level="body-sm">
-                          {datasets.length - index}.
-                        </Typography>
-                      </td>
                       <td>
                         <Typography level="title-sm">{dataset.name}</Typography>
                       </td>

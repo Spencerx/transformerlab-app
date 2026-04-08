@@ -495,71 +495,62 @@ export default function ViewArtifactsModal({
               >
                 <Table>
                   <tbody>
-                    {data?.artifacts?.map(
-                      (artifact: Artifact, index: number) => (
-                        <tr key={`artifact-${artifact.filename}`}>
+                    {data?.artifacts?.map((artifact: Artifact) => (
+                      <tr key={`artifact-${artifact.filename}`}>
+                        <td>
+                          <Typography level="title-sm">
+                            {artifact.filename}
+                          </Typography>
+                        </td>
+                        {hasDate && (
                           <td>
                             <Typography level="body-sm">
-                              {(data?.artifacts?.length || 0) - index}.
+                              {artifact.date
+                                ? new Date(artifact.date).toLocaleString()
+                                : '-'}
                             </Typography>
                           </td>
+                        )}
+                        {hasSize && (
                           <td>
-                            <Typography level="title-sm">
-                              {artifact.filename}
+                            <Typography level="body-sm">
+                              {artifact.size ? formatBytes(artifact.size) : '-'}
                             </Typography>
                           </td>
-                          {hasDate && (
-                            <td>
-                              <Typography level="body-sm">
-                                {artifact.date
-                                  ? new Date(artifact.date).toLocaleString()
-                                  : '-'}
-                              </Typography>
-                            </td>
-                          )}
-                          {hasSize && (
-                            <td>
-                              <Typography level="body-sm">
-                                {artifact.size
-                                  ? formatBytes(artifact.size)
-                                  : '-'}
-                              </Typography>
-                            </td>
-                          )}
-                          <td>
-                            <Stack direction="row" spacing={0.5}>
-                              {canPreview(artifact.filename) && (
-                                <IconButton
-                                  size="sm"
-                                  variant="plain"
-                                  color="primary"
-                                  onClick={() =>
-                                    onPreviewItem
-                                      ? onPreviewItem({
-                                          filename: artifact.filename,
-                                          jobId: String(jobId),
-                                        })
-                                      : handleViewArtifact(artifact)
-                                  }
-                                  title="View"
-                                >
-                                  <Eye size={16} />
-                                </IconButton>
-                              )}
+                        )}
+                        <td>
+                          <Stack direction="row" spacing={0.5}>
+                            {canPreview(artifact.filename) && (
                               <IconButton
                                 size="sm"
                                 variant="plain"
-                                color="neutral"
-                                onClick={() => handleDownloadArtifact(artifact)}
-                                title="Download"
+                                color="primary"
+                                onClick={() =>
+                                  onPreviewItem
+                                    ? onPreviewItem({
+                                        filename: artifact.filename,
+                                        jobId: String(jobId),
+                                      })
+                                    : handleViewArtifact(artifact)
+                                }
+                                title="View"
                               >
-                                <Download size={16} />
+                                <Eye size={16} />
                               </IconButton>
-                            </Stack>
-                          </td>
-                        </tr>
-                      ),
-                    )}
+                            )}
+                            <IconButton
+                              size="sm"
+                              variant="plain"
+                              color="neutral"
+                              onClick={() => handleDownloadArtifact(artifact)}
+                              title="Download"
+                            >
+                              <Download size={16} />
+                            </IconButton>
+                          </Stack>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </Table>
               </Sheet>
