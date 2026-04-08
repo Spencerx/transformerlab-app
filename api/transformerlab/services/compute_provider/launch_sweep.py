@@ -177,6 +177,9 @@ async def launch_sweep_jobs(
                 if env_vars and team_secrets:
                     env_vars = replace_secrets_in_dict(env_vars, team_secrets)
 
+                # Explicitly pass storage provider to launched jobs so runtime
+                # behavior does not depend on inherited parent env.
+                env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
                 env_vars["_TFL_JOB_ID"] = str(child_job_id)
                 env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
                 env_vars["_TFL_USER_ID"] = user_id
@@ -199,7 +202,7 @@ async def launch_sweep_jobs(
 
                 tfl_storage_uri = None
                 if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI") and team_id:
-                    tfl_storage_uri = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", str(team_id))
+                    tfl_storage_uri = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", str(team_id), "workspace")
                 else:
                     try:
                         storage_root = await storage.root_uri()
