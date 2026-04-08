@@ -97,13 +97,13 @@ def process_env_parameters_to_env_vars(config: dict) -> dict:
     return config
 
 
-@router.get("/list", summary="Returns all the tasks")
+@router.get("/list", summary="Returns all tasks for the given experiment")
 @cached(
-    key="tasks:list",
+    key="tasks:list:{experimentId}",
     ttl="300s",
-    tags=["tasks", "tasks:list"],
+    tags=["tasks", "tasks:list:{experimentId}"],
 )
-async def task_get_all():
+async def task_get_all(experimentId: str):
     tasks = await task_service.task_get_all()
     return tasks
 
