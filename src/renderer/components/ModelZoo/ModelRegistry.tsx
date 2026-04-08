@@ -41,7 +41,6 @@ import {
 } from '@mui/joy';
 import {
   BriefcaseIcon,
-  CheckCircle2Icon,
   ChevronDownIcon,
   PackageIcon,
   PencilIcon,
@@ -51,12 +50,14 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react';
-import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
-import { fetchWithAuth } from 'renderer/lib/authContext';
-import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
+import {
+  useSWRWithAuth as useSWR,
+  fetchWithAuth,
+} from 'renderer/lib/authContext';
 import * as chatAPI from '../../lib/transformerlab-api-sdk';
 import { fetcher } from '../../lib/transformerlab-api-sdk';
 import { licenseTypes, modelTypes } from '../../lib/utils';
+import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 
 dayjs.extend(relativeTime);
 
@@ -163,23 +164,17 @@ function VersionRow({
   assetType,
   groupId,
   updatingVersion,
-  selectingVersion,
-  isCurrentFoundation,
   onSetTag,
   onClearTag,
   onDelete,
-  onSelect,
 }: {
   v: VersionEntry;
   assetType: string;
   groupId: string;
   updatingVersion: string | null;
-  selectingVersion: string | null;
-  isCurrentFoundation: boolean;
   onSetTag: (versionLabel: string, tag: string) => void;
   onClearTag: (versionLabel: string) => void;
   onDelete: (versionLabel: string) => void;
-  onSelect: (version: VersionEntry) => void;
 }) {
   return (
     <tr key={v.id}>
@@ -299,19 +294,12 @@ function GroupVersionsTable({
   groupId,
   assetType,
   mutateGroups,
-  experimentInfo,
-  experimentInfoMutate,
-  currentFoundation,
 }: {
   groupId: string;
   assetType: string;
   mutateGroups: () => void;
-  experimentInfo: any;
-  experimentInfoMutate: () => void;
-  currentFoundation: string;
 }) {
   const [updatingVersion, setUpdatingVersion] = useState<string | null>(null);
-  const [selectingVersion, setSelectingVersion] = useState<string | null>(null);
 
   const {
     data: versions,
@@ -393,87 +381,6 @@ function GroupVersionsTable({
     }
   };
 
-  /**
-   * Select a version's underlying model as the experiment foundation.
-   */
-  const handleSelectVersion = async (v: VersionEntry) => {
-    if (!experimentInfo?.id) return;
-
-    setSelectingVersion(v.version_label);
-    try {
-      const detailResp = await fetchWithAuth(
-        chatAPI.Endpoints.Models.ModelDetailsFromFilesystem(v.asset_id),
-      );
-      const modelDetails = detailResp.ok ? await detailResp.json() : {};
-
-      const architecture = modelDetails?.architecture || '';
-      const modelFilename = modelDetails?.model_filename || '';
-
-      let foundationFilename = '';
-
-      const localListResp = await fetchWithAuth(
-        chatAPI.Endpoints.Models.LocalList(),
-      );
-      const localModels = localListResp.ok ? await localListResp.json() : [];
-      const localModel = Array.isArray(localModels)
-        ? localModels.find((m: any) => m.model_id === v.asset_id)
-        : null;
-
-      if (localModel?.stored_in_filesystem) {
-        foundationFilename = localModel.local_path || '';
-      } else if (modelFilename) {
-        foundationFilename = modelFilename;
-      }
-
-      const additionalConfigs: Record<string, string> = {};
-      if (architecture) {
-        try {
-          const enginesResp = await fetchWithAuth(
-            chatAPI.Endpoints.Experiment.ListScriptsOfType(
-              experimentInfo.id,
-              'loader',
-              `model_architectures:${architecture}`,
-            ),
-          );
-          if (enginesResp.ok) {
-            const engines = await enginesResp.json();
-            if (engines && engines.length > 0) {
-              const engine = engines[0];
-              additionalConfigs.inferenceParams = JSON.stringify({
-                inferenceEngine: engine.uniqueId,
-                inferenceEngineFriendlyName: engine.name || '',
-              });
-            }
-          }
-        } catch {
-          // Silently ignore — user can set engine manually
-        }
-      }
-
-      await fetchWithAuth(
-        chatAPI.Endpoints.Experiment.UpdateConfigs(experimentInfo.id),
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            foundation: v.asset_id,
-            foundation_model_architecture: architecture,
-            foundation_filename: foundationFilename,
-            adaptor: '',
-            generationParams:
-              '{"temperature": 0.7,"maxTokens": 1024, "topP": 1.0, "frequencyPenalty": 0.0}',
-            ...additionalConfigs,
-          }),
-        },
-      );
-      experimentInfoMutate();
-    } catch (err) {
-      console.error('Failed to select model from registry:', err);
-    } finally {
-      setSelectingVersion(null);
-    }
-  };
-
   const versionList: VersionEntry[] = Array.isArray(versions) ? versions : [];
 
   if (isLoading) {
@@ -519,12 +426,9 @@ function GroupVersionsTable({
             assetType={assetType}
             groupId={groupId}
             updatingVersion={updatingVersion}
-            selectingVersion={selectingVersion}
-            isCurrentFoundation={currentFoundation === v.asset_id}
             onSetTag={handleSetTag}
             onClearTag={handleClearTag}
             onDelete={handleDeleteVersion}
-            onSelect={handleSelectVersion}
           />
         ))}
       </tbody>
@@ -867,9 +771,6 @@ export default function ModelRegistry() {
                         groupId={group.group_id}
                         assetType="model"
                         mutateGroups={mutateGroups}
-                        experimentInfo={experimentInfo}
-                        experimentInfoMutate={experimentInfoMutate}
-                        currentFoundation={currentFoundation}
                       />
                     )}
                   </AccordionDetails>

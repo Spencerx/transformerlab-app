@@ -30,7 +30,6 @@ import * as chatAPI from '../../lib/transformerlab-api-sdk';
 
 import { filterByFilters, licenseTypes, modelTypes } from '../../lib/utils';
 import TinyMLXLogo from '../Shared/TinyMLXLogo';
-import SelectButton from '../Experiment/SelectButton';
 import { fetchWithAuth } from 'renderer/lib/authContext';
 import VersionGroupChip from '../Shared/VersionGroupChip';
 import AssetVersionsDrawer from '../Shared/AssetVersionsDrawer';
