@@ -198,8 +198,8 @@ class DstackProvider(ComputeProvider):
             except Exception as exc:
                 errors.append(exc)
                 if method == "POST":
-                    message = str(exc)
-                    if "status 404" not in message and "status 405" not in message:
+                    # if "status 404" not in message and "status 405" not in message:
+                    if exc.response.status_code not in [404, 405]:
                         raise
         raise RuntimeError(f"Unable to list dstack runs after {len(attempts)} attempts. Last error: {errors[-1]}")
 
