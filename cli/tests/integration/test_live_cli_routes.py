@@ -129,7 +129,9 @@ def test_cli_route_contract_live_server() -> None:
         info_response = client.get(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers)
         _assert_status_in(info_response, {200}, "GET /compute_provider/providers/{id}")
 
-        provider_check_response = client.get(f"{BASE_URL}/compute_provider/providers/{provider_id}/check", headers=headers)
+        provider_check_response = client.get(
+            f"{BASE_URL}/compute_provider/providers/{provider_id}/check", headers=headers
+        )
         _assert_status_in(
             provider_check_response,
             {200, 400, 404, 422},
@@ -173,7 +175,9 @@ def test_cli_route_contract_live_server() -> None:
         )
         _assert_status_in(validate_response, {200, 400, 422}, "POST /experiment/{id}/task/validate")
 
-        task_get_response = client.get(f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/get", headers=headers)
+        task_get_response = client.get(
+            f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/get", headers=headers
+        )
         _assert_status_in(task_get_response, {404}, "GET /experiment/{id}/task/{task_id}/get")
 
         task_delete_response = client.get(
@@ -198,7 +202,9 @@ def test_cli_route_contract_live_server() -> None:
                 "is_interactive": False,
             },
         )
-        _assert_status_in(task_gallery_import_response, {200, 400, 404, 422}, "POST /experiment/{id}/task/gallery/import")
+        _assert_status_in(
+            task_gallery_import_response, {200, 400, 404, 422}, "POST /experiment/{id}/task/gallery/import"
+        )
 
         # CLI launch uses this endpoint; a minimal payload may fail validation but should not 500.
         launch_response = client.post(
@@ -212,7 +218,9 @@ def test_cli_route_contract_live_server() -> None:
         jobs_list_response = client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/list?type=REMOTE", headers=headers)
         _assert_status_in(jobs_list_response, {200}, "GET /experiment/{id}/jobs/list")
 
-        stop_job_response = client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stop", headers=headers)
+        stop_job_response = client.get(
+            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stop", headers=headers
+        )
         _assert_status_in(stop_job_response, {404}, "GET /experiment/{id}/jobs/{job_id}/stop")
 
         provider_logs_response = client.get(
