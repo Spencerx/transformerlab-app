@@ -163,17 +163,6 @@ def make_seatbelt_preexec(
 
 _BWRAP_BIN: Optional[str] = None
 _BWRAP_AVAILABLE: Optional[bool] = None
-_LINUX_BASE_RO_PATHS: tuple[str, ...] = (
-    "/usr",
-    "/bin",
-    "/sbin",
-    "/lib",
-    "/lib64",
-    "/etc",
-    "/run",
-    "/var",
-    "/opt",
-)
 
 
 def _find_bwrap() -> bool:
