@@ -230,12 +230,16 @@ def test_cli_compute_provider_routes_live_server(live_context: dict[str, str], p
             "GET /compute_provider/providers/{id}/check",
         )
         _assert_status_in(
-            client.patch(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": True}),
+            client.patch(
+                f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": True}
+            ),
             {200},
             "PATCH /compute_provider/providers/{id} disable",
         )
         _assert_status_in(
-            client.patch(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": False}),
+            client.patch(
+                f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": False}
+            ),
             {200},
             "PATCH /compute_provider/providers/{id} enable",
         )
@@ -253,7 +257,9 @@ def test_cli_task_routes_live_server(live_context: dict[str, str]) -> None:
 
     with httpx.Client(timeout=30.0) as client:
         _assert_status_in(
-            client.get(f"{BASE_URL}/experiment/{experiment_id}/task/list_by_type_in_experiment?type=REMOTE", headers=headers),
+            client.get(
+                f"{BASE_URL}/experiment/{experiment_id}/task/list_by_type_in_experiment?type=REMOTE", headers=headers
+            ),
             {200},
             "GET /experiment/{id}/task/list_by_type_in_experiment",
         )
