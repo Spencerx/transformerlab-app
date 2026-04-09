@@ -213,13 +213,19 @@ async def task_list_files(task_id: str) -> TaskFilesResponse:
             task_dir = storage.join(workspace_dir, "task", str(task_id))
             if await storage.exists(task_dir):
                 entries = await storage.ls(task_dir)
+                # Build a set of basenames already in local_files for dedup.
+                existing_basenames = {os.path.basename(f.split(" -> ")[-1].strip()) for f in local_files}
                 for entry in entries:
-                    # storage.ls returns full paths; strip the task_dir prefix
-                    name = entry.replace(task_dir, "").lstrip("/").lstrip("\\")
-                    if name == "index.json":
+                    # storage.ls returns full paths; compute relative path safely
+                    try:
+                        name = os.path.relpath(entry, task_dir)
+                    except ValueError:
+                        continue  # entry is not under task_dir; skip it
+                    if not name or name == "." or name == "index.json":
                         continue
-                    if name and name not in local_files:
+                    if name not in existing_basenames:
                         local_files.append(name)
+                        existing_basenames.add(name)
     except Exception as e:  # pragma: no cover - defensive logging
         print(f"Error listing local files for task {task_id} from task dir: {e}")
 
