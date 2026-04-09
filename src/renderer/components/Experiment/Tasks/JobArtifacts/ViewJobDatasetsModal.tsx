@@ -252,24 +252,15 @@ export default function ViewJobDatasetsModal({
               }}
             >
               {datasets.map((dataset) => (
-                <ListItem
-                  key={dataset.name}
-                  sx={{ overflow: 'hidden' }}
-                  endAction={
-                    <Button
-                      size="sm"
-                      variant="outlined"
-                      onClick={() => setSaveDialogDataset(dataset.name)}
-                      startDecorator={<Save size={16} />}
-                      loading={savingDataset === dataset.name}
-                      disabled={savingDataset !== null}
-                    >
-                      Save to Registry
-                    </Button>
-                  }
-                >
-                  <ListItemButton sx={{ minWidth: 0, overflow: 'hidden' }}>
-                    <ListItemContent sx={{ minWidth: 0 }}>
+                <ListItem key={dataset.name}>
+                  <ListItemButton
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <ListItemContent sx={{ flex: 1, minWidth: 0 }}>
                       <Typography level="title-sm" noWrap>
                         {dataset.name}
                       </Typography>
@@ -279,6 +270,20 @@ export default function ViewJobDatasetsModal({
                         </Typography>
                       )}
                     </ListItemContent>
+                    <Button
+                      size="sm"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSaveDialogDataset(dataset.name);
+                      }}
+                      startDecorator={<Save size={16} />}
+                      loading={savingDataset === dataset.name}
+                      disabled={savingDataset !== null}
+                      sx={{ flexShrink: 0 }}
+                    >
+                      Save to Registry
+                    </Button>
                   </ListItemButton>
                 </ListItem>
               ))}

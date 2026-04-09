@@ -497,23 +497,8 @@ export default function ViewArtifactsModal({
                 }}
               >
                 {data?.artifacts?.map((artifact: Artifact) => (
-                  <ListItem
-                    key={`artifact-${artifact.filename}`}
-                    sx={{ overflow: 'hidden' }}
-                    endAction={
-                      <IconButton
-                        size="sm"
-                        variant="plain"
-                        color="neutral"
-                        onClick={() => handleDownloadArtifact(artifact)}
-                        title="Download"
-                      >
-                        <Download size={16} />
-                      </IconButton>
-                    }
-                  >
+                  <ListItem key={`artifact-${artifact.filename}`}>
                     <ListItemButton
-                      sx={{ minWidth: 0, overflow: 'hidden' }}
                       selected={
                         selectedFilename
                           ? selectedFilename === artifact.filename
@@ -529,8 +514,13 @@ export default function ViewArtifactsModal({
                             : handleViewArtifact(artifact)
                           : undefined
                       }
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                      }}
                     >
-                      <ListItemContent sx={{ minWidth: 0 }}>
+                      <ListItemContent sx={{ flex: 1, minWidth: 0 }}>
                         <Typography level="title-sm" noWrap>
                           {artifact.filename}
                         </Typography>
@@ -547,6 +537,19 @@ export default function ViewArtifactsModal({
                           )}
                         </Stack>
                       </ListItemContent>
+                      <IconButton
+                        size="sm"
+                        variant="plain"
+                        color="neutral"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadArtifact(artifact);
+                        }}
+                        title="Download"
+                        sx={{ flexShrink: 0 }}
+                      >
+                        <Download size={16} />
+                      </IconButton>
                     </ListItemButton>
                   </ListItem>
                 ))}

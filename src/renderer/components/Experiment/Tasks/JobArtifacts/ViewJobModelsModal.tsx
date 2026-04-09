@@ -249,24 +249,15 @@ export default function ViewJobModelsModal({
               }}
             >
               {models.map((model) => (
-                <ListItem
-                  key={model.name}
-                  sx={{ overflow: 'hidden' }}
-                  endAction={
-                    <Button
-                      size="sm"
-                      variant="outlined"
-                      onClick={() => setSaveDialogModel(model.name)}
-                      startDecorator={<Save size={16} />}
-                      loading={savingModel === model.name}
-                      disabled={savingModel !== null}
-                    >
-                      Save to Registry
-                    </Button>
-                  }
-                >
-                  <ListItemButton sx={{ minWidth: 0, overflow: 'hidden' }}>
-                    <ListItemContent sx={{ minWidth: 0 }}>
+                <ListItem key={model.name}>
+                  <ListItemButton
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <ListItemContent sx={{ flex: 1, minWidth: 0 }}>
                       <Typography level="title-sm" noWrap>
                         {model.name}
                       </Typography>
@@ -276,6 +267,20 @@ export default function ViewJobModelsModal({
                         </Typography>
                       )}
                     </ListItemContent>
+                    <Button
+                      size="sm"
+                      variant="outlined"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSaveDialogModel(model.name);
+                      }}
+                      startDecorator={<Save size={16} />}
+                      loading={savingModel === model.name}
+                      disabled={savingModel !== null}
+                      sx={{ flexShrink: 0 }}
+                    >
+                      Save to Registry
+                    </Button>
                   </ListItemButton>
                 </ListItem>
               ))}
