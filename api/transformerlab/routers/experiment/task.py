@@ -216,6 +216,8 @@ async def task_list_files(task_id: str) -> TaskFilesResponse:
                 for entry in entries:
                     # storage.ls returns full paths; strip the task_dir prefix
                     name = entry.replace(task_dir, "").lstrip("/").lstrip("\\")
+                    if name == "index.json":
+                        continue
                     if name and name not in local_files:
                         local_files.append(name)
     except Exception as e:  # pragma: no cover - defensive logging
