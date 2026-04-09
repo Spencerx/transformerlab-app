@@ -87,7 +87,7 @@ export default function ViewJobArtifactsTabbedModal({
         </Typography>
         <Box sx={{ display: 'flex', flex: 1, gap: 2, overflow: 'hidden' }}>
           {/* Left: scrollable sections */}
-          <Box sx={{ flex: 1, overflow: 'auto' }}>
+          <Box sx={{ flex: 1, overflow: 'auto', minWidth: 0 }}>
             <Stack spacing={3}>
               <section>
                 <Stack
