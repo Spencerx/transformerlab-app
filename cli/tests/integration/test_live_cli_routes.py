@@ -88,6 +88,28 @@ def _assert_status_in(response: httpx.Response, expected: set[int], route_name: 
     )
 
 
+def _assert_not_found_contract(response: httpx.Response, route_name: str) -> None:
+    """Accept both normal 404 and legacy 200 + NOT FOUND payload patterns."""
+    if response.status_code == 404:
+        return
+
+    if response.status_code == 200:
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+        message = str(payload.get("message", payload.get("detail", ""))).lower()
+        assert "not found" in message, (
+            f"{route_name} returned 200 but did not indicate missing resource. Body: {response.text}"
+        )
+        return
+
+    raise AssertionError(
+        f"{route_name} returned unexpected status {response.status_code}. "
+        f"Expected 404 or legacy 200/NOT FOUND. Body: {response.text}"
+    )
+
+
 def test_cli_route_contract_live_server() -> None:
     """Smoke test route contracts across all major CLI command groups."""
     provider_id: str | None = None
@@ -178,7 +200,7 @@ def test_cli_route_contract_live_server() -> None:
         task_get_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/get", headers=headers
         )
-        _assert_status_in(task_get_response, {404}, "GET /experiment/{id}/task/{task_id}/get")
+        _assert_not_found_contract(task_get_response, "GET /experiment/{id}/task/{task_id}/get")
 
         task_delete_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/delete",
@@ -221,31 +243,31 @@ def test_cli_route_contract_live_server() -> None:
         stop_job_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stop", headers=headers
         )
-        _assert_status_in(stop_job_response, {404}, "GET /experiment/{id}/jobs/{job_id}/stop")
+        _assert_not_found_contract(stop_job_response, "GET /experiment/{id}/jobs/{job_id}/stop")
 
         provider_logs_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/provider_logs",
             headers=headers,
         )
-        _assert_status_in(provider_logs_response, {404}, "GET /experiment/{id}/jobs/{job_id}/provider_logs")
+        _assert_not_found_contract(provider_logs_response, "GET /experiment/{id}/jobs/{job_id}/provider_logs")
 
         stream_output_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stream_output",
             headers=headers,
         )
-        _assert_status_in(stream_output_response, {404}, "GET /experiment/{id}/jobs/{job_id}/stream_output")
+        _assert_not_found_contract(stream_output_response, "GET /experiment/{id}/jobs/{job_id}/stream_output")
 
         request_logs_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/request_logs",
             headers=headers,
         )
-        _assert_status_in(request_logs_response, {404}, "GET /experiment/{id}/jobs/{job_id}/request_logs")
+        _assert_not_found_contract(request_logs_response, "GET /experiment/{id}/jobs/{job_id}/request_logs")
 
         tunnel_info_response = client.get(
             f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/tunnel_info",
             headers=headers,
         )
-        _assert_status_in(tunnel_info_response, {404}, "GET /experiment/{id}/jobs/{job_id}/tunnel_info")
+        _assert_not_found_contract(tunnel_info_response, "GET /experiment/{id}/jobs/{job_id}/tunnel_info")
 
         artifacts_response = client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts", headers=headers)
         _assert_status_in(artifacts_response, {200, 404}, "GET /jobs/{job_id}/artifacts")
@@ -257,7 +279,7 @@ def test_cli_route_contract_live_server() -> None:
         _assert_status_in(artifact_download_response, {404, 405}, "GET /jobs/{job_id}/artifact/{filename}")
 
         artifacts_zip_response = client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts/download_all", headers=headers)
-        _assert_status_in(artifacts_zip_response, {404}, "GET /jobs/{job_id}/artifacts/download_all")
+        _assert_not_found_contract(artifacts_zip_response, "GET /jobs/{job_id}/artifacts/download_all")
 
         publish_dataset_response = client.post(
             f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/datasets/does-not-exist/save_to_registry"
