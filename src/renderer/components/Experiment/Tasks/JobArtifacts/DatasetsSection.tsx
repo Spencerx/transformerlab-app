@@ -58,7 +58,6 @@ export default function DatasetsSection({
     null,
   );
   const [saveTaskJobId, setSaveTaskJobId] = useState<string | null>(null);
-  const [assetNameError, setAssetNameError] = useState<string | null>(null);
 
   // Fetch existing datasets in the registry for "Add to existing" option
   const { data: registryDatasets } = useSWR(
@@ -123,7 +122,6 @@ export default function DatasetsSection({
     setSavingDataset(datasetName);
     setSaveError(null);
     setSaveSuccess(null);
-    setAssetNameError(null);
 
     try {
       const url = getAPIFullPath('jobs', ['saveDatasetToRegistry'], {
@@ -131,17 +129,12 @@ export default function DatasetsSection({
         jobId: jobId.toString(),
         datasetName,
         targetName: info.groupId || info.groupName,
-        assetName: info.assetName,
         mode: info.mode,
         tag: info.tag,
-        versionLabel: info.versionLabel,
         description: info.description,
-        groupName: info.groupName,
       });
 
-      const response = await fetchWithAuth(url, {
-        method: 'POST',
-      });
+      const response = await fetchWithAuth(url, { method: 'POST' });
 
       if (!response.ok) {
         let errorMessage = 'Failed to save dataset to registry';
@@ -149,14 +142,7 @@ export default function DatasetsSection({
           const errorData = await response.json();
           errorMessage = errorData.detail || errorMessage;
         } catch (e) {
-          // If response is not JSON, use status text
           errorMessage = `${response.status}: ${response.statusText}`;
-        }
-        // If it's a 409 conflict (name already exists), show inline on the asset name field
-        if (response.status === 409) {
-          setAssetNameError(errorMessage);
-          setSavingDataset(null);
-          return;
         }
         throw new Error(errorMessage);
       }
@@ -292,14 +278,12 @@ export default function DatasetsSection({
       open={saveDialogDataset !== null}
       onClose={() => {
         setSaveDialogDataset(null);
-        setAssetNameError(null);
       }}
       sourceName={saveDialogDataset || ''}
       type="dataset"
       existingNames={existingDatasetNames}
       saving={savingDataset !== null}
       jobId={jobId ?? undefined}
-      assetNameError={assetNameError}
       onSave={(info) => {
         if (saveDialogDataset) {
           handleSaveToRegistry(saveDialogDataset, info);

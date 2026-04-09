@@ -42,14 +42,10 @@ export interface SaveVersionInfo {
   groupName: string;
   /** The UUID group_id when adding to an existing group */
   groupId?: string;
-  /** Unique name for the asset in the registry folder */
-  assetName: string;
   /** 'new' = create a new group, 'existing' = add version to existing group */
   mode: 'new' | 'existing';
   /** Tag to assign to the new version */
   tag: string;
-  /** User-defined version label (e.g. 'v1', 'march-run') */
-  versionLabel: string;
   /** Human-readable description for the version */
   description: string;
 }
@@ -69,8 +65,6 @@ interface SaveToRegistryDialogProps {
   onSave: (info: SaveVersionInfo) => void;
   /** Job ID that produced this asset (optional, for display) */
   jobId?: string | number;
-  /** External error message to display on the asset name field (e.g. name already exists) */
-  assetNameError?: string | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -97,15 +91,11 @@ export default function SaveToRegistryDialog({
   saving,
   onSave,
   jobId,
-  assetNameError: externalAssetNameError,
 }: SaveToRegistryDialogProps) {
   const [mode, setMode] = useState<'new' | 'existing'>('new');
   const [newName, setNewName] = useState(sourceName);
-  const [assetName, setAssetName] = useState(sourceName);
-  const [assetNameError, setAssetNameError] = useState<string | null>(null);
   const [existingTarget, setExistingTarget] = useState<string | null>(null);
   const [tag, setTag] = useState<string>('latest');
-  const [versionLabel, setVersionLabel] = useState('v1');
   const [description, setDescription] = useState('');
 
   // Fetch existing groups from asset_versions API
@@ -121,70 +111,33 @@ export default function SaveToRegistryDialog({
     mode === 'existing' && existingTarget
       ? groups.find((g) => g.group_id === existingTarget)
       : null;
-  const latestVersionLabel = selectedGroup?.latest_version_label ?? null;
-
-  const getNextVersionLabel = (latestLabel: string | null): string => {
-    if (!latestLabel) {
-      return 'v1';
-    }
-
-    const match = latestLabel.match(/^(.*?)(\d+)$/);
-    if (!match) {
-      return `${latestLabel}-2`;
-    }
-
-    const prefix = match[1];
-    const numericSuffix = Number(match[2]);
-    return `${prefix}${numericSuffix + 1}`;
-  };
+  const nextVersionLabel =
+    mode === 'new'
+      ? 'v1'
+      : selectedGroup
+        ? `v${(selectedGroup.version_count ?? 0) + 1}`
+        : 'v1';
 
   // Reset state when opening
   useEffect(() => {
     if (open) {
       setMode('new');
       setNewName(sourceName);
-      setAssetName(sourceName);
-      setAssetNameError(null);
       setExistingTarget(null);
       setTag('latest');
-      setVersionLabel('v1');
       setDescription('');
     }
   }, [open, sourceName]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    if (mode === 'new') {
-      setVersionLabel('v1');
-      return;
-    }
-
-    if (mode === 'existing' && selectedGroup) {
-      setVersionLabel(getNextVersionLabel(latestVersionLabel));
-    }
-  }, [open, mode, selectedGroup, latestVersionLabel]);
-
-  // Sync external asset name error from parent (e.g. 409 conflict response)
-  useEffect(() => {
-    if (externalAssetNameError) {
-      setAssetNameError(externalAssetNameError);
-    }
-  }, [externalAssetNameError]);
-
   const typeLabel = type === 'dataset' ? 'Dataset' : 'Model';
 
   const canSave =
-    (mode === 'new'
+    mode === 'new'
       ? newName.trim().length > 0
-      : existingTarget !== null && existingTarget.trim().length > 0) &&
-    assetName.trim().length > 0;
+      : existingTarget !== null && existingTarget.trim().length > 0;
 
   const handleSubmit = () => {
     if (!canSave) return;
-    setAssetNameError(null);
     const groupName =
       mode === 'new'
         ? newName.trim()
@@ -192,10 +145,8 @@ export default function SaveToRegistryDialog({
     onSave({
       groupName,
       groupId: mode === 'existing' ? existingTarget! : undefined,
-      assetName: assetName.trim(),
       mode,
       tag,
-      versionLabel: versionLabel.trim() || 'v1',
       description:
         description.trim() || `Created from job ${jobId ?? 'unknown'}`,
     });
@@ -279,11 +230,8 @@ export default function SaveToRegistryDialog({
                       sx={{ mt: 0.5 }}
                     >
                       Currently has {selectedGroup.version_count} version
-                      {selectedGroup.version_count !== 1 ? 's' : ''}
-                      {latestVersionLabel
-                        ? ` (latest: ${latestVersionLabel})`
-                        : ''}
-                      .
+                      {selectedGroup.version_count !== 1 ? 's' : ''}. Next
+                      version will be <strong>{nextVersionLabel}</strong>.
                     </Typography>
                   )}
                 </FormControl>
@@ -304,47 +252,6 @@ export default function SaveToRegistryDialog({
           </Typography>
 
           <Stack spacing={2}>
-            {/* Asset name (unique folder name in the registry) */}
-            <FormControl error={!!assetNameError}>
-              <FormLabel>Version Name</FormLabel>
-              <Input
-                size="sm"
-                value={assetName}
-                onChange={(e) => {
-                  setAssetName(e.target.value);
-                  setAssetNameError(null);
-                }}
-                placeholder={`Unique name for this ${typeLabel.toLowerCase()}`}
-                color={assetNameError ? 'danger' : undefined}
-              />
-              {assetNameError ? (
-                <Typography level="body-xs" color="danger" sx={{ mt: 0.5 }}>
-                  {assetNameError}
-                </Typography>
-              ) : (
-                <Typography level="body-xs" color="neutral" sx={{ mt: 0.5 }}>
-                  The unique folder name used to store the{' '}
-                  {typeLabel.toLowerCase()} in the registry.
-                </Typography>
-              )}
-            </FormControl>
-
-            {/* Version label */}
-            <FormControl>
-              <FormLabel>Version Label</FormLabel>
-              <Input
-                size="sm"
-                value={versionLabel}
-                readOnly
-                disabled
-                placeholder="Auto-generated version label"
-                sx={{ cursor: 'not-allowed' }}
-              />
-              <Typography level="body-xs" color="neutral" sx={{ mt: 0.5 }}>
-                A system-generated label for this version.
-              </Typography>
-            </FormControl>
-
             {/* Tag selector */}
             <FormControl>
               <FormLabel>
@@ -408,7 +315,7 @@ export default function SaveToRegistryDialog({
             loading={saving}
             disabled={!canSave}
           >
-            Publish as {versionLabel || 'v1'}
+            Publish as {nextVersionLabel}
           </Button>
           <Button
             variant="plain"
