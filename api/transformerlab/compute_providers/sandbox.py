@@ -81,22 +81,21 @@ def _build_seatbelt_profile(
     for p in extra_read_paths:
         if p:
             rules.append(f'(allow file-read* (subpath "{p}"))')
-    # macOS system libraries and developer tools (needed by git, xcrun, etc.)
+    # Avoid path-by-path allowlisting churn for system files:
+    # permit read-only access everywhere, while keeping writes scoped by
+    # workspace_dir/extra_rw_paths plus /private for temp/runtime paths.
     rules += [
-        '(allow file-read* (subpath "/Library"))',
-        '(allow file-read* (subpath "/usr"))',
-        '(allow file-read* (subpath "/bin"))',
-        '(allow file-read* (subpath "/sbin"))',
-        # Some macOS tools still reference canonical paths (not /private symlinks).
+        "(allow file-read*)",
+        '(allow file* (subpath "/private"))',
         '(allow file* (subpath "/tmp"))',
         '(allow file* (subpath "/var"))',
         '(allow file* (subpath "/etc"))',
-        # Homebrew/system app locations used by user-installed CLIs.
         '(allow file* (subpath "/opt"))',
         '(allow file* (subpath "/Applications"))',
-        # Allow all /private paths (tmp, var folders, etc.) for compatibility
-        # with tools that rely on macOS private path layouts and symlinks.
-        '(allow file* (subpath "/private"))',
+        '(allow file* (subpath "/Library"))',
+        '(allow file* (subpath "/usr"))',
+        '(allow file* (subpath "/bin"))',
+        '(allow file* (subpath "/sbin"))',
     ]
     # GPU device files (CUDA / Metal)
     rules += [
