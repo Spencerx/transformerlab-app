@@ -186,6 +186,22 @@ class DstackProvider(ComputeProvider):
         }
         return mapping.get(cluster_state, JobState.UNKNOWN)
 
+    def _list_runs(self, limit: int, timeout: int = 30) -> requests.Response:
+        """List runs with compatibility fallbacks across dstack API variants."""
+
+        try:
+            return self._make_request(
+                "POST",
+                "/api/runs/list",
+                json_data={"project_name": self.project_name, "only_active": False, "limit": limit},
+                timeout=timeout,
+            )
+        except Exception as exc:
+            if hasattr(exc, "response") and exc.response.status_code not in [404, 405]:
+                raise
+            logger.error("Unable to list dstack runs: %s", exc)
+            raise RuntimeError("Unable to list dstack runs") from exc
+
     # ------------------------------------------------------------------
     # ComputeProvider interface
     # ------------------------------------------------------------------
@@ -256,11 +272,7 @@ class DstackProvider(ComputeProvider):
         )
 
     def list_clusters(self) -> List[ClusterStatus]:
-        response = self._make_request(
-            "POST",
-            "/api/runs/list",
-            json_data={"project_name": self.project_name, "only_active": False, "limit": 100},
-        )
+        response = self._list_runs(limit=100)
         runs = response.json()
         return [
             ClusterStatus(
@@ -379,12 +391,7 @@ class DstackProvider(ComputeProvider):
 
     def check(self) -> bool:
         try:
-            self._make_request(
-                "POST",
-                "/api/runs/list",
-                json_data={"project_name": self.project_name, "only_active": False, "limit": 1},
-                timeout=10,
-            )
+            self._list_runs(limit=1, timeout=10)
             return True
         except Exception:
             return False
