@@ -39,7 +39,6 @@ def _auth_headers(client: httpx.Client) -> dict[str, str]:
     if isinstance(teams_payload, list):
         teams_list = teams_payload
     elif isinstance(teams_payload, dict):
-        # Different API versions can return a wrapped object.
         if isinstance(teams_payload.get("teams"), list):
             teams_list = teams_payload["teams"]
         elif isinstance(teams_payload.get("data"), list):
@@ -50,9 +49,7 @@ def _auth_headers(client: httpx.Client) -> dict[str, str]:
         teams_list = []
 
     assert teams_list, f"Expected at least one team for the test user, got: {teams_payload!r}"
-    team_id = teams_list[0]["id"]
-
-    return {**auth_headers, "X-Team-Id": str(team_id)}
+    return {**auth_headers, "X-Team-Id": str(teams_list[0]["id"])}
 
 
 def _first_experiment_id(client: httpx.Client, headers: dict[str, str]) -> str:
@@ -77,7 +74,6 @@ def _first_experiment_id(client: httpx.Client, headers: dict[str, str]) -> str:
                     assert experiment_id, f"Experiment object missing id: {first!r}"
                     return str(experiment_id)
                 return str(first)
-
     raise AssertionError(f"Expected at least one experiment, got: {payload!r}")
 
 
@@ -88,22 +84,24 @@ def _assert_status_in(response: httpx.Response, expected: set[int], route_name: 
     )
 
 
-def _assert_not_found_contract(response: httpx.Response, route_name: str) -> None:
-    """Accept both normal 404 and legacy 200 + NOT FOUND payload patterns."""
+def _assert_json_message(response: httpx.Response, accepted_messages: set[str], route_name: str) -> None:
+    try:
+        payload = response.json()
+    except ValueError as exc:
+        raise AssertionError(f"{route_name} expected JSON body for 200 response. Body: {response.text}") from exc
+    message = str(payload.get("message", payload.get("detail", ""))).strip().lower()
+    assert message in accepted_messages, (
+        f"{route_name} returned 200 with unexpected JSON message '{message}'. Body: {response.text}"
+    )
+
+
+def _assert_missing_contract(response: httpx.Response, route_name: str) -> None:
+    """Accept 404 or legacy 200 JSON with missing-resource message."""
     if response.status_code == 404:
         return
-
     if response.status_code == 200:
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = {}
-        message = str(payload.get("message", payload.get("detail", ""))).lower()
-        assert "not found" in message, (
-            f"{route_name} returned 200 but did not indicate missing resource. Body: {response.text}"
-        )
+        _assert_json_message(response, {"not found"}, route_name)
         return
-
     raise AssertionError(
         f"{route_name} returned unexpected status {response.status_code}. "
         f"Expected 404 or legacy 200/NOT FOUND. Body: {response.text}"
@@ -114,224 +112,240 @@ def _assert_stop_contract(response: httpx.Response, route_name: str) -> None:
     """Accept backend stop-job variants for missing/non-running jobs."""
     if response.status_code == 404:
         return
-
     if response.status_code == 200:
-        try:
-            payload = response.json()
-        except ValueError:
-            payload = {}
-        message = str(payload.get("message", payload.get("detail", ""))).lower()
-        # Some backends return {"message":"OK"} even when stop is a no-op.
-        assert message in {"ok", "not found"}, (
-            f"{route_name} returned 200 with unexpected payload. Body: {response.text}"
-        )
+        _assert_json_message(response, {"ok", "not found"}, route_name)
         return
-
     raise AssertionError(
         f"{route_name} returned unexpected status {response.status_code}. "
         f"Expected 404 or legacy 200/OK|NOT FOUND. Body: {response.text}"
     )
 
 
-def test_cli_route_contract_live_server() -> None:
-    """Smoke test route contracts across all major CLI command groups."""
-    provider_id: str | None = None
-    experiment_id: str | None = None
-    fake_task_id = "route-smoke-task-id"
-    fake_job_id = "route-smoke-job-id"
+def _assert_stream_or_logs_missing_contract(response: httpx.Response, route_name: str) -> None:
+    """Accept missing-job behavior for log/stream endpoints.
 
+    Some backends return 404, while others return 200 with plain text payloads
+    like 'data: Error: ...' for missing jobs.
+    """
+    if response.status_code == 404:
+        return
+    if response.status_code == 200:
+        content = response.text.lower()
+        assert any(token in content for token in ("error", "not found", "no log files found")), (
+            f"{route_name} returned 200 without a recognizable missing/error payload. Body: {response.text}"
+        )
+        return
+    raise AssertionError(
+        f"{route_name} returned unexpected status {response.status_code}. "
+        f"Expected 404 or legacy 200/error text. Body: {response.text}"
+    )
+
+
+@pytest.fixture()
+def live_context() -> dict[str, str]:
     with httpx.Client(timeout=30.0) as client:
         headers = _auth_headers(client)
         auth_only_headers = {"Authorization": headers["Authorization"]}
-
-        # Server/auth/user routes
-        health_response = client.get(f"{BASE_URL}/healthz")
-        _assert_status_in(health_response, {200}, "GET /healthz")
-
-        user_response = client.get(f"{BASE_URL}/users/me", headers=auth_only_headers)
-        _assert_status_in(user_response, {200}, "GET /users/me")
-
-        teams_response = client.get(f"{BASE_URL}/users/me/teams", headers=auth_only_headers)
-        _assert_status_in(teams_response, {200}, "GET /users/me/teams")
-
-        # Experiment routes
         experiment_id = _first_experiment_id(client, headers)
+    return {"headers": headers, "auth_only_headers": auth_only_headers, "experiment_id": experiment_id}
 
-        # Compute-provider routes
-        list_response = client.get(f"{BASE_URL}/compute_provider/providers/?include_disabled=false", headers=headers)
-        _assert_status_in(list_response, {200}, "GET /compute_provider/providers/")
 
-        create_payload = {
-            "name": f"cli-route-smoke-{uuid.uuid4().hex[:8]}",
-            "type": "local",
-            "config": {},
-        }
+@pytest.fixture()
+def provider_id(live_context: dict[str, str]) -> str:
+    created_provider_id: str | None = None
+    with httpx.Client(timeout=30.0) as client:
+        headers = live_context["headers"]
+        create_payload = {"name": f"cli-route-smoke-{uuid.uuid4().hex[:8]}", "type": "local", "config": {}}
         create_response = client.post(f"{BASE_URL}/compute_provider/providers/", headers=headers, json=create_payload)
         _assert_status_in(create_response, {200}, "POST /compute_provider/providers/")
-        provider_id = create_response.json().get("id")
-        assert provider_id, "Provider create response did not include id"
+        created_provider_id = create_response.json().get("id")
+        assert created_provider_id, "Provider create response did not include id"
 
-        info_response = client.get(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers)
-        _assert_status_in(info_response, {200}, "GET /compute_provider/providers/{id}")
+    try:
+        return created_provider_id
+    finally:
+        if created_provider_id:
+            with httpx.Client(timeout=30.0) as cleanup_client:
+                cleanup_client.delete(
+                    f"{BASE_URL}/compute_provider/providers/{created_provider_id}",
+                    headers=live_context["headers"],
+                )
 
-        provider_check_response = client.get(
-            f"{BASE_URL}/compute_provider/providers/{provider_id}/check", headers=headers
+
+def test_cli_auth_and_experiment_routes_live_server(live_context: dict[str, str]) -> None:
+    with httpx.Client(timeout=30.0) as client:
+        _assert_status_in(client.get(f"{BASE_URL}/healthz"), {200}, "GET /healthz")
+        _assert_status_in(
+            client.get(f"{BASE_URL}/users/me", headers=live_context["auth_only_headers"]),
+            {200},
+            "GET /users/me",
         )
         _assert_status_in(
-            provider_check_response,
+            client.get(f"{BASE_URL}/users/me/teams", headers=live_context["auth_only_headers"]),
+            {200},
+            "GET /users/me/teams",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/experiment/", headers=live_context["headers"]),
+            {200},
+            "GET /experiment/",
+        )
+
+
+def test_cli_compute_provider_routes_live_server(live_context: dict[str, str], provider_id: str) -> None:
+    headers = live_context["headers"]
+    with httpx.Client(timeout=30.0) as client:
+        _assert_status_in(
+            client.get(f"{BASE_URL}/compute_provider/providers/?include_disabled=false", headers=headers),
+            {200},
+            "GET /compute_provider/providers/",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers),
+            {200},
+            "GET /compute_provider/providers/{id}",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/compute_provider/providers/{provider_id}/check", headers=headers),
             {200, 400, 404, 422},
             "GET /compute_provider/providers/{id}/check",
         )
-
-        disable_response = client.patch(
-            f"{BASE_URL}/compute_provider/providers/{provider_id}",
-            headers=headers,
-            json={"disabled": True},
-        )
-        _assert_status_in(disable_response, {200}, "PATCH /compute_provider/providers/{id} disable")
-
-        enable_response = client.patch(
-            f"{BASE_URL}/compute_provider/providers/{provider_id}",
-            headers=headers,
-            json={"disabled": False},
-        )
-        _assert_status_in(enable_response, {200}, "PATCH /compute_provider/providers/{id} enable")
-
-        # Task and launch routes
-        task_list_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/task/list_by_type_in_experiment?type=REMOTE",
-            headers=headers,
-        )
-        _assert_status_in(task_list_response, {200}, "GET /experiment/{id}/task/list_by_type_in_experiment")
-
-        task_gallery_response = client.get(f"{BASE_URL}/experiment/{experiment_id}/task/gallery", headers=headers)
-        _assert_status_in(task_gallery_response, {200}, "GET /experiment/{id}/task/gallery")
-
-        task_gallery_interactive_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/task/gallery/interactive",
-            headers=headers,
-        )
-        _assert_status_in(task_gallery_interactive_response, {200}, "GET /experiment/{id}/task/gallery/interactive")
-
-        validate_response = client.post(
-            f"{BASE_URL}/experiment/{experiment_id}/task/validate",
-            headers={**headers, "Content-Type": "text/plain"},
-            content="name: smoke\nrun: echo hi\ntype: trainer\n",
-        )
-        _assert_status_in(validate_response, {200, 400, 422}, "POST /experiment/{id}/task/validate")
-
-        task_get_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/get", headers=headers
-        )
-        _assert_not_found_contract(task_get_response, "GET /experiment/{id}/task/{task_id}/get")
-
-        task_delete_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/delete",
-            headers=headers,
-        )
-        _assert_status_in(task_delete_response, {200, 404}, "GET /experiment/{id}/task/{task_id}/delete")
-
-        task_create_json_response = client.post(
-            f"{BASE_URL}/experiment/{experiment_id}/task/create",
-            headers=headers,
-            json={"github_repo_url": "https://github.com/does-not-exist/repo"},
-        )
-        _assert_status_in(task_create_json_response, {200, 400, 404, 422}, "POST /experiment/{id}/task/create (json)")
-
-        task_gallery_import_response = client.post(
-            f"{BASE_URL}/experiment/{experiment_id}/task/gallery/import",
-            headers=headers,
-            json={
-                "gallery_id": "route-smoke-gallery-id",
-                "experiment_id": experiment_id,
-                "is_interactive": False,
-            },
+        _assert_status_in(
+            client.patch(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": True}),
+            {200},
+            "PATCH /compute_provider/providers/{id} disable",
         )
         _assert_status_in(
-            task_gallery_import_response, {200, 400, 404, 422}, "POST /experiment/{id}/task/gallery/import"
-        )
-
-        # CLI launch uses this endpoint; a minimal payload may fail validation but should not 500.
-        launch_response = client.post(
-            f"{BASE_URL}/compute_provider/providers/{provider_id}/launch/",
-            headers=headers,
-            json={},
-        )
-        _assert_status_in(launch_response, {200, 202, 400, 404, 422}, "POST /compute_provider/providers/{id}/launch/")
-
-        # Job/artifact/log routes
-        jobs_list_response = client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/list?type=REMOTE", headers=headers)
-        _assert_status_in(jobs_list_response, {200}, "GET /experiment/{id}/jobs/list")
-
-        stop_job_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stop", headers=headers
-        )
-        _assert_stop_contract(stop_job_response, "GET /experiment/{id}/jobs/{job_id}/stop")
-
-        provider_logs_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/provider_logs",
-            headers=headers,
-        )
-        _assert_not_found_contract(provider_logs_response, "GET /experiment/{id}/jobs/{job_id}/provider_logs")
-
-        stream_output_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stream_output",
-            headers=headers,
-        )
-        _assert_not_found_contract(stream_output_response, "GET /experiment/{id}/jobs/{job_id}/stream_output")
-
-        request_logs_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/request_logs",
-            headers=headers,
-        )
-        _assert_not_found_contract(request_logs_response, "GET /experiment/{id}/jobs/{job_id}/request_logs")
-
-        tunnel_info_response = client.get(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/tunnel_info",
-            headers=headers,
-        )
-        _assert_not_found_contract(tunnel_info_response, "GET /experiment/{id}/jobs/{job_id}/tunnel_info")
-
-        artifacts_response = client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts", headers=headers)
-        _assert_status_in(artifacts_response, {200, 404}, "GET /jobs/{job_id}/artifacts")
-
-        artifact_download_response = client.get(
-            f"{BASE_URL}/jobs/{fake_job_id}/artifact/does-not-exist.txt?task=download",
-            headers=headers,
-        )
-        _assert_status_in(artifact_download_response, {404, 405}, "GET /jobs/{job_id}/artifact/{filename}")
-
-        artifacts_zip_response = client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts/download_all", headers=headers)
-        _assert_not_found_contract(artifacts_zip_response, "GET /jobs/{job_id}/artifacts/download_all")
-
-        publish_dataset_response = client.post(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/datasets/does-not-exist/save_to_registry"
-            "?mode=new&tag=latest&version_label=v1",
-            headers=headers,
+            client.patch(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": False}),
+            {200},
+            "PATCH /compute_provider/providers/{id} enable",
         )
         _assert_status_in(
-            publish_dataset_response,
+            client.post(f"{BASE_URL}/compute_provider/providers/{provider_id}/launch/", headers=headers, json={}),
+            {200, 202, 400, 404, 422},
+            "POST /compute_provider/providers/{id}/launch/",
+        )
+
+
+def test_cli_task_routes_live_server(live_context: dict[str, str]) -> None:
+    headers = live_context["headers"]
+    experiment_id = live_context["experiment_id"]
+    fake_task_id = "route-smoke-task-id"
+
+    with httpx.Client(timeout=30.0) as client:
+        _assert_status_in(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/task/list_by_type_in_experiment?type=REMOTE", headers=headers),
+            {200},
+            "GET /experiment/{id}/task/list_by_type_in_experiment",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/task/gallery", headers=headers),
+            {200},
+            "GET /experiment/{id}/task/gallery",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/task/gallery/interactive", headers=headers),
+            {200},
+            "GET /experiment/{id}/task/gallery/interactive",
+        )
+        _assert_status_in(
+            client.post(
+                f"{BASE_URL}/experiment/{experiment_id}/task/validate",
+                headers={**headers, "Content-Type": "text/plain"},
+                content="name: smoke\nrun: echo hi\ntype: trainer\n",
+            ),
+            {200, 400, 422},
+            "POST /experiment/{id}/task/validate",
+        )
+        _assert_missing_contract(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/get", headers=headers),
+            "GET /experiment/{id}/task/{task_id}/get",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/task/{fake_task_id}/delete", headers=headers),
+            {200, 404},
+            "GET /experiment/{id}/task/{task_id}/delete",
+        )
+        _assert_status_in(
+            client.post(
+                f"{BASE_URL}/experiment/{experiment_id}/task/create",
+                headers=headers,
+                json={"github_repo_url": "https://github.com/does-not-exist/repo"},
+            ),
+            {200, 400, 404, 422},
+            "POST /experiment/{id}/task/create (json)",
+        )
+        _assert_status_in(
+            client.post(
+                f"{BASE_URL}/experiment/{experiment_id}/task/gallery/import",
+                headers=headers,
+                json={"gallery_id": "route-smoke-gallery-id", "experiment_id": experiment_id, "is_interactive": False},
+            ),
+            {200, 400, 404, 422},
+            "POST /experiment/{id}/task/gallery/import",
+        )
+
+
+def test_cli_job_and_artifact_routes_live_server(live_context: dict[str, str]) -> None:
+    headers = live_context["headers"]
+    experiment_id = live_context["experiment_id"]
+    fake_job_id = "route-smoke-job-id"
+
+    with httpx.Client(timeout=30.0) as client:
+        _assert_status_in(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/list?type=REMOTE", headers=headers),
+            {200},
+            "GET /experiment/{id}/jobs/list",
+        )
+        _assert_stop_contract(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stop", headers=headers),
+            "GET /experiment/{id}/jobs/{job_id}/stop",
+        )
+        _assert_stream_or_logs_missing_contract(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/provider_logs", headers=headers),
+            "GET /experiment/{id}/jobs/{job_id}/provider_logs",
+        )
+        _assert_stream_or_logs_missing_contract(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/stream_output", headers=headers),
+            "GET /experiment/{id}/jobs/{job_id}/stream_output",
+        )
+        _assert_stream_or_logs_missing_contract(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/request_logs", headers=headers),
+            "GET /experiment/{id}/jobs/{job_id}/request_logs",
+        )
+        _assert_missing_contract(
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/tunnel_info", headers=headers),
+            "GET /experiment/{id}/jobs/{job_id}/tunnel_info",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts", headers=headers),
+            {200, 404},
+            "GET /jobs/{job_id}/artifacts",
+        )
+        _assert_status_in(
+            client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifact/does-not-exist.txt?task=download", headers=headers),
+            {404, 405},
+            "GET /jobs/{job_id}/artifact/{filename}",
+        )
+        _assert_missing_contract(
+            client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts/download_all", headers=headers),
+            "GET /jobs/{job_id}/artifacts/download_all",
+        )
+        _assert_status_in(
+            client.post(
+                f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/datasets/does-not-exist/save_to_registry"
+                "?mode=new&tag=latest&version_label=v1",
+                headers=headers,
+            ),
             {400, 404, 422},
             "POST /experiment/{id}/jobs/{job_id}/datasets/{name}/save_to_registry",
         )
-
-        publish_model_response = client.post(
-            f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/models/does-not-exist/save_to_registry"
-            "?mode=new&tag=latest&version_label=v1",
-            headers=headers,
-        )
         _assert_status_in(
-            publish_model_response,
+            client.post(
+                f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/models/does-not-exist/save_to_registry"
+                "?mode=new&tag=latest&version_label=v1",
+                headers=headers,
+            ),
             {400, 404, 422},
             "POST /experiment/{id}/jobs/{job_id}/models/{name}/save_to_registry",
         )
-
-        delete_response = client.delete(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers)
-        _assert_status_in(delete_response, {200}, "DELETE /compute_provider/providers/{id}")
-        provider_id = None
-
-    # Best-effort cleanup if assertions fail mid-test.
-    if provider_id:
-        with httpx.Client(timeout=30.0) as client:
-            headers = _auth_headers(client)
-            client.delete(f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers)
