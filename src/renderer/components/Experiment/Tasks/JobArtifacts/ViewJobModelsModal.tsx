@@ -62,7 +62,7 @@ export default function ViewJobModelsModal({
 
   // Fetch existing models in the registry for "Add to existing" option
   const { data: registryModels } = useSWR(
-    open ? chatAPI.Endpoints.Models.LocalList() : null,
+    open || renderContentOnly ? chatAPI.Endpoints.Models.LocalList() : null,
     fetcher,
   );
 

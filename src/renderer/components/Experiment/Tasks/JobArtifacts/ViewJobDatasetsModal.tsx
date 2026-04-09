@@ -62,7 +62,7 @@ export default function ViewJobDatasetsModal({
 
   // Fetch existing datasets in the registry for "Add to existing" option
   const { data: registryDatasets } = useSWR(
-    open ? chatAPI.Endpoints.Dataset.LocalList() : null,
+    open || renderContentOnly ? chatAPI.Endpoints.Dataset.LocalList() : null,
     fetcher,
   );
 
