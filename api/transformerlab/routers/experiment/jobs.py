@@ -1547,12 +1547,8 @@ async def save_dataset_to_registry(
     dataset_name: str,
     experimentId: str,
     target_name: Optional[str] = Query(None, description="Group name for the dataset in the registry"),
-    asset_name: Optional[str] = Query(None, description="Unique folder name for the dataset in the datasets directory"),
-    mode: str = Query(
-        "new", description="'new' to create a new entry, 'existing' to merge into an existing registry dataset"
-    ),
+    mode: str = Query("new", description="'new' to create a new entry, 'existing' to add version to existing group"),
     tag: str = Query("latest", description="Tag to assign to the new version"),
-    version_label: str = Query("v1", description="Version label for this entry (e.g. 'v1', 'march-run')"),
     description: Optional[str] = Query(None, description="Human-readable description for the version"),
     user_and_team=Depends(get_user_and_team),
     session: AsyncSession = Depends(get_async_session),
@@ -1571,57 +1567,46 @@ async def save_dataset_to_registry(
 
         datasets_registry_dir = await get_datasets_dir()
 
-        if mode == "existing":
-            # For mode='existing', the asset is merged into the target group folder.
-            if not target_name:
-                raise HTTPException(status_code=400, detail="target_name is required when mode is 'existing'")
-            target_name_secure = secure_filename(target_name)
+        # Resolve the group name from target_name or fall back to dataset_name
+        group_name = secure_filename(target_name) if target_name else dataset_name_secure
 
+        if mode == "existing":
             # Verify the group exists — either in the asset versioning system
             # or as a physical folder in the registry directory (legacy entries).
             existing_groups = await asset_version_service.list_groups("dataset")
-            group_in_versions = any(g["group_name"] == target_name_secure for g in existing_groups)
-            group_on_disk = await storage.exists(storage.join(datasets_registry_dir, target_name_secure))
+            group_in_versions = any(g["group_name"] == group_name for g in existing_groups)
+            group_on_disk = await storage.exists(storage.join(datasets_registry_dir, group_name))
             if not group_in_versions and not group_on_disk:
-                raise HTTPException(status_code=404, detail=f"Dataset group '{target_name}' not found in registry")
-
-            # Determine the unique folder name for this new version's files.
-            if asset_name:
-                effective_asset_name = secure_filename(asset_name)
-            else:
-                effective_asset_name = dataset_name_secure
-            dest_path = storage.join(datasets_registry_dir, effective_asset_name)
-            if await storage.exists(dest_path):
-                from datetime import datetime
-
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                effective_asset_name = f"{effective_asset_name}_{timestamp}"
+                raise HTTPException(status_code=404, detail=f"Dataset group '{group_name}' not found in registry")
         else:
-            # Determine the unique destination folder name (asset_name).
-            # Auto-suffix with a timestamp on conflict so the save always succeeds.
-            if asset_name:
-                effective_asset_name = secure_filename(asset_name)
-            else:
-                effective_asset_name = secure_filename(target_name) if target_name else dataset_name_secure
+            # For mode="new", check that group name doesn't collide with a flat dataset
+            # (a flat dataset has an index.json at its root level).
+            candidate_path = storage.join(datasets_registry_dir, group_name)
+            index_path = storage.join(candidate_path, "index.json")
+            if await storage.exists(index_path):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A downloaded dataset named '{group_name}' already exists in the registry",
+                )
 
-            dest_path = storage.join(datasets_registry_dir, effective_asset_name)
-            if await storage.exists(dest_path):
-                from datetime import datetime
+        # Compute the next version automatically
+        group_dir = storage.join(datasets_registry_dir, group_name)
+        version_label = await _compute_next_version(group_dir)
 
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                effective_asset_name = f"{effective_asset_name}_{timestamp}"
+        # Build destination path and asset_id
+        dest_path = storage.join(datasets_registry_dir, group_name, version_label)
+        asset_id = f"{group_name}/{version_label}"
 
         asyncio.create_task(
             _save_dataset_to_registry(
                 job_id=job_id,
                 dataset_name_secure=dataset_name_secure,
                 source_path=source_path,
-                datasets_registry_dir=datasets_registry_dir,
-                target_name=target_name,
-                asset_name=effective_asset_name,
-                mode=mode,
-                tag=tag,
+                dest_path=dest_path,
+                group_name=group_name,
+                asset_id=asset_id,
                 version_label=version_label,
+                tag=tag,
                 description=description,
             )
         )
@@ -1642,33 +1627,27 @@ async def _save_dataset_to_registry(
     job_id: str,
     dataset_name_secure: str,
     source_path: str,
-    datasets_registry_dir: str,
-    target_name: Optional[str],
-    asset_name: str,
-    mode: str,
-    tag: str,
+    dest_path: str,
+    group_name: str,
+    asset_id: str,
     version_label: str,
+    tag: str,
     description: Optional[str],
 ):
     """Coroutine that performs the copy and creates the version entry."""
-    # asset_name is always the unique destination folder name.
-    # Existence check was already done in the endpoint before dispatching.
-    dest_path = storage.join(datasets_registry_dir, asset_name)
     await storage.copy_dir(source_path, dest_path)
 
-    group_name = secure_filename(target_name) if target_name else asset_name
     version_description = description if description else f"Created from job {job_id}"
     await asset_version_service.create_version(
         asset_type="dataset",
         group_name=group_name,
-        asset_id=asset_name,
+        asset_id=asset_id,
         version_label=version_label,
         job_id=job_id,
         description=version_description,
         tag=tag,
     )
-
-    return asset_name
+    return asset_id
 
 
 @router.post("/{job_id}/models/{model_name}/save_to_registry")
