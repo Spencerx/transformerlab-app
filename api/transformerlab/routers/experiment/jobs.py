@@ -1523,6 +1523,24 @@ async def get_job_models(job_id: str, experimentId: str, request: Request):
     return {"models": models}
 
 
+async def _compute_next_version(group_dir: str) -> str:
+    """Scan a group directory for existing vN folders and return the next version label."""
+    import re
+
+    highest = 0
+    if await storage.exists(group_dir):
+        try:
+            entries = await storage.ls(group_dir, detail=False)
+            for entry in entries:
+                name = entry.rstrip("/").split("/")[-1]
+                match = re.match(r"^v(\d+)$", name)
+                if match:
+                    highest = max(highest, int(match.group(1)))
+        except Exception:
+            pass
+    return f"v{highest + 1}"
+
+
 @router.post("/{job_id}/datasets/{dataset_name}/save_to_registry")
 async def save_dataset_to_registry(
     job_id: str,
@@ -1580,24 +1598,18 @@ async def save_dataset_to_registry(
                 effective_asset_name = f"{effective_asset_name}_{timestamp}"
         else:
             # Determine the unique destination folder name (asset_name).
-            # If the caller explicitly supplied asset_name, enforce uniqueness (409 on conflict).
-            # Otherwise fall back to target_name / source name and auto-suffix on conflict.
+            # Auto-suffix with a timestamp on conflict so the save always succeeds.
             if asset_name:
                 effective_asset_name = secure_filename(asset_name)
-                dest_path = storage.join(datasets_registry_dir, effective_asset_name)
-                if await storage.exists(dest_path):
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"A dataset named '{effective_asset_name}' already exists in the registry. Please choose a different name.",
-                    )
             else:
                 effective_asset_name = secure_filename(target_name) if target_name else dataset_name_secure
-                dest_path = storage.join(datasets_registry_dir, effective_asset_name)
-                if await storage.exists(dest_path):
-                    from datetime import datetime
 
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    effective_asset_name = f"{effective_asset_name}_{timestamp}"
+            dest_path = storage.join(datasets_registry_dir, effective_asset_name)
+            if await storage.exists(dest_path):
+                from datetime import datetime
+
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                effective_asset_name = f"{effective_asset_name}_{timestamp}"
 
         asyncio.create_task(
             _save_dataset_to_registry(
@@ -1665,12 +1677,8 @@ async def save_model_to_registry(
     model_name: str,
     experimentId: str,
     target_name: Optional[str] = Query(None, description="Group name for the model in the registry"),
-    asset_name: Optional[str] = Query(None, description="Unique folder name for the model in the models directory"),
-    mode: str = Query(
-        "new", description="'new' to create a new entry, 'existing' to merge into an existing registry model"
-    ),
+    mode: str = Query("new", description="'new' to create a new entry, 'existing' to add version to existing group"),
     tag: str = Query("latest", description="Tag to assign to the new version"),
-    version_label: str = Query("v1", description="Version label for this entry (e.g. 'v1', 'march-run')"),
     description: Optional[str] = Query(None, description="Human-readable description for the version"),
 ):
     """Copy a model from job's models directory to the global models registry."""
@@ -1687,63 +1695,46 @@ async def save_model_to_registry(
 
         models_registry_dir = await get_models_dir()
 
-        if mode == "existing":
-            # For mode='existing', the asset is merged into the target group folder.
-            if not target_name:
-                raise HTTPException(status_code=400, detail="target_name is required when mode is 'existing'")
-            target_name_secure = secure_filename(target_name)
+        # Resolve the group name from target_name or fall back to model_name
+        group_name = secure_filename(target_name) if target_name else model_name_secure
 
+        if mode == "existing":
             # Verify the group exists — either in the asset versioning system
             # or as a physical folder in the registry directory (legacy entries).
             existing_groups = await asset_version_service.list_groups("model")
-            group_in_versions = any(g["group_name"] == target_name_secure for g in existing_groups)
-            group_on_disk = await storage.exists(storage.join(models_registry_dir, target_name_secure))
+            group_in_versions = any(g["group_name"] == group_name for g in existing_groups)
+            group_on_disk = await storage.exists(storage.join(models_registry_dir, group_name))
             if not group_in_versions and not group_on_disk:
-                raise HTTPException(status_code=404, detail=f"Model group '{target_name}' not found in registry")
-
-            # Determine the unique folder name for this new version's files.
-            if asset_name:
-                effective_asset_name = secure_filename(asset_name)
-            else:
-                effective_asset_name = model_name_secure
-            dest_path = storage.join(models_registry_dir, effective_asset_name)
-            if await storage.exists(dest_path):
-                from datetime import datetime
-
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                effective_asset_name = f"{effective_asset_name}_{timestamp}"
+                raise HTTPException(status_code=404, detail=f"Model group '{group_name}' not found in registry")
         else:
-            # Determine the unique destination folder name (asset_name).
-            # If the caller explicitly supplied asset_name, enforce uniqueness (409 on conflict).
-            # Otherwise fall back to target_name / source name and auto-suffix on conflict.
-            if asset_name:
-                effective_asset_name = secure_filename(asset_name)
-                dest_path = storage.join(models_registry_dir, effective_asset_name)
-                if await storage.exists(dest_path):
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"A model named '{effective_asset_name}' already exists in the registry. Please choose a different name.",
-                    )
-            else:
-                effective_asset_name = secure_filename(target_name) if target_name else model_name_secure
-                dest_path = storage.join(models_registry_dir, effective_asset_name)
-                if await storage.exists(dest_path):
-                    from datetime import datetime
+            # For mode="new", check that group name doesn't collide with a flat downloaded model
+            # (a flat model has an index.json at its root level).
+            candidate_path = storage.join(models_registry_dir, group_name)
+            index_path = storage.join(candidate_path, "index.json")
+            if await storage.exists(index_path):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"A downloaded model named '{group_name}' already exists in the registry",
+                )
 
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    effective_asset_name = f"{effective_asset_name}_{timestamp}"
+        # Compute the next version automatically
+        group_dir = storage.join(models_registry_dir, group_name)
+        version_label = await _compute_next_version(group_dir)
+
+        # Build destination path and asset_id
+        dest_path = storage.join(models_registry_dir, group_name, version_label)
+        asset_id = f"{group_name}/{version_label}"
 
         asyncio.create_task(
             _save_model_to_registry(
                 job_id=job_id,
                 model_name_secure=model_name_secure,
                 source_path=source_path,
-                models_registry_dir=models_registry_dir,
-                target_name=target_name,
-                asset_name=effective_asset_name,
-                mode=mode,
-                tag=tag,
+                dest_path=dest_path,
+                group_name=group_name,
+                asset_id=asset_id,
                 version_label=version_label,
+                tag=tag,
                 description=description,
             )
         )
@@ -1764,33 +1755,28 @@ async def _save_model_to_registry(
     job_id: str,
     model_name_secure: str,
     source_path: str,
-    models_registry_dir: str,
-    target_name: Optional[str],
-    asset_name: str,
-    mode: str,
-    tag: str,
+    dest_path: str,
+    group_name: str,
+    asset_id: str,
     version_label: str,
+    tag: str,
     description: Optional[str],
 ):
     """Coroutine that performs the copy and creates the version entry."""
-    # asset_name is always the unique destination folder name.
-    # Existence check was already done in the endpoint before dispatching.
-    dest_path = storage.join(models_registry_dir, asset_name)
     await storage.copy_dir(source_path, dest_path)
 
-    group_name = secure_filename(target_name) if target_name else asset_name
     version_description = description if description else f"Created from job {job_id}"
     await asset_version_service.create_version(
         asset_type="model",
         group_name=group_name,
-        asset_id=asset_name,
+        asset_id=asset_id,
         version_label=version_label,
         job_id=job_id,
         description=version_description,
         tag=tag,
     )
 
-    return asset_name
+    return asset_id
 
 
 @router.get("/{job_id}/files")
