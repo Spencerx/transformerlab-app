@@ -55,6 +55,14 @@ jobs:
             exit 1
           fi
 
+      - name: Inject Sentry DSN
+        if: env.SENTRY_DSN != ''
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+        run: |
+          sed -i 's|__SENTRY_DSN_PLACEHOLDER__|'"$SENTRY_DSN"'|' \
+            src/transformerlab_cli/util/telemetry.py
+
       - name: Build release distributions
         run: |
           python -m pip install build
