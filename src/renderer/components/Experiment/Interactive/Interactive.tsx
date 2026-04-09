@@ -6,12 +6,12 @@ import React, {
   useRef,
 } from 'react';
 import Sheet from '@mui/joy/Sheet';
-import { Button, Stack, Typography, Box, Skeleton } from '@mui/joy';
+import { Button, Stack, Typography, Box, Skeleton, Alert } from '@mui/joy';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { PlusIcon } from 'lucide-react';
 import { useSWRWithAuth as useSWR, useAPI } from 'renderer/lib/authContext';
-import { useNavigate } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
 
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
@@ -26,11 +26,21 @@ import DeleteTaskConfirmModal from '../Tasks/DeleteTaskConfirmModal';
 import InteractiveJobCard from './InteractiveJobCard';
 import JobsList from '../Tasks/JobsList';
 import FileBrowserModal from '../Tasks/FileBrowserModal';
+import { API_URL } from 'renderer/lib/api-client/urls';
 
 const duration = require('dayjs/plugin/duration');
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
+
+const REQUIRED_SPECIAL_SECRETS = [
+  { key: '_HF_TOKEN', label: 'Hugging Face token' },
+  { key: '_NGROK_AUTH_TOKEN', label: 'ngrok auth token' },
+] as const;
+
+type SpecialSecretStatus = {
+  exists?: boolean;
+};
 
 /** Interactive tasks may have no stored provider_id; prefer a remote provider over local. */
 function defaultLaunchProviderId(
@@ -71,11 +81,15 @@ export default function Interactive() {
   const [viewFileBrowserFromJob, setViewFileBrowserFromJob] = useState<
     string | null
   >(null);
+  const [missingSpecialSecrets, setMissingSpecialSecrets] = useState<string[]>(
+    [],
+  );
+  const [isCheckingSpecialSecrets, setIsCheckingSpecialSecrets] =
+    useState(false);
 
   const { experimentInfo } = useExperimentInfo();
   const { addNotification } = useNotification();
   const { fetchWithAuth, team } = useAuth();
-  const navigate = useNavigate();
 
   // Trigger to force re-render when localStorage changes
   const [pendingIdsTrigger, setPendingIdsTrigger] = useState(0);
@@ -97,6 +111,65 @@ export default function Interactive() {
       console.error('Failed to fetch providers', providerListError);
     }
   }, [providerListError]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkSpecialSecrets = async () => {
+      setIsCheckingSpecialSecrets(true);
+
+      try {
+        const userSecretsPromise = fetchWithAuth(
+          `${API_URL()}users/me/special_secrets`,
+        );
+        const teamSecretsPromise = team?.id
+          ? fetchWithAuth(`${API_URL()}teams/${team.id}/special_secrets`)
+          : Promise.resolve(null);
+
+        const [userRes, teamRes] = await Promise.all([
+          userSecretsPromise,
+          teamSecretsPromise,
+        ]);
+
+        const userData = userRes?.ok ? await userRes.json() : null;
+        const teamData = teamRes && teamRes.ok ? await teamRes.json() : null;
+
+        const userSpecialSecrets = (userData?.special_secrets || {}) as Record<
+          string,
+          SpecialSecretStatus
+        >;
+        const teamSpecialSecrets = (teamData?.special_secrets || {}) as Record<
+          string,
+          SpecialSecretStatus
+        >;
+
+        const missing = REQUIRED_SPECIAL_SECRETS.filter(({ key }) => {
+          const userHasSecret = Boolean(userSpecialSecrets[key]?.exists);
+          const teamHasSecret = Boolean(teamSpecialSecrets[key]?.exists);
+          return !userHasSecret && !teamHasSecret;
+        }).map(({ label }) => label);
+
+        if (!cancelled) {
+          setMissingSpecialSecrets(missing);
+        }
+      } catch (error) {
+        console.error('Failed to check interactive special secrets:', error);
+        if (!cancelled) {
+          setMissingSpecialSecrets([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsCheckingSpecialSecrets(false);
+        }
+      }
+    };
+
+    checkSpecialSecrets();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchWithAuth, team?.id]);
 
   // Pending job IDs persisted per experiment
   const pendingJobsStorageKey = useMemo(
@@ -1100,6 +1173,37 @@ export default function Interactive() {
           New
         </Button>
       </Stack>
+      {!isCheckingSpecialSecrets && missingSpecialSecrets.length > 0 && (
+        <Alert
+          color="warning"
+          variant="soft"
+          sx={{
+            mt: 1,
+            mb: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          <Box>
+            <Typography level="body-sm">
+              Interactive sessions may fail without required secrets. Missing:{' '}
+              <b>{missingSpecialSecrets.join(', ')}</b>. Set them in{' '}
+              <Typography
+                component={RouterLink}
+                to="/user/secrets"
+                level="body-sm"
+                sx={{ textDecoration: 'underline' }}
+              >
+                User Settings
+              </Typography>
+              .
+            </Typography>
+          </Box>
+        </Alert>
+      )}
       <Sheet
         variant="soft"
         sx={{
