@@ -422,12 +422,12 @@ def _run_install_script() -> int:
         return 1
 
 
-def _offer_install_script() -> None:
-    """Prompt the user to run the install script after writing config."""
+def _offer_install_script() -> int:
+    """Prompt the user to run the install script after writing config. Returns exit code."""
     if not typer.confirm("\nRun the install script now?", default=True):
         console.print("[dim]Skipped. You can run it manually later.[/dim]")
-        return
-    _run_install_script()
+        return 0
+    return _run_install_script()
 
 
 # ---------------------------------------------------------------------------
@@ -608,7 +608,7 @@ def _install_from_config(config_path: str, dry_run: bool) -> None:
         raise typer.Exit(1)
 
     console.print(f"\n[info]Loaded configuration from {config_path}[/info]")
-    telemetry.breadcrumb("loaded_config_file", path=config_path)
+    telemetry.breadcrumb("loaded_config_file")
 
     # Generate JWT secrets if not provided in the config
     if env_vars.get("TRANSFORMERLAB_JWT_SECRET") and env_vars.get("TRANSFORMERLAB_REFRESH_SECRET"):
@@ -714,7 +714,7 @@ def _install_interactive(dry_run: bool) -> None:
     env_vars.update(_prompt_email(existing))
     telemetry.incr(
         "installer.email_configured",
-        method=env_vars.get("EMAIL_METHOD", "dev"),
+        method=env_vars.get("EMAIL_METHOD", "not_set"),
     )
 
     env_vars.update(_prompt_auth(existing))
@@ -768,7 +768,11 @@ def _install_interactive(dry_run: bool) -> None:
 
     # Run install script
     telemetry.breadcrumb("offering_install_script")
-    _offer_install_script()
+    exit_code = _offer_install_script()
+    if exit_code != 0:
+        telemetry.incr("installer.error", reason="install_script_failed")
+        telemetry.flush()
+        raise typer.Exit(exit_code)
 
     telemetry.incr("installer.success")
     telemetry.flush()

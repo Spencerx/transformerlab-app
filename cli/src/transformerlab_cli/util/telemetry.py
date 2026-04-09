@@ -59,7 +59,7 @@ def incr(key: str, value: int = 1, **tags: str) -> None:
     try:
         from sentry_sdk import metrics
 
-        metrics.incr(key, value, tags=tags)
+        metrics.count(key, float(value), attributes=tags)
     except Exception:
         pass
 

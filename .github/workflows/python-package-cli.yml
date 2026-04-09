@@ -60,8 +60,11 @@ jobs:
         env:
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
-          sed -i 's|__SENTRY_DSN_PLACEHOLDER__|'"$SENTRY_DSN"'|' \
-            src/transformerlab_cli/util/telemetry.py
+          python3 -c "
+          import sys, pathlib
+          p = pathlib.Path('src/transformerlab_cli/util/telemetry.py')
+          p.write_text(p.read_text().replace('__SENTRY_DSN_PLACEHOLDER__', sys.argv[1]))
+          " "$SENTRY_DSN"
 
       - name: Build release distributions
         run: |
