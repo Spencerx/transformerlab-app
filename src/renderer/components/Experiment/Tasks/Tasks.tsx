@@ -27,7 +27,6 @@ import EditInteractiveTaskModal from './EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from './DeleteTaskConfirmModal';
 import QueueTaskModal from './QueueTaskModal';
 import ViewOutputModalStreaming from './ViewOutputModalStreaming';
-import ViewProfilingModal from './ViewProfilingModal';
 import ViewCheckpointsModal from './ViewCheckpointsModal';
 import ViewEvalResultsModal from './ViewEvalResultsModal';
 import CompareEvalResultsModal from './CompareEvalResultsModal';
@@ -58,9 +57,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     null,
   );
   const [viewCheckpointsFromJob, setViewCheckpointsFromJob] = useState<
-    string | null
-  >(null);
-  const [viewProfilingFromJob, setViewProfilingFromJob] = useState<
     string | null
   >(null);
   const [viewEvalImagesFromJob, setViewEvalImagesFromJob] = useState<
@@ -1464,11 +1460,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         open={viewAllArtifactsFromJob !== null}
         onClose={() => setViewAllArtifactsFromJob(null)}
         jobId={viewAllArtifactsFromJob}
-      />
-      <ViewProfilingModal
-        open={viewProfilingFromJob !== null}
-        onClose={() => setViewProfilingFromJob(null)}
-        jobId={viewProfilingFromJob}
       />
       <ViewCheckpointsModal
         open={viewCheckpointsFromJob !== null}

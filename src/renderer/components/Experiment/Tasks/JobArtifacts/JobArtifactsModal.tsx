@@ -14,6 +14,7 @@ import {
   FileTextIcon,
   ArchiveIcon,
   Download,
+  CpuIcon,
 } from 'lucide-react';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import ArtifactsSection from './ArtifactsSection';
@@ -21,6 +22,7 @@ import { downloadAllArtifacts } from './artifactUtils';
 import DatasetsSection from './DatasetsSection';
 import ModelsSection from './ModelsSection';
 import ArtifactPreviewPane, { PreviewableItem } from './ArtifactPreviewPane';
+import ProfilingReport from '../ProfilingReport';
 
 interface JobArtifactsModalProps {
   open: boolean;
@@ -157,6 +159,21 @@ export default function JobArtifactsModal({
                   onPreviewItem={setPreviewItem}
                   selectedFilename={previewItem?.filename ?? null}
                 />
+              </section>
+
+              <Divider />
+
+              <section>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  sx={{ mb: 1 }}
+                >
+                  <CpuIcon size={18} />
+                  <Typography level="title-md">Profiling</Typography>
+                </Stack>
+                {jobId && <ProfilingReport jobId={jobId} />}
               </section>
             </Stack>
           </Box>
