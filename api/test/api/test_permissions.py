@@ -49,19 +49,25 @@ def test_upsert_updates_existing_rule(client):
         pytest.skip("No members to test permissions with")
     target_user_id = members[0]["user_id"]
 
-    client.put(f"/teams/{team_id}/permissions", json={
-        "user_id": target_user_id,
-        "resource_type": "model",
-        "resource_id": "*",
-        "actions": ["read"],
-    })
+    client.put(
+        f"/teams/{team_id}/permissions",
+        json={
+            "user_id": target_user_id,
+            "resource_type": "model",
+            "resource_id": "*",
+            "actions": ["read"],
+        },
+    )
 
-    response = client.put(f"/teams/{team_id}/permissions", json={
-        "user_id": target_user_id,
-        "resource_type": "model",
-        "resource_id": "*",
-        "actions": ["read", "write"],
-    })
+    response = client.put(
+        f"/teams/{team_id}/permissions",
+        json={
+            "user_id": target_user_id,
+            "resource_type": "model",
+            "resource_id": "*",
+            "actions": ["read", "write"],
+        },
+    )
     assert response.status_code == 200
     assert set(response.json()["actions"]) == {"read", "write"}
 
@@ -92,12 +98,15 @@ def test_delete_permission_rule(client):
         pytest.skip("No members to test permissions with")
     target_user_id = members[0]["user_id"]
 
-    create_resp = client.put(f"/teams/{team_id}/permissions", json={
-        "user_id": target_user_id,
-        "resource_type": "dataset",
-        "resource_id": "ds-1",
-        "actions": ["read"],
-    })
+    create_resp = client.put(
+        f"/teams/{team_id}/permissions",
+        json={
+            "user_id": target_user_id,
+            "resource_type": "dataset",
+            "resource_id": "ds-1",
+            "actions": ["read"],
+        },
+    )
     rule_id = create_resp.json()["id"]
 
     del_resp = client.delete(f"/teams/{team_id}/permissions/{rule_id}")
@@ -117,11 +126,14 @@ def test_create_permission_invalid_action(client):
         pytest.skip("No members to test permissions with")
     target_user_id = members[0]["user_id"]
 
-    response = client.put(f"/teams/{team_id}/permissions", json={
-        "user_id": target_user_id,
-        "resource_type": "experiment",
-        "resource_id": "*",
-        "actions": ["fly"],
-    })
+    response = client.put(
+        f"/teams/{team_id}/permissions",
+        json={
+            "user_id": target_user_id,
+            "resource_type": "experiment",
+            "resource_id": "*",
+            "actions": ["fly"],
+        },
+    )
     # The app maps RequestValidationError → 400 (see api.py validation_exception_handler)
     assert response.status_code in (400, 422)

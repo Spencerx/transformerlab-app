@@ -310,9 +310,6 @@ class ResourcePermission(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint(
-            "user_id", "team_id", "resource_type", "resource_id",
-            name="uq_resource_permission"
-        ),
+        UniqueConstraint("user_id", "team_id", "resource_type", "resource_id", name="uq_resource_permission"),
         Index("idx_resource_permissions_user_team", "user_id", "team_id"),
     )

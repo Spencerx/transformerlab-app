@@ -55,8 +55,8 @@ async def check_permission(
     # Steps 2-4: ACL lookup in specificity order
     candidates = [
         (resource_type, resource_id),  # exact match
-        (resource_type, "*"),           # type wildcard
-        ("*", "*"),                     # global wildcard
+        (resource_type, "*"),  # type wildcard
+        ("*", "*"),  # global wildcard
     ]
 
     for rt, rid in candidates:
