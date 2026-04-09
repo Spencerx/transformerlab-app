@@ -22,7 +22,7 @@ import { formatBytes } from 'renderer/lib/utils';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import { fetchWithAuth } from 'renderer/lib/authContext';
 import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
-import SaveToRegistryDialog, { SaveVersionInfo } from './SaveToRegistryDialog';
+import SaveToRegistryDialog, { SaveVersionInfo } from '../SaveToRegistryDialog';
 
 interface ViewJobDatasetsModalProps {
   open: boolean;

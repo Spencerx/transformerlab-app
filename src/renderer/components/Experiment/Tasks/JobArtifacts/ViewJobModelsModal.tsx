@@ -24,7 +24,7 @@ import {
   fetchWithAuth,
   useSWRWithAuth as useSWR,
 } from 'renderer/lib/authContext';
-import SaveToRegistryDialog, { SaveVersionInfo } from './SaveToRegistryDialog';
+import SaveToRegistryDialog, { SaveVersionInfo } from '../SaveToRegistryDialog';
 
 interface ViewJobModelsModalProps {
   open: boolean;
@@ -245,9 +245,6 @@ export default function ViewJobModelsModal({
             <List
               sx={{
                 overflow: 'auto',
-                borderRadius: 'sm',
-                border: '1px solid',
-                borderColor: 'divider',
                 p: 0,
               }}
             >
