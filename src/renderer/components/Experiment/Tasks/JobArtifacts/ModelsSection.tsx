@@ -65,6 +65,9 @@ export default function ModelsSection({
     open || renderContentOnly ? chatAPI.Endpoints.Models.LocalList() : null,
     fetcher,
   );
+  const existingModelNames: string[] = Array.isArray(registryModels)
+    ? registryModels.map((m: { model_id: string }) => m.model_id)
+    : [];
 
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
@@ -104,12 +107,6 @@ export default function ModelsSection({
       setSaveTaskJobId(null);
     }
   }, [saveTaskData, saveTaskJobId]);
-
-  const existingModelNames: string[] = Array.isArray(registryModels)
-    ? registryModels
-        .map((m: any) => m.model_id || m.name || m.id)
-        .filter(Boolean)
-    : [];
 
   const models: Model[] = data?.models || [];
 

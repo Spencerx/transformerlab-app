@@ -65,6 +65,9 @@ export default function DatasetsSection({
     open || renderContentOnly ? chatAPI.Endpoints.Dataset.LocalList() : null,
     fetcher,
   );
+  const existingDatasetNames: string[] = Array.isArray(registryDatasets)
+    ? registryDatasets.map((d: { dataset_id: string }) => d.dataset_id)
+    : [];
 
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
@@ -104,12 +107,6 @@ export default function DatasetsSection({
       setSaveTaskJobId(null);
     }
   }, [saveTaskData, saveTaskJobId]);
-
-  const existingDatasetNames: string[] = Array.isArray(registryDatasets)
-    ? registryDatasets
-        .map((d: any) => d.dataset_id || d.name || d.id)
-        .filter(Boolean)
-    : [];
 
   const datasets: Dataset[] = data?.datasets || [];
 

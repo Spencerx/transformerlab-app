@@ -205,10 +205,13 @@ export default function SaveToRegistryDialog({
     <Modal open={open} onClose={onClose}>
       <ModalDialog
         sx={{
-          width: 520,
-          maxWidth: '95vw',
-          maxHeight: '90vh',
-          overflow: 'hidden',
+          width: {
+            xs: 'calc(100vw - 2rem)',
+            sm: 'min(640px, calc(100vw - 2rem))',
+          },
+          maxWidth: 'calc(100vw - 2rem)',
+          maxHeight: 'calc(100vh - 2rem)',
+          overflowY: 'auto',
         }}
       >
         <ModalClose />
