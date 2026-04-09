@@ -512,6 +512,7 @@ export default function ViewArtifactsModal({
                     }
                   >
                     <ListItemButton
+                      sx={{ minWidth: 0, overflow: 'hidden' }}
                       selected={
                         selectedFilename
                           ? selectedFilename === artifact.filename

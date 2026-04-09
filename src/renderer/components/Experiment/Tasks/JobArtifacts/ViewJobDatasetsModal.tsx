@@ -267,7 +267,7 @@ export default function ViewJobDatasetsModal({
                     </Button>
                   }
                 >
-                  <ListItemButton>
+                  <ListItemButton sx={{ minWidth: 0, overflow: 'hidden' }}>
                     <ListItemContent sx={{ minWidth: 0 }}>
                       <Typography level="title-sm" noWrap>
                         {dataset.name}

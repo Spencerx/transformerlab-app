@@ -264,7 +264,7 @@ export default function ViewJobModelsModal({
                     </Button>
                   }
                 >
-                  <ListItemButton>
+                  <ListItemButton sx={{ minWidth: 0, overflow: 'hidden' }}>
                     <ListItemContent sx={{ minWidth: 0 }}>
                       <Typography level="title-sm" noWrap>
                         {model.name}

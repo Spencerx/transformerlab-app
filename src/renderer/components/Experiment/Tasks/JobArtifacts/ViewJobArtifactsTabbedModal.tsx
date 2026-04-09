@@ -97,7 +97,7 @@ export default function ViewJobArtifactsTabbedModal({
                   sx={{ mb: 1 }}
                 >
                   <DatabaseIcon size={18} />
-                  <Typography level="title-lg">
+                  <Typography level="title-md">
                     Models{countLabel(modelsCount)}
                   </Typography>
                 </Stack>
@@ -120,7 +120,7 @@ export default function ViewJobArtifactsTabbedModal({
                   sx={{ mb: 1 }}
                 >
                   <FileTextIcon size={18} />
-                  <Typography level="title-lg">
+                  <Typography level="title-md">
                     Datasets{countLabel(datasetsCount)}
                   </Typography>
                 </Stack>
@@ -143,7 +143,7 @@ export default function ViewJobArtifactsTabbedModal({
                   sx={{ mb: 1 }}
                 >
                   <ArchiveIcon size={18} />
-                  <Typography level="title-lg">
+                  <Typography level="title-md">
                     Other Artifacts{countLabel(artifactsCount)}
                   </Typography>
                   {artifactsCount !== null && artifactsCount > 0 && (
