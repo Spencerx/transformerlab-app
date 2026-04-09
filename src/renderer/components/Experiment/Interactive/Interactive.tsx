@@ -104,6 +104,10 @@ export default function Interactive() {
     () => (Array.isArray(providerListData) ? providerListData : []),
     [providerListData],
   );
+  const hasNonLocalProvider = useMemo(
+    () => providers.some((provider) => provider?.type !== 'local'),
+    [providers],
+  );
 
   useEffect(() => {
     if (providerListError) {
@@ -143,11 +147,20 @@ export default function Interactive() {
           SpecialSecretStatus
         >;
 
-        const missing = REQUIRED_SPECIAL_SECRETS.filter(({ key }) => {
-          const userHasSecret = Boolean(userSpecialSecrets[key]?.exists);
-          const teamHasSecret = Boolean(teamSpecialSecrets[key]?.exists);
-          return !userHasSecret && !teamHasSecret;
-        }).map(({ label }) => label);
+        const requiredSecrets = REQUIRED_SPECIAL_SECRETS.filter(({ key }) => {
+          if (key === '_NGROK_AUTH_TOKEN') {
+            return hasNonLocalProvider;
+          }
+          return true;
+        });
+
+        const missing = requiredSecrets
+          .filter(({ key }) => {
+            const userHasSecret = Boolean(userSpecialSecrets[key]?.exists);
+            const teamHasSecret = Boolean(teamSpecialSecrets[key]?.exists);
+            return !userHasSecret && !teamHasSecret;
+          })
+          .map(({ label }) => label);
 
         if (!cancelled) {
           setMissingSpecialSecrets(missing);
@@ -169,7 +182,7 @@ export default function Interactive() {
     return () => {
       cancelled = true;
     };
-  }, [fetchWithAuth, team?.id]);
+  }, [fetchWithAuth, team?.id, hasNonLocalProvider]);
 
   // Pending job IDs persisted per experiment
   const pendingJobsStorageKey = useMemo(
@@ -1190,7 +1203,10 @@ export default function Interactive() {
           <Box>
             <Typography level="body-sm">
               Interactive sessions may fail without required secrets. Missing:{' '}
-              <b>{missingSpecialSecrets.join(', ')}</b>. Set them in{' '}
+              <b>{missingSpecialSecrets.join(', ')}</b>.
+              {hasNonLocalProvider &&
+                ' ngrok auth token is required for interactive tasks on remote providers.'}{' '}
+              Set them in{' '}
               <Typography
                 component={RouterLink}
                 to="/user/secrets"
