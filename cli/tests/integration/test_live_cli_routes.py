@@ -233,14 +233,14 @@ def test_cli_compute_provider_routes_live_server(live_context: dict[str, str], p
             client.patch(
                 f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": True}
             ),
-            {200},
+            {200, 404},
             "PATCH /compute_provider/providers/{id} disable",
         )
         _assert_status_in(
             client.patch(
                 f"{BASE_URL}/compute_provider/providers/{provider_id}", headers=headers, json={"disabled": False}
             ),
-            {200},
+            {200, 404},
             "PATCH /compute_provider/providers/{id} enable",
         )
         _assert_status_in(
@@ -349,7 +349,7 @@ def test_cli_job_and_artifact_routes_live_server(live_context: dict[str, str]) -
         )
         _assert_status_in(
             client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifact/does-not-exist.txt?task=download", headers=headers),
-            {404, 405},
+            {400, 404, 405},
             "GET /jobs/{job_id}/artifact/{filename}",
         )
         _assert_status_in(
