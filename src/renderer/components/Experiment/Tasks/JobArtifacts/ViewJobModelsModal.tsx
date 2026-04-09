@@ -265,8 +265,10 @@ export default function ViewJobModelsModal({
                   }
                 >
                   <ListItemButton>
-                    <ListItemContent>
-                      <Typography level="title-sm">{model.name}</Typography>
+                    <ListItemContent sx={{ minWidth: 0 }}>
+                      <Typography level="title-sm" noWrap>
+                        {model.name}
+                      </Typography>
                       {model.size && (
                         <Typography level="body-xs">
                           {formatBytes(model.size)}

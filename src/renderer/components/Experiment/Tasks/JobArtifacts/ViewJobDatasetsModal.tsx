@@ -268,8 +268,10 @@ export default function ViewJobDatasetsModal({
                   }
                 >
                   <ListItemButton>
-                    <ListItemContent>
-                      <Typography level="title-sm">{dataset.name}</Typography>
+                    <ListItemContent sx={{ minWidth: 0 }}>
+                      <Typography level="title-sm" noWrap>
+                        {dataset.name}
+                      </Typography>
                       {dataset.size && (
                         <Typography level="body-xs">
                           {formatBytes(dataset.size)}

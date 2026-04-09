@@ -528,8 +528,8 @@ export default function ViewArtifactsModal({
                           : undefined
                       }
                     >
-                      <ListItemContent>
-                        <Typography level="title-sm">
+                      <ListItemContent sx={{ minWidth: 0 }}>
+                        <Typography level="title-sm" noWrap>
                           {artifact.filename}
                         </Typography>
                         <Stack direction="row" spacing={2}>
