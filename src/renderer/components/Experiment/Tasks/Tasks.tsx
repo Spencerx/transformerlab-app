@@ -27,16 +27,16 @@ import EditInteractiveTaskModal from './EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from './DeleteTaskConfirmModal';
 import QueueTaskModal from './QueueTaskModal';
 import ViewOutputModalStreaming from './ViewOutputModalStreaming';
-import ViewArtifactsModal from './JobArtifacts/ViewArtifactsModal';
+import ArtifactsSection from './JobArtifacts/ArtifactsSection';
 import ViewProfilingModal from './ViewProfilingModal';
 import ViewCheckpointsModal from './ViewCheckpointsModal';
 import ViewEvalResultsModal from './ViewEvalResultsModal';
 import CompareEvalResultsModal from './CompareEvalResultsModal';
 import PreviewDatasetModal from '../../Data/PreviewDatasetModal';
 import ViewSweepResultsModal from './ViewSweepResultsModal';
-import ViewJobDatasetsModal from './JobArtifacts/ViewJobDatasetsModal';
-import ViewJobModelsModal from './JobArtifacts/ViewJobModelsModal';
-import ViewJobArtifactsTabbedModal from './JobArtifacts/ViewJobArtifactsTabbedModal';
+import DatasetsSection from './JobArtifacts/DatasetsSection';
+import ModelsSection from './JobArtifacts/ModelsSection';
+import JobArtifactsModal from './JobArtifacts/JobArtifactsModal';
 import FileBrowserModal from './FileBrowserModal';
 import SafeJSONParse from '../../Shared/SafeJSONParse';
 import NewTaskModal2 from './NewTaskModal/NewTaskModal2';
@@ -1472,12 +1472,12 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           />
         );
       })()}
-      <ViewJobArtifactsTabbedModal
+      <JobArtifactsModal
         open={viewAllArtifactsFromJob !== null}
         onClose={() => setViewAllArtifactsFromJob(null)}
         jobId={viewAllArtifactsFromJob}
       />
-      <ViewArtifactsModal
+      <ArtifactsSection
         open={viewArtifactsFromJob !== null}
         onClose={() => setViewArtifactsFromJob(null)}
         jobId={viewArtifactsFromJob}
@@ -1515,14 +1515,14 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         viewType="preview"
       />
       {viewJobDatasetsFromJob !== null && (
-        <ViewJobDatasetsModal
+        <DatasetsSection
           open
           onClose={() => setViewJobDatasetsFromJob(null)}
           jobId={viewJobDatasetsFromJob}
         />
       )}
       {viewJobModelsFromJob !== null && (
-        <ViewJobModelsModal
+        <ModelsSection
           open
           onClose={() => setViewJobModelsFromJob(null)}
           jobId={viewJobModelsFromJob}

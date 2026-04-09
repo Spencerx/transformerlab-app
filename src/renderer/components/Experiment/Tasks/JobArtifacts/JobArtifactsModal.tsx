@@ -16,23 +16,23 @@ import {
   Download,
 } from 'lucide-react';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
-import ViewArtifactsModal from './ViewArtifactsModal';
+import ArtifactsSection from './ArtifactsSection';
 import { downloadAllArtifacts } from './artifactUtils';
-import ViewJobDatasetsModal from './ViewJobDatasetsModal';
-import ViewJobModelsModal from './ViewJobModelsModal';
+import DatasetsSection from './DatasetsSection';
+import ModelsSection from './ModelsSection';
 import ArtifactPreviewPane, { PreviewableItem } from './ArtifactPreviewPane';
 
-interface ViewJobArtifactsTabbedModalProps {
+interface JobArtifactsModalProps {
   open: boolean;
   onClose: () => void;
   jobId: string | null;
 }
 
-export default function ViewJobArtifactsTabbedModal({
+export default function JobArtifactsModal({
   open,
   onClose,
   jobId,
-}: ViewJobArtifactsTabbedModalProps) {
+}: JobArtifactsModalProps) {
   const { experimentInfo } = useExperimentInfo();
   const [modelsCount, setModelsCount] = useState<number | null>(null);
   const [datasetsCount, setDatasetsCount] = useState<number | null>(null);
@@ -93,7 +93,7 @@ export default function ViewJobArtifactsTabbedModal({
                     Models{countLabel(modelsCount)}
                   </Typography>
                 </Stack>
-                <ViewJobModelsModal
+                <ModelsSection
                   jobId={jobId}
                   renderContentOnly
                   onCountLoaded={setModelsCount}
@@ -114,7 +114,7 @@ export default function ViewJobArtifactsTabbedModal({
                     Datasets{countLabel(datasetsCount)}
                   </Typography>
                 </Stack>
-                <ViewJobDatasetsModal
+                <DatasetsSection
                   jobId={jobId}
                   renderContentOnly
                   onCountLoaded={setDatasetsCount}
@@ -150,7 +150,7 @@ export default function ViewJobArtifactsTabbedModal({
                     </Button>
                   )}
                 </Stack>
-                <ViewArtifactsModal
+                <ArtifactsSection
                   jobId={jobId}
                   renderContentOnly
                   onCountLoaded={setArtifactsCount}

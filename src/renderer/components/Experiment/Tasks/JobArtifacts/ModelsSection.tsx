@@ -26,7 +26,7 @@ import {
 } from 'renderer/lib/authContext';
 import SaveToRegistryDialog, { SaveVersionInfo } from '../SaveToRegistryDialog';
 
-interface ViewJobModelsModalProps {
+interface ModelsSectionProps {
   open?: boolean;
   onClose?: () => void;
   jobId: number | string | null;
@@ -40,13 +40,13 @@ interface Model {
   date?: string;
 }
 
-export default function ViewJobModelsModal({
+export default function ModelsSection({
   open = false,
   onClose = () => {},
   jobId,
   renderContentOnly = false,
   onCountLoaded,
-}: ViewJobModelsModalProps) {
+}: ModelsSectionProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading, mutate } = useAPI('jobs', ['getJobModels'], {
     jobId,

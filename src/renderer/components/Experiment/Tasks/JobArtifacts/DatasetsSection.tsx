@@ -24,7 +24,7 @@ import { fetchWithAuth } from 'renderer/lib/authContext';
 import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
 import SaveToRegistryDialog, { SaveVersionInfo } from '../SaveToRegistryDialog';
 
-interface ViewJobDatasetsModalProps {
+interface DatasetsSectionProps {
   open?: boolean;
   onClose?: () => void;
   jobId: number | string | null;
@@ -38,13 +38,13 @@ interface Dataset {
   date?: string;
 }
 
-export default function ViewJobDatasetsModal({
+export default function DatasetsSection({
   open = false,
   onClose = () => {},
   jobId,
   renderContentOnly = false,
   onCountLoaded,
-}: ViewJobDatasetsModalProps) {
+}: DatasetsSectionProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading, mutate } = useAPI('jobs', ['getJobDatasets'], {
     jobId,

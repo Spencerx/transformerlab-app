@@ -29,7 +29,7 @@ import {
   downloadAllArtifacts,
 } from './artifactUtils';
 
-interface ViewArtifactsModalProps {
+interface ArtifactsSectionProps {
   open?: boolean;
   onClose?: () => void;
   jobId: number | string | null;
@@ -45,7 +45,7 @@ interface Artifact {
   size?: number;
 }
 
-export default function ViewArtifactsModal({
+export default function ArtifactsSection({
   open = false,
   onClose = () => {},
   jobId,
@@ -53,7 +53,7 @@ export default function ViewArtifactsModal({
   onCountLoaded,
   onPreviewItem,
   selectedFilename,
-}: ViewArtifactsModalProps) {
+}: ArtifactsSectionProps) {
   const { experimentInfo } = useExperimentInfo();
   const { data, isLoading: artifactsLoading } = useAPI(
     'jobs',
