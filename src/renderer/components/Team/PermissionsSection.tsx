@@ -57,7 +57,7 @@ const ALL_ACTIONS: PermissionAction[] = [
 export default function PermissionsSection({
   teamId,
   members,
-}: PermissionsSectionProps): JSX.Element {
+}: PermissionsSectionProps) {
   const { fetchWithAuth } = useAuth();
 
   const selectableMembers = useMemo(
@@ -158,7 +158,6 @@ export default function PermissionsSection({
             label: String(dataset.name || dataset.dataset_id),
           }));
           setResourceOptions(items);
-          return;
         }
       } catch {
         setResourceOptions([]);
@@ -170,15 +169,17 @@ export default function PermissionsSection({
     loadOptions();
   }, [addFormOpen, fetchWithAuth, newResourceType, teamId]);
 
-  const groupedRules = useMemo(() => {
-    const groups: Record<string, PermissionRule[]> = {};
-    for (const rule of rules) {
-      const key = rule.resource_type;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(rule);
-    }
-    return groups;
-  }, [rules]);
+  const groupedRules = useMemo(
+    () =>
+      rules.reduce<Record<string, PermissionRule[]>>((groups, rule) => {
+        const key = rule.resource_type;
+        return {
+          ...groups,
+          [key]: [...(groups[key] || []), rule],
+        };
+      }, {}),
+    [rules],
+  );
 
   const onToggleAction = (action: PermissionAction) => {
     setNewActions((prev) =>
@@ -395,28 +396,54 @@ export default function PermissionsSection({
             </Card>
           )}
 
-          {loadingRules ? (
+          {loadingRules && (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
               <CircularProgress />
             </Box>
-          ) : rules.length === 0 ? (
+          )}
+          {!loadingRules && rules.length === 0 && (
             <Alert color="neutral" variant="soft">
               No explicit rules. This member currently inherits default full
               access.
             </Alert>
-          ) : (
+          )}
+          {!loadingRules && rules.length > 0 && (
             <Stack spacing={2}>
               {Object.entries(groupedRules).map(([resourceType, group]) => (
                 <Box key={resourceType}>
                   <Typography level="title-sm" mb={1}>
                     {resourceType === '*' ? 'All resource types' : resourceType}
                   </Typography>
-                  <Table size="sm" variant="soft">
+                  <Table
+                    size="sm"
+                    variant="soft"
+                    sx={{
+                      tableLayout: 'fixed',
+                      width: '100%',
+                      '& th:nth-of-type(1), & td:nth-of-type(1)': {
+                        width: '35%',
+                      },
+                      '& th:nth-of-type(2), & td:nth-of-type(2)': {
+                        width: '45%',
+                      },
+                      '& td:nth-of-type(2)': {
+                        whiteSpace: 'normal',
+                        overflowWrap: 'anywhere',
+                      },
+                      '& th:nth-of-type(3), & td:nth-of-type(3)': {
+                        width: '120px',
+                        textAlign: 'right',
+                        whiteSpace: 'nowrap',
+                      },
+                    }}
+                  >
                     <thead>
                       <tr>
                         <th>Resource</th>
                         <th>Actions</th>
-                        <th style={{ width: 80 }} />
+                        <th style={{ width: 1, whiteSpace: 'nowrap' }}>
+                          Action
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -432,9 +459,14 @@ export default function PermissionsSection({
                             <Button
                               size="sm"
                               color="danger"
-                              variant="plain"
+                              variant="outlined"
                               onClick={() => onDeleteRule(rule.id)}
                               disabled={saving}
+                              sx={{
+                                minWidth: 90,
+                                whiteSpace: 'nowrap',
+                                ml: 'auto',
+                              }}
                               startDecorator={<Trash2Icon size={14} />}
                             >
                               Delete
