@@ -1,6 +1,5 @@
 """Unit tests for permission_service.check_permission()."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
 from transformerlab.services.permission_service import check_permission
@@ -43,6 +42,7 @@ def _rule(resource_type, resource_id, actions):
 
 # --- owner tests ---
 
+
 async def test_owner_always_allowed_for_any_action():
     session = _make_session(_owner())
     assert await check_permission(session, "u1", "t1", "experiment", "exp1", "delete") is True
@@ -55,6 +55,7 @@ async def test_owner_allowed_even_for_admin_action():
 
 # --- non-member tests ---
 
+
 async def test_non_member_is_denied():
     session = _make_session(None)
     assert await check_permission(session, "u1", "t1", "experiment", "exp1", "read") is False
@@ -62,12 +63,14 @@ async def test_non_member_is_denied():
 
 # --- denylist default tests ---
 
+
 async def test_member_with_no_acl_records_has_full_access():
     session = _make_session(_member(), None, None, None)
     assert await check_permission(session, "u1", "t1", "experiment", "exp1", "delete") is True
 
 
 # --- exact match tests ---
+
 
 async def test_member_exact_match_action_allowed():
     rule = _rule("experiment", "exp1", ["read", "execute"])
@@ -83,6 +86,7 @@ async def test_member_exact_match_action_denied():
 
 # --- type wildcard tests ---
 
+
 async def test_member_type_wildcard_action_allowed():
     rule = _rule("experiment", "*", ["read"])
     session = _make_session(_member(), None, rule)
@@ -96,6 +100,7 @@ async def test_member_type_wildcard_action_denied():
 
 
 # --- global wildcard tests ---
+
 
 async def test_member_global_wildcard_action_allowed():
     rule = _rule("*", "*", ["read", "execute"])
@@ -111,8 +116,11 @@ async def test_member_global_wildcard_action_denied():
 
 # --- specificity precedence: exact beats type wildcard ---
 
+
 async def test_exact_match_takes_precedence_over_type_wildcard():
     exact_rule = _rule("experiment", "exp1", ["read"])
     type_rule = _rule("experiment", "*", ["read", "delete"])
     session = _make_session(_member(), exact_rule)
     assert await check_permission(session, "u1", "t1", "experiment", "exp1", "delete") is False
+    session1 = _make_session(_member(), type_rule)
+    assert await check_permission(session1, "u1", "t1", "experiment", "exp1", "delete") is True
