@@ -27,15 +27,12 @@ import EditInteractiveTaskModal from './EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from './DeleteTaskConfirmModal';
 import QueueTaskModal from './QueueTaskModal';
 import ViewOutputModalStreaming from './ViewOutputModalStreaming';
-import ArtifactsSection from './JobArtifacts/ArtifactsSection';
 import ViewProfilingModal from './ViewProfilingModal';
 import ViewCheckpointsModal from './ViewCheckpointsModal';
 import ViewEvalResultsModal from './ViewEvalResultsModal';
 import CompareEvalResultsModal from './CompareEvalResultsModal';
 import PreviewDatasetModal from '../../Data/PreviewDatasetModal';
 import ViewSweepResultsModal from './ViewSweepResultsModal';
-import DatasetsSection from './JobArtifacts/DatasetsSection';
-import ModelsSection from './JobArtifacts/ModelsSection';
 import JobArtifactsModal from './JobArtifacts/JobArtifactsModal';
 import FileBrowserModal from './FileBrowserModal';
 import SafeJSONParse from '../../Shared/SafeJSONParse';
@@ -63,9 +60,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const [viewCheckpointsFromJob, setViewCheckpointsFromJob] = useState<
     string | null
   >(null);
-  const [viewArtifactsFromJob, setViewArtifactsFromJob] = useState<
-    string | null
-  >(null);
   const [viewProfilingFromJob, setViewProfilingFromJob] = useState<
     string | null
   >(null);
@@ -80,12 +74,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     string | null
   >(null);
   const [interactiveJobForModal, setInteractiveJobForModal] = useState<
-    string | null
-  >(null);
-  const [viewJobDatasetsFromJob, setViewJobDatasetsFromJob] = useState<
-    string | null
-  >(null);
-  const [viewJobModelsFromJob, setViewJobModelsFromJob] = useState<
     string | null
   >(null);
   const [viewAllArtifactsFromJob, setViewAllArtifactsFromJob] = useState<
@@ -1477,11 +1465,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         onClose={() => setViewAllArtifactsFromJob(null)}
         jobId={viewAllArtifactsFromJob}
       />
-      <ArtifactsSection
-        open={viewArtifactsFromJob !== null}
-        onClose={() => setViewArtifactsFromJob(null)}
-        jobId={viewArtifactsFromJob}
-      />
       <ViewProfilingModal
         open={viewProfilingFromJob !== null}
         onClose={() => setViewProfilingFromJob(null)}
@@ -1514,20 +1497,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         dataset_id={previewDatasetModal.datasetId}
         viewType="preview"
       />
-      {viewJobDatasetsFromJob !== null && (
-        <DatasetsSection
-          open
-          onClose={() => setViewJobDatasetsFromJob(null)}
-          jobId={viewJobDatasetsFromJob}
-        />
-      )}
-      {viewJobModelsFromJob !== null && (
-        <ModelsSection
-          open
-          onClose={() => setViewJobModelsFromJob(null)}
-          jobId={viewJobModelsFromJob}
-        />
-      )}
       <FileBrowserModal
         mode="job"
         open={viewFileBrowserFromJob !== null}
