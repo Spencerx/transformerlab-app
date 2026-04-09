@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -13,6 +13,9 @@ import { getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import { fetchWithAuth } from 'renderer/lib/authContext';
 import Model3DViewer from 'renderer/components/Shared/Model3DViewer';
+import { getFileExtension, downloadArtifact } from './artifactUtils';
+
+export { canPreviewFile } from './artifactUtils';
 
 export interface PreviewableItem {
   filename: string;
@@ -22,34 +25,6 @@ export interface PreviewableItem {
 interface ArtifactPreviewPaneProps {
   item: PreviewableItem | null;
   onClose: () => void;
-}
-
-const PREVIEWABLE_EXTENSIONS = [
-  'json',
-  'txt',
-  'log',
-  'png',
-  'jpg',
-  'jpeg',
-  'gif',
-  'bmp',
-  'webp',
-  'svg',
-  'mp4',
-  'webm',
-  'mov',
-  'mp3',
-  'wav',
-  'ogg',
-  'm4a',
-  'flac',
-  'glb',
-  'gltf',
-];
-
-export function canPreviewFile(filename: string): boolean {
-  const ext = filename.toLowerCase().split('.').pop() || '';
-  return PREVIEWABLE_EXTENSIONS.includes(ext);
 }
 
 export default function ArtifactPreviewPane({
@@ -70,6 +45,8 @@ export default function ArtifactPreviewPane({
     };
   }, [previewData]);
 
+  const loadIdRef = useRef(0);
+
   // Load preview when item changes
   useEffect(() => {
     if (!item) {
@@ -77,102 +54,62 @@ export default function ArtifactPreviewPane({
       setPreviewError(null);
       return;
     }
-    loadPreview(item);
+    const id = ++loadIdRef.current;
+    loadPreview(item, id);
   }, [item?.filename, item?.jobId]);
 
-  const getFileExtension = (filename: string) => {
-    return filename.toLowerCase().split('.').pop() || '';
-  };
-
-  const loadPreview = async (previewItem: PreviewableItem) => {
+  const loadPreview = async (previewItem: PreviewableItem, id: number) => {
     setPreviewLoading(true);
     setPreviewError(null);
     setPreviewData(null);
 
     const ext = getFileExtension(previewItem.filename);
+    const artifactUrl = getAPIFullPath('jobs', ['getArtifact'], {
+      experimentId: experimentInfo?.id,
+      jobId: previewItem.jobId,
+      filename: previewItem.filename,
+    });
 
     try {
+      let data: any = null;
       if (ext === 'json') {
-        const url = getAPIFullPath('jobs', ['getArtifact'], {
-          experimentId: experimentInfo?.id,
-          jobId: previewItem.jobId,
-          filename: previewItem.filename,
-        });
-        const response = await fetchWithAuth(`${url}?task=view`);
+        const response = await fetchWithAuth(`${artifactUrl}?task=view`);
         if (!response.ok) throw new Error('Failed to load artifact');
-        const jsonData = await response.json();
-        setPreviewData({ type: 'json', data: jsonData });
+        data = { type: 'json', data: await response.json() };
       } else if (['txt', 'log'].includes(ext)) {
-        const url = getAPIFullPath('jobs', ['getArtifact'], {
-          experimentId: experimentInfo?.id,
-          jobId: previewItem.jobId,
-          filename: previewItem.filename,
-        });
-        const response = await fetchWithAuth(`${url}?task=view`);
+        const response = await fetchWithAuth(`${artifactUrl}?task=view`);
         if (!response.ok) throw new Error('Failed to load artifact');
-        const textData = await response.text();
-        setPreviewData({ type: 'text', data: textData });
+        data = { type: 'text', data: await response.text() };
       } else if (
         ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'].includes(ext)
       ) {
-        const imageUrl = getAPIFullPath('jobs', ['getArtifact'], {
-          experimentId: experimentInfo?.id,
-          jobId: previewItem.jobId,
-          filename: previewItem.filename,
-        });
-        setPreviewData({ type: 'image', url: `${imageUrl}?task=view` });
+        data = { type: 'image', url: `${artifactUrl}?task=view` };
       } else if (['mp4', 'webm', 'mov'].includes(ext)) {
-        const videoUrl = getAPIFullPath('jobs', ['getArtifact'], {
-          experimentId: experimentInfo?.id,
-          jobId: previewItem.jobId,
-          filename: previewItem.filename,
-        });
-        setPreviewData({ type: 'video', url: `${videoUrl}?task=view` });
+        data = { type: 'video', url: `${artifactUrl}?task=view` };
       } else if (['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext)) {
-        const audioUrl = getAPIFullPath('jobs', ['getArtifact'], {
-          experimentId: experimentInfo?.id,
-          jobId: previewItem.jobId,
-          filename: previewItem.filename,
-        });
-        setPreviewData({ type: 'audio', url: `${audioUrl}?task=view` });
+        data = { type: 'audio', url: `${artifactUrl}?task=view` };
       } else if (['glb', 'gltf'].includes(ext)) {
-        const modelUrl = getAPIFullPath('jobs', ['getArtifact'], {
-          experimentId: experimentInfo?.id,
-          jobId: previewItem.jobId,
-          filename: previewItem.filename,
-        });
-        setPreviewData({
+        data = {
           type: 'model3d',
-          url: `${modelUrl}?task=view`,
+          url: `${artifactUrl}?task=view`,
           filename: previewItem.filename,
-        });
+        };
       }
+
+      if (id !== loadIdRef.current) return;
+      setPreviewData(data);
     } catch {
+      if (id !== loadIdRef.current) return;
       setPreviewError('Failed to load artifact preview');
     } finally {
-      setPreviewLoading(false);
+      if (id === loadIdRef.current) setPreviewLoading(false);
     }
   };
 
   const handleDownload = async () => {
     if (!item) return;
     try {
-      const downloadUrl = getAPIFullPath('jobs', ['getArtifact'], {
-        experimentId: experimentInfo?.id,
-        jobId: item.jobId,
-        filename: item.filename,
-      });
-      const response = await fetchWithAuth(`${downloadUrl}?task=download`);
-      if (!response.ok) throw new Error('Failed to download artifact');
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = item.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      await downloadArtifact(experimentInfo?.id, item.jobId, item.filename);
     } catch (error) {
       console.error('Download failed:', error);
     }

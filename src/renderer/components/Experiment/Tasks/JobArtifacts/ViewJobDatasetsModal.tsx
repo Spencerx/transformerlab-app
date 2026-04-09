@@ -25,8 +25,8 @@ import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
 import SaveToRegistryDialog, { SaveVersionInfo } from '../SaveToRegistryDialog';
 
 interface ViewJobDatasetsModalProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
   jobId: number | string | null;
   renderContentOnly?: boolean;
   onCountLoaded?: (count: number) => void;
@@ -39,8 +39,8 @@ interface Dataset {
 }
 
 export default function ViewJobDatasetsModal({
-  open,
-  onClose,
+  open = false,
+  onClose = () => {},
   jobId,
   renderContentOnly = false,
   onCountLoaded,

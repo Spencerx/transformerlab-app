@@ -27,8 +27,8 @@ import {
 import SaveToRegistryDialog, { SaveVersionInfo } from '../SaveToRegistryDialog';
 
 interface ViewJobModelsModalProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
   jobId: number | string | null;
   renderContentOnly?: boolean;
   onCountLoaded?: (count: number) => void;
@@ -41,8 +41,8 @@ interface Model {
 }
 
 export default function ViewJobModelsModal({
-  open,
-  onClose,
+  open = false,
+  onClose = () => {},
   jobId,
   renderContentOnly = false,
   onCountLoaded,

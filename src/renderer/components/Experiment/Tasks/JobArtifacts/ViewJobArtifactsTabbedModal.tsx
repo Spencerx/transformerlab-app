@@ -15,10 +15,9 @@ import {
   ArchiveIcon,
   Download,
 } from 'lucide-react';
-import { getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
-import { fetchWithAuth } from 'renderer/lib/authContext';
 import ViewArtifactsModal from './ViewArtifactsModal';
+import { downloadAllArtifacts } from './artifactUtils';
 import ViewJobDatasetsModal from './ViewJobDatasetsModal';
 import ViewJobModelsModal from './ViewJobModelsModal';
 import ArtifactPreviewPane, { PreviewableItem } from './ArtifactPreviewPane';
@@ -45,21 +44,7 @@ export default function ViewJobArtifactsTabbedModal({
     if (!jobId) return;
     try {
       setIsDownloadingAll(true);
-      const downloadUrl = getAPIFullPath('jobs', ['downloadAllArtifacts'], {
-        experimentId: experimentInfo?.id,
-        jobId,
-      });
-      const response = await fetchWithAuth(downloadUrl);
-      if (!response.ok) throw new Error('Failed to download artifacts');
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `artifacts_job_${jobId}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      await downloadAllArtifacts(experimentInfo?.id, jobId);
     } catch (error) {
       console.error('Download failed:', error);
     } finally {
@@ -109,8 +94,6 @@ export default function ViewJobArtifactsTabbedModal({
                   </Typography>
                 </Stack>
                 <ViewJobModelsModal
-                  open={false}
-                  onClose={() => {}}
                   jobId={jobId}
                   renderContentOnly
                   onCountLoaded={setModelsCount}
@@ -132,8 +115,6 @@ export default function ViewJobArtifactsTabbedModal({
                   </Typography>
                 </Stack>
                 <ViewJobDatasetsModal
-                  open={false}
-                  onClose={() => {}}
                   jobId={jobId}
                   renderContentOnly
                   onCountLoaded={setDatasetsCount}
@@ -170,8 +151,6 @@ export default function ViewJobArtifactsTabbedModal({
                   )}
                 </Stack>
                 <ViewArtifactsModal
-                  open={false}
-                  onClose={() => {}}
                   jobId={jobId}
                   renderContentOnly
                   onCountLoaded={setArtifactsCount}

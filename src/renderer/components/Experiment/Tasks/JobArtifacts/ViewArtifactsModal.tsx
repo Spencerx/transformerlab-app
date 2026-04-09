@@ -22,10 +22,16 @@ import { formatBytes } from 'renderer/lib/utils';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import { fetchWithAuth } from 'renderer/lib/authContext';
 import Model3DViewer from 'renderer/components/Shared/Model3DViewer';
+import {
+  canPreviewFile as canPreview,
+  getFileExtension,
+  downloadArtifact,
+  downloadAllArtifacts,
+} from './artifactUtils';
 
 interface ViewArtifactsModalProps {
-  open: boolean;
-  onClose: () => void;
+  open?: boolean;
+  onClose?: () => void;
   jobId: number | string | null;
   renderContentOnly?: boolean;
   onCountLoaded?: (count: number) => void;
@@ -40,8 +46,8 @@ interface Artifact {
 }
 
 export default function ViewArtifactsModal({
-  open,
-  onClose,
+  open = false,
+  onClose = () => {},
   jobId,
   renderContentOnly = false,
   onCountLoaded,
@@ -90,41 +96,6 @@ export default function ViewArtifactsModal({
   const hasSize = !!data?.artifacts?.some(
     (artifact: Artifact) => artifact.size,
   );
-
-  const getFileExtension = (filename: string) => {
-    return filename.toLowerCase().split('.').pop() || '';
-  };
-
-  const canPreview = (filename: string) => {
-    const ext = getFileExtension(filename);
-    const previewableExtensions = [
-      'json',
-      'txt',
-      'log',
-      // Images
-      'png',
-      'jpg',
-      'jpeg',
-      'gif',
-      'bmp',
-      'webp',
-      'svg',
-      // Video
-      'mp4',
-      'webm',
-      'mov',
-      // Audio
-      'mp3',
-      'wav',
-      'ogg',
-      'm4a',
-      'flac',
-      // 3D Models
-      'glb',
-      'gltf',
-    ];
-    return previewableExtensions.includes(ext);
-  };
 
   const handleViewArtifact = async (artifact: Artifact) => {
     if (!jobId) return;
@@ -211,34 +182,13 @@ export default function ViewArtifactsModal({
   const handleDownloadArtifact = async (artifact: Artifact) => {
     if (!jobId) return;
     try {
-      const downloadUrl = getAPIFullPath('jobs', ['getArtifact'], {
-        experimentId: experimentInfo?.id,
-        jobId: jobId.toString(),
-        filename: artifact.filename,
-      });
-
-      // Fetch with authentication and trigger download
-      const response = await fetchWithAuth(`${downloadUrl}?task=download`);
-      if (!response.ok) {
-        throw new Error('Failed to download artifact');
-      }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      // Create a temporary link and click it to trigger download
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = artifact.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Clean up the blob URL after a short delay
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      await downloadArtifact(
+        experimentInfo?.id,
+        jobId.toString(),
+        artifact.filename,
+      );
     } catch (error) {
       console.error('Download failed:', error);
-      // Optionally show an error notification to the user
     }
   };
 
@@ -246,33 +196,9 @@ export default function ViewArtifactsModal({
     if (!jobId) return;
     try {
       setIsDownloading(true);
-      const downloadUrl = getAPIFullPath('jobs', ['downloadAllArtifacts'], {
-        experimentId: experimentInfo?.id,
-        jobId: jobId.toString(),
-      });
-
-      // Fetch with authentication and trigger download
-      const response = await fetchWithAuth(`${downloadUrl}`);
-      if (!response.ok) {
-        throw new Error('Failed to download artifacts');
-      }
-
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-
-      // Create a temporary link and click it to trigger download
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = `artifacts_job_${jobId}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      // Clean up the blob URL after a short delay
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      await downloadAllArtifacts(experimentInfo?.id, jobId.toString());
     } catch (error) {
       console.error('Download failed:', error);
-      // Optionally show an error notification to the user
     } finally {
       setIsDownloading(false);
     }
@@ -557,7 +483,6 @@ export default function ViewArtifactsModal({
             )}
           </Box>
 
-          {/* Preview Pane (only when not delegating to parent) */}
           {!onPreviewItem && selectedArtifact && (
             <>
               <Divider orientation="vertical" />

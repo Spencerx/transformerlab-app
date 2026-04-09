@@ -43,16 +43,12 @@ interface JobsListProps {
   onViewOutput?: (jobId: string) => void;
   onViewCheckpoints?: (jobId: string) => void;
   onViewAllArtifacts?: (jobId: string) => void;
-  onViewArtifacts?: (jobId: string) => void;
   onViewEvalImages?: (jobId: string) => void;
   onViewSweepOutput?: (jobId: string) => void;
   onViewSweepResults?: (jobId: string) => void;
   onViewEvalResults?: (jobId: string) => void;
   onViewGeneratedDataset?: (jobId: string, datasetId: string) => void;
   onViewInteractive?: (jobId: string) => void;
-  onViewJobDatasets?: (jobId: string) => void;
-  onViewJobModels?: (jobId: string) => void;
-  onViewProfiling?: (jobId: string) => void;
   onViewFileBrowser?: (jobId: string) => void;
   loading: boolean;
   onViewTrackio?: (jobId: string) => void;
@@ -71,16 +67,12 @@ const JobsList: React.FC<JobsListProps> = ({
   onViewOutput,
   onViewCheckpoints,
   onViewAllArtifacts,
-  onViewArtifacts,
   onViewEvalImages,
   onViewSweepOutput,
   onViewSweepResults,
   onViewEvalResults,
   onViewGeneratedDataset,
   onViewInteractive,
-  onViewJobDatasets,
-  onViewJobModels,
-  onViewProfiling,
   onViewFileBrowser,
   loading,
   onViewTrackio,

@@ -1399,12 +1399,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewAllArtifacts={(jobId) =>
             setViewAllArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
           }
-          onViewArtifacts={(jobId) =>
-            setViewArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewProfiling={(jobId) =>
-            setViewProfilingFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
           onViewEvalImages={(jobId) =>
             setViewEvalImagesFromJob(jobId && jobId !== 'NaN' ? jobId : null)
           }
@@ -1414,12 +1408,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewGeneratedDataset={(jobId, datasetId) => {
             setPreviewDatasetModal({ open: true, datasetId });
           }}
-          onViewJobDatasets={(jobId) =>
-            setViewJobDatasetsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewJobModels={(jobId) =>
-            setViewJobModelsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));
