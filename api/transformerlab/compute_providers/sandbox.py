@@ -201,9 +201,9 @@ def wrap_command_with_bwrap(
     """
     Wrap *cmd* in a bwrap invocation that:
       - Creates a new filesystem namespace
-      - Bind-mounts common Linux system paths read-only
+      - Bind-mounts host filesystem read-only
       - Bind-mounts workspace_dir read-write
-      - Bind-mounts extra_read_paths read-only (shared caches)
+      - Bind-mounts extra_read_paths read-only (kept for parity/overrides)
       - Bind-mounts /dev (needed for GPU device files)
       - Bind-mounts /proc and /sys
       - Shares the host network namespace (models still download); see --share-net
@@ -223,6 +223,10 @@ def wrap_command_with_bwrap(
         bwrap,
         "--share-net",
         "--unshare-ipc",
+        # Broad read-only view of the host FS to avoid path-by-path allowlist churn.
+        "--ro-bind",
+        "/",
+        "/",
         "--dev-bind",
         "/dev",
         "/dev",
@@ -237,12 +241,6 @@ def wrap_command_with_bwrap(
         workspace_dir,
         workspace_dir,
     ]
-
-    # Keep core system binaries/libs/config readable without exposing the entire
-    # host filesystem like "--ro-bind / /".
-    for p in _LINUX_BASE_RO_PATHS:
-        if os.path.exists(p):
-            args += ["--ro-bind", p, p]
 
     for p in extra_read_paths:
         if p and os.path.exists(p):
