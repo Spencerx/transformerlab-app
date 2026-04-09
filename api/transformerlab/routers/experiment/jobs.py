@@ -20,6 +20,7 @@ from transformerlab.routers.auth import get_user_and_team
 from transformerlab.routers.serverinfo import watch_file
 from transformerlab.services.job_service import get_artifacts_from_directory, job_update_status
 import transformerlab.services.job_service as job_service
+from transformerlab.services.permission_service import require_permission
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
 from transformerlab.shared import shared, zip_utils
 from transformerlab.shared.models.models import ProviderType
@@ -121,6 +122,7 @@ async def job_create(
     type: str = "UNDEFINED",
     status: str = "CREATED",
     data: str = "{}",
+    _: None = Depends(require_permission("experiment", "execute", id_param="experimentId")),
 ):
     jobid = await job_service.job_create(type=type, status=status, job_data=data, experiment_id=experimentId)
     return jobid
