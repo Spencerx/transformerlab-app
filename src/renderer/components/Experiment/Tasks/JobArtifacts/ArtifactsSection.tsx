@@ -398,11 +398,7 @@ export default function ArtifactsSection({
         </Stack>
       )}
 
-      {noArtifacts ? (
-        <Typography level="body-xs" color="neutral" sx={{ py: 1 }}>
-          No artifacts found.
-        </Typography>
-      ) : (
+      {noArtifacts ? null : (
         <Box sx={{ display: 'flex', gap: 2, flex: 1, overflow: 'hidden' }}>
           {/* Artifacts List */}
           <Box

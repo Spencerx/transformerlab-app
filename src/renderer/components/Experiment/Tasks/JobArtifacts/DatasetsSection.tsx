@@ -226,11 +226,7 @@ export default function DatasetsSection({
         </Alert>
       )}
 
-      {noDatasetsFound ? (
-        <Typography level="body-xs" color="neutral" sx={{ py: 1 }}>
-          No datasets found.
-        </Typography>
-      ) : (
+      {noDatasetsFound ? null : (
         <Box
           sx={{
             display: 'flex',

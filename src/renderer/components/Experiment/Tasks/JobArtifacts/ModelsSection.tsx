@@ -226,11 +226,7 @@ export default function ModelsSection({
         </Alert>
       )}
 
-      {noModelsFound ? (
-        <Typography level="body-xs" color="neutral" sx={{ py: 1 }}>
-          No models found.
-        </Typography>
-      ) : (
+      {noModelsFound ? null : (
         <Box
           sx={{
             display: 'flex',
