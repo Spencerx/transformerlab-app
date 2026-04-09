@@ -316,6 +316,11 @@ export default function InteractiveJobCard({
               job.status === 'INTERACTIVE' ? 99 : undefined
             }
           />
+          {tunnelTimedOut && !tunnelReady && (
+            <Typography level="body-xs" color="warning" sx={{ mt: 0.5 }}>
+              Startup may have stalled. Check Logs.
+            </Typography>
+          )}
         </Box>
 
         {showActions && (
@@ -332,13 +337,7 @@ export default function InteractiveJobCard({
               </Button>
               <Button
                 variant="soft"
-                color={
-                  tunnelReady
-                    ? 'success'
-                    : tunnelTimedOut
-                      ? 'warning'
-                      : 'neutral'
-                }
+                color={tunnelReady ? 'success' : 'neutral'}
                 size="sm"
                 disabled={!tunnelReady}
                 onClick={() => setInteractOpen(true)}
@@ -346,7 +345,7 @@ export default function InteractiveJobCard({
                 {tunnelReady
                   ? 'Interact'
                   : tunnelTimedOut
-                    ? 'May have failed — check Logs'
+                    ? 'Waiting…'
                     : 'Launching…'}
               </Button>
             </Stack>
