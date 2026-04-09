@@ -87,10 +87,16 @@ def _build_seatbelt_profile(
         '(allow file-read* (subpath "/usr"))',
         '(allow file-read* (subpath "/bin"))',
         '(allow file-read* (subpath "/sbin"))',
-        # SSL config needed for HTTPS git clone
-        '(allow file-read* (subpath "/private/etc"))',
-        # xcrun writes temp cache files under /private/var/folders
-        '(allow file* (subpath "/private/var/folders"))',
+        # Some macOS tools still reference canonical paths (not /private symlinks).
+        '(allow file* (subpath "/tmp"))',
+        '(allow file* (subpath "/var"))',
+        '(allow file* (subpath "/etc"))',
+        # Homebrew/system app locations used by user-installed CLIs.
+        '(allow file* (subpath "/opt"))',
+        '(allow file* (subpath "/Applications"))',
+        # Allow all /private paths (tmp, var folders, etc.) for compatibility
+        # with tools that rely on macOS private path layouts and symlinks.
+        '(allow file* (subpath "/private"))',
     ]
     # GPU device files (CUDA / Metal)
     rules += [
