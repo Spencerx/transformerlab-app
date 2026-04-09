@@ -188,20 +188,19 @@ class DstackProvider(ComputeProvider):
 
     def _list_runs(self, limit: int, timeout: int = 30) -> requests.Response:
         """List runs with compatibility fallbacks across dstack API variants."""
-        errors: list[Exception] = []
-        attempts: list[tuple[str, str, Dict[str, Any]]] = [
-            ("POST", "/api/runs/list", {"project_name": self.project_name, "only_active": False, "limit": limit})
-        ]
-        for method, endpoint, payload in attempts:
-            try:
-                return self._make_request(method, endpoint, json_data=payload, timeout=timeout)
-            except Exception as exc:
-                errors.append(exc)
-                if method == "POST":
-                    # if "status 404" not in message and "status 405" not in message:
-                    if exc.response.status_code not in [404, 405]:
-                        raise
-        raise RuntimeError(f"Unable to list dstack runs after {len(attempts)} attempts. Last error: {errors[-1]}")
+
+        try:
+            return self._make_request(
+                "POST",
+                "/api/runs/list",
+                json_data={"project_name": self.project_name, "only_active": False, "limit": limit},
+                timeout=timeout,
+            )
+        except Exception as exc:
+            if hasattr(exc, "response") and exc.response.status_code not in [404, 405]:
+                raise
+            logger.error("Unable to list dstack runs: %s", exc)
+            raise RuntimeError("Unable to list dstack runs") from exc
 
     # ------------------------------------------------------------------
     # ComputeProvider interface
