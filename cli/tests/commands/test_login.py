@@ -30,7 +30,7 @@ def test_logout_help():
 @patch("transformerlab_cli.commands.login.set_api_key", return_value=True)
 @patch("transformerlab_cli.commands.login.set_config")
 @patch("transformerlab_cli.commands.login.load_config", return_value={"server": "http://localhost:8338"})
-def test_login_success(mock_load, mock_set, mock_set_key, mock_user, mock_teams):
+def test_login_success(_mock_load, _mock_set, _mock_set_key, _mock_user, _mock_teams):
     """Test successful login flow."""
     result = runner.invoke(app, ["login", "--api-key", "test-key"])
     assert result.exit_code == 0
@@ -39,14 +39,14 @@ def test_login_success(mock_load, mock_set, mock_set_key, mock_user, mock_teams)
 
 @patch("transformerlab_cli.commands.login.set_api_key", return_value=False)
 @patch("transformerlab_cli.commands.login.load_config", return_value={"server": "http://localhost:8338"})
-def test_login_failure(mock_load, mock_set_key):
+def test_login_failure(_mock_load, _mock_set_key):
     """Test login failure."""
     result = runner.invoke(app, ["login", "--api-key", "bad-key"])
     assert result.exit_code == 1
 
 
 @patch("transformerlab_cli.commands.logout.delete_api_key", return_value=True)
-def test_logout_success(mock_delete):
+def test_logout_success(_mock_delete):
     """Test successful logout."""
     result = runner.invoke(app, ["logout"])
     assert result.exit_code == 0

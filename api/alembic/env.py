@@ -26,7 +26,7 @@ target_metadata = Base.metadata
 EXCLUDED_TABLES = {"workflows", "workflow_runs", "user"}
 
 
-def include_object(object, name, type_, reflected, compare_to):
+def include_object(object, name, type_, _reflected, _compare_to):
     """Skip objects Alembic should not track."""
     if type_ == "table" and name in EXCLUDED_TABLES:
         return False
