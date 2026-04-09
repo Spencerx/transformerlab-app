@@ -58,16 +58,14 @@ interface SaveToRegistryDialogProps {
   sourceName: string;
   /** 'dataset' or 'model' — used for labels */
   type: 'dataset' | 'model';
-  /** List of existing registry entry names for the "Add to existing" option */
-  existingNames: string[];
   /** Whether the save is in progress */
   saving: boolean;
   /** Called when the user confirms the save */
   onSave: (info: SaveVersionInfo) => void;
-  /** Job ID that produced this asset (optional, for display) */
-  jobId?: string | number;
-  /** External error message to display on the asset name field (e.g. name already exists) */
-  assetNameError?: string | null;
+  /** Job ID that produced this asset (for display) */
+  jobId: string | number | null;
+  /** External error message for the asset name field */
+  assetNameError: string | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -90,7 +88,6 @@ export default function SaveToRegistryDialog({
   onClose,
   sourceName,
   type,
-  existingNames,
   saving,
   onSave,
   jobId,
@@ -200,7 +197,17 @@ export default function SaveToRegistryDialog({
 
   return (
     <Modal open={open} onClose={onClose}>
-      <ModalDialog sx={{ width: 520, maxWidth: '95vw' }}>
+      <ModalDialog
+        sx={{
+          width: {
+            xs: 'calc(100vw - 2rem)',
+            sm: 'min(640px, calc(100vw - 2rem))',
+          },
+          maxWidth: 'calc(100vw - 2rem)',
+          maxHeight: 'calc(100vh - 2rem)',
+          overflowY: 'auto',
+        }}
+      >
         <ModalClose />
         <Stack direction="row" alignItems="center" gap={1}>
           <LayersIcon size={20} />
