@@ -142,7 +142,6 @@ export default function ModelNameInput({
 
   const handleRemoveEntry = React.useCallback(
     (entry: string, e: React.MouseEvent) => {
-      e.stopPropagation();
       e.preventDefault();
       removeModelFromHistory(storageKey, entry);
       setHistory(readModelHistory(storageKey));
@@ -155,15 +154,20 @@ export default function ModelNameInput({
       freeSolo
       // Provide the saved history as options
       options={history}
-      // The controlled input value
+      // Control both the input value and the autocomplete value
+      value={value || null}
       inputValue={value}
-      // Joy UI fires onInputChange for free-form typing
-      onInputChange={(_event, newInputValue) => {
-        onChange(newInputValue ?? '');
+      // Only handle free-form typing via onInputChange
+      onInputChange={(_event, newInputValue, reason) => {
+        if (reason === 'input') {
+          onChange(newInputValue ?? '');
+        }
       }}
-      // Also handle selection from the dropdown
+      // Handle clearing via the clear button (value becomes null)
       onChange={(_event, newValue) => {
-        if (typeof newValue === 'string') {
+        if (newValue === null) {
+          onChange('');
+        } else if (typeof newValue === 'string') {
           onChange(newValue);
         }
       }}
@@ -188,7 +192,10 @@ export default function ModelNameInput({
             variant="plain"
             color="neutral"
             aria-label={`Remove ${option} from history`}
-            onClick={(e) => handleRemoveEntry(option, e)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              handleRemoveEntry(option, e as any);
+            }}
             sx={{ flexShrink: 0, minWidth: 'unset', p: 0.25 }}
           >
             <XIcon size={12} />

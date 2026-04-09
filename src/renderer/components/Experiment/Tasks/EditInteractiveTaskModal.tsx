@@ -401,9 +401,10 @@ export default function EditInteractiveTaskModal({
 
       // Persist model name to history before saving
       const modelName = configFieldValues['MODEL_NAME'];
-      if (modelName?.trim() && interactiveType) {
+      if (modelName?.trim() && (interactiveType || galleryId)) {
+        const taskTypeOrId = interactiveType || galleryId;
         saveModelToHistory(
-          getModelHistoryKey(interactiveType),
+          getModelHistoryKey(taskTypeOrId),
           modelName.trim(),
         );
       }
