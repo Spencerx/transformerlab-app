@@ -104,7 +104,7 @@ def process_env_parameters_to_env_vars(config: dict) -> dict:
     tags=["tasks", "tasks:list:{experimentId}"],
 )
 async def task_get_all(experimentId: str):
-    tasks = await task_service.task_get_all()
+    tasks = await task_service.task_get_by_experiment(experimentId)
     return tasks
 
 
