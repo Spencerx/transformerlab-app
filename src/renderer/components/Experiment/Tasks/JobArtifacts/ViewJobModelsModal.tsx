@@ -251,6 +251,7 @@ export default function ViewJobModelsModal({
               {models.map((model) => (
                 <ListItem
                   key={model.name}
+                  sx={{ overflow: 'hidden' }}
                   endAction={
                     <Button
                       size="sm"

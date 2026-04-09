@@ -499,6 +499,7 @@ export default function ViewArtifactsModal({
                 {data?.artifacts?.map((artifact: Artifact) => (
                   <ListItem
                     key={`artifact-${artifact.filename}`}
+                    sx={{ overflow: 'hidden' }}
                     endAction={
                       <IconButton
                         size="sm"

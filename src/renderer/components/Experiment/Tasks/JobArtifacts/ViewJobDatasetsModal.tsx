@@ -254,6 +254,7 @@ export default function ViewJobDatasetsModal({
               {datasets.map((dataset) => (
                 <ListItem
                   key={dataset.name}
+                  sx={{ overflow: 'hidden' }}
                   endAction={
                     <Button
                       size="sm"
