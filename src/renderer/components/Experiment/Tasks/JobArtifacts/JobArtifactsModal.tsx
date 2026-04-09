@@ -76,7 +76,7 @@ export default function JobArtifactsModal({
           {/* Left: scrollable sections */}
           <Box
             sx={{
-              flex: 1,
+              flex: '0 0 30%',
               overflowY: 'auto',
               overflowX: 'hidden',
               minWidth: 0,
