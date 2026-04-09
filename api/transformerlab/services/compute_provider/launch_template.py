@@ -335,6 +335,9 @@ async def launch_template_on_provider(
     # interactive remote setup based on the gallery entry.
 
     # Add default environment variables
+    # Explicitly pass storage provider to launched jobs so task runtimes don't
+    # depend on inheriting parent process env.
+    env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
     env_vars["_TFL_JOB_ID"] = str(job_id)
     env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
     env_vars["_TFL_USER_ID"] = user_id
@@ -363,19 +366,24 @@ async def launch_template_on_provider(
         if request.enable_profiling_torch:
             env_vars["_TFL_PROFILING_TORCH"] = "1"
 
-    # Get TFL_STORAGE_URI from storage context
+    # Get TFL_STORAGE_URI for the launched runtime.
+    # For localfs, explicitly provide an org-scoped URI so subprocess code can
+    # resolve storage without relying on contextvar propagation.
     tfl_storage_uri = None
-    try:
-        storage_root = await storage.root_uri()
-        if storage_root:
-            if storage.is_remote_path(storage_root):
-                # Remote cloud storage (S3/GCS/etc.)
-                tfl_storage_uri = storage_root
-            elif STORAGE_PROVIDER == "localfs":
-                # localfs: expose the local mount path to the remote worker
-                tfl_storage_uri = storage_root
-    except Exception:
-        pass
+    if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI") and team_id:
+        tfl_storage_uri = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", str(team_id), "workspace")
+    else:
+        try:
+            storage_root = await storage.root_uri()
+            if storage_root:
+                if storage.is_remote_path(storage_root):
+                    # Remote cloud storage (S3/GCS/etc.)
+                    tfl_storage_uri = storage_root
+                elif STORAGE_PROVIDER == "localfs":
+                    # localfs: expose the local mount path to the launched worker
+                    tfl_storage_uri = storage_root
+        except Exception:
+            pass
 
     if tfl_storage_uri:
         env_vars["TFL_STORAGE_URI"] = tfl_storage_uri

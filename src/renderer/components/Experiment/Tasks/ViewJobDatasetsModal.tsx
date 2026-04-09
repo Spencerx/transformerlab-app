@@ -55,12 +55,6 @@ export default function ViewJobDatasetsModal({
   const [saveTaskJobId, setSaveTaskJobId] = useState<string | null>(null);
   const [assetNameError, setAssetNameError] = useState<string | null>(null);
 
-  // Fetch existing datasets in the registry for "Add to existing" option
-  const { data: registryDatasets } = useSWR(
-    open ? chatAPI.Endpoints.Dataset.LocalList() : null,
-    fetcher,
-  );
-
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
     saveTaskJobId && experimentInfo?.id
@@ -100,12 +94,6 @@ export default function ViewJobDatasetsModal({
     }
   }, [saveTaskData, saveTaskJobId]);
 
-  const existingDatasetNames: string[] = Array.isArray(registryDatasets)
-    ? registryDatasets
-        .map((d: any) => d.dataset_id || d.name || d.id)
-        .filter(Boolean)
-    : [];
-
   const datasets: Dataset[] = data?.datasets || [];
 
   const handleSaveToRegistry = async (
@@ -122,12 +110,13 @@ export default function ViewJobDatasetsModal({
         experimentId: experimentInfo?.id,
         jobId: jobId.toString(),
         datasetName,
-        targetName: info.groupName,
+        targetName: info.groupId || info.groupName,
         assetName: info.assetName,
         mode: info.mode,
         tag: info.tag,
         versionLabel: info.versionLabel,
         description: info.description,
+        groupName: info.groupName,
       });
 
       const response = await fetchWithAuth(url, {
@@ -333,7 +322,6 @@ export default function ViewJobDatasetsModal({
         }}
         sourceName={saveDialogDataset || ''}
         type="dataset"
-        existingNames={existingDatasetNames}
         saving={savingDataset !== null}
         jobId={jobId}
         assetNameError={assetNameError}

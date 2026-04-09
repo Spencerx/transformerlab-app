@@ -55,12 +55,6 @@ export default function ViewJobModelsModal({
   const [saveTaskJobId, setSaveTaskJobId] = useState<string | null>(null);
   const [assetNameError, setAssetNameError] = useState<string | null>(null);
 
-  // Fetch existing models in the registry for "Add to existing" option
-  const { data: registryModels } = useSWR(
-    open ? chatAPI.Endpoints.Models.LocalList() : null,
-    fetcher,
-  );
-
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
     saveTaskJobId && experimentInfo?.id
@@ -100,12 +94,6 @@ export default function ViewJobModelsModal({
     }
   }, [saveTaskData, saveTaskJobId]);
 
-  const existingModelNames: string[] = Array.isArray(registryModels)
-    ? registryModels
-        .map((m: any) => m.model_id || m.name || m.id)
-        .filter(Boolean)
-    : [];
-
   const models: Model[] = data?.models || [];
 
   const handleSaveToRegistry = async (
@@ -122,12 +110,13 @@ export default function ViewJobModelsModal({
         experimentId: experimentInfo?.id,
         jobId: jobId.toString(),
         modelName,
-        targetName: info.groupName,
+        targetName: info.groupId || info.groupName,
         assetName: info.assetName,
         mode: info.mode,
         tag: info.tag,
         versionLabel: info.versionLabel,
         description: info.description,
+        groupName: info.groupName,
       });
 
       const response = await fetchWithAuth(url, {
@@ -333,7 +322,6 @@ export default function ViewJobModelsModal({
         }}
         sourceName={saveDialogModel || ''}
         type="model"
-        existingNames={existingModelNames}
         saving={savingModel !== null}
         jobId={jobId}
         assetNameError={assetNameError}

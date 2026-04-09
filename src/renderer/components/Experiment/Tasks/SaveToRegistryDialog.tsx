@@ -27,6 +27,7 @@ import { fetcher } from '../../../lib/transformerlab-api-sdk';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface GroupSummary {
+  group_id: string;
   group_name: string;
   asset_type: string;
   version_count: number;
@@ -34,8 +35,10 @@ interface GroupSummary {
 }
 
 export interface SaveVersionInfo {
-  /** The group name (either new or existing) */
+  /** The display name for the group (new name or existing display name) */
   groupName: string;
+  /** The UUID group_id when adding to an existing group */
+  groupId?: string;
   /** Unique name for the asset in the registry folder */
   assetName: string;
   /** 'new' = create a new group, 'existing' = add version to existing group */
@@ -55,16 +58,14 @@ interface SaveToRegistryDialogProps {
   sourceName: string;
   /** 'dataset' or 'model' — used for labels */
   type: 'dataset' | 'model';
-  /** List of existing registry entry names for the "Add to existing" option */
-  existingNames: string[];
   /** Whether the save is in progress */
   saving: boolean;
   /** Called when the user confirms the save */
   onSave: (info: SaveVersionInfo) => void;
-  /** Job ID that produced this asset (optional, for display) */
-  jobId?: string | number;
-  /** External error message to display on the asset name field (e.g. name already exists) */
-  assetNameError?: string | null;
+  /** Job ID that produced this asset (for display) */
+  jobId: string | number | null;
+  /** External error message for the asset name field */
+  assetNameError: string | null;
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -87,7 +88,6 @@ export default function SaveToRegistryDialog({
   onClose,
   sourceName,
   type,
-  existingNames,
   saving,
   onSave,
   jobId,
@@ -110,10 +110,10 @@ export default function SaveToRegistryDialog({
   const groups: GroupSummary[] = Array.isArray(groupsData) ? groupsData : [];
   const groupNames = groups.map((g) => g.group_name);
 
-  // Find selected group info for "next version" display
+  // Find selected group info for "next version" display (existingTarget stores group_id)
   const selectedGroup =
     mode === 'existing' && existingTarget
-      ? groups.find((g) => g.group_name === existingTarget)
+      ? groups.find((g) => g.group_id === existingTarget)
       : null;
   const latestVersionLabel = selectedGroup?.latest_version_label ?? null;
 
@@ -179,9 +179,13 @@ export default function SaveToRegistryDialog({
   const handleSubmit = () => {
     if (!canSave) return;
     setAssetNameError(null);
-    const groupName = mode === 'new' ? newName.trim() : existingTarget!;
+    const groupName =
+      mode === 'new'
+        ? newName.trim()
+        : (selectedGroup?.group_name ?? existingTarget!);
     onSave({
       groupName,
+      groupId: mode === 'existing' ? existingTarget! : undefined,
       assetName: assetName.trim(),
       mode,
       tag,
@@ -193,7 +197,17 @@ export default function SaveToRegistryDialog({
 
   return (
     <Modal open={open} onClose={onClose}>
-      <ModalDialog sx={{ width: 520, maxWidth: '95vw' }}>
+      <ModalDialog
+        sx={{
+          width: {
+            xs: 'calc(100vw - 2rem)',
+            sm: 'min(640px, calc(100vw - 2rem))',
+          },
+          maxWidth: 'calc(100vw - 2rem)',
+          maxHeight: 'calc(100vh - 2rem)',
+          overflowY: 'auto',
+        }}
+      >
         <ModalClose />
         <Stack direction="row" alignItems="center" gap={1}>
           <LayersIcon size={20} />
@@ -236,9 +250,17 @@ export default function SaveToRegistryDialog({
             {mode === 'existing' && (
               <FormControl sx={{ ml: 4, mt: 1 }}>
                 <Autocomplete
-                  options={groupNames}
-                  value={existingTarget}
-                  onChange={(_e, value) => setExistingTarget(value)}
+                  options={groups}
+                  getOptionLabel={(option) =>
+                    typeof option === 'string' ? option : option.group_name
+                  }
+                  isOptionEqualToValue={(option, value) =>
+                    option.group_id === value.group_id
+                  }
+                  value={selectedGroup ?? null}
+                  onChange={(_e, value) =>
+                    setExistingTarget(value ? value.group_id : null)
+                  }
                   placeholder={`Search ${typeLabel.toLowerCase()}s…`}
                   autoFocus
                 />
