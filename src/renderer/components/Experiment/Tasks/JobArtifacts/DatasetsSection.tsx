@@ -59,15 +59,6 @@ export default function DatasetsSection({
   );
   const [saveTaskJobId, setSaveTaskJobId] = useState<string | null>(null);
 
-  // Fetch existing datasets in the registry for "Add to existing" option
-  const { data: registryDatasets } = useSWR(
-    open || renderContentOnly ? chatAPI.Endpoints.Dataset.LocalList() : null,
-    fetcher,
-  );
-  const existingDatasetNames: string[] = Array.isArray(registryDatasets)
-    ? registryDatasets.map((d: { dataset_id: string }) => d.dataset_id)
-    : [];
-
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
     saveTaskJobId && experimentInfo?.id
@@ -281,7 +272,6 @@ export default function DatasetsSection({
       }}
       sourceName={saveDialogDataset || ''}
       type="dataset"
-      existingNames={existingDatasetNames}
       saving={savingDataset !== null}
       jobId={jobId ?? undefined}
       onSave={(info) => {

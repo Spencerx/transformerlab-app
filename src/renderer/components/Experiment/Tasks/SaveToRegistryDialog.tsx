@@ -57,8 +57,6 @@ interface SaveToRegistryDialogProps {
   sourceName: string;
   /** 'dataset' or 'model' — used for labels */
   type: 'dataset' | 'model';
-  /** List of existing registry entry names for the "Add to existing" option */
-  existingNames: string[];
   /** Whether the save is in progress */
   saving: boolean;
   /** Called when the user confirms the save */
@@ -87,7 +85,6 @@ export default function SaveToRegistryDialog({
   onClose,
   sourceName,
   type,
-  existingNames,
   saving,
   onSave,
   jobId,

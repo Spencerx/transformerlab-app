@@ -59,15 +59,6 @@ export default function ModelsSection({
   const [saveDialogModel, setSaveDialogModel] = useState<string | null>(null);
   const [saveTaskJobId, setSaveTaskJobId] = useState<string | null>(null);
 
-  // Fetch existing models in the registry for "Add to existing" option
-  const { data: registryModels } = useSWR(
-    open || renderContentOnly ? chatAPI.Endpoints.Models.LocalList() : null,
-    fetcher,
-  );
-  const existingModelNames: string[] = Array.isArray(registryModels)
-    ? registryModels.map((m: { model_id: string }) => m.model_id)
-    : [];
-
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
     saveTaskJobId && experimentInfo?.id
@@ -278,7 +269,6 @@ export default function ModelsSection({
       }}
       sourceName={saveDialogModel || ''}
       type="model"
-      existingNames={existingModelNames}
       saving={savingModel !== null}
       jobId={jobId ?? undefined}
       onSave={(info) => {
