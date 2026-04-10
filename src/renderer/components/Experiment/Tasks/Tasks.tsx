@@ -1295,12 +1295,14 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onQueueTask={handleQueue}
           onEditTask={handleEditTask}
           onExportTask={handleExportToTeamGallery}
-          onViewFilesTask={(taskRow) =>
-            setViewTaskFilesFromTask({
-              id: taskRow.id,
-              name: (taskRow as any).name ?? (taskRow as any).title ?? null,
-            })
-          }
+          // TODO: potentially deprecated — file browsing is now integrated into the Edit Task modal.
+          // Remove onViewFilesTask and related FileBrowserModal state once confirmed unnecessary.
+          // onViewFilesTask={(taskRow) =>
+          //   setViewTaskFilesFromTask({
+          //     id: taskRow.id,
+          //     name: (taskRow as any).name ?? (taskRow as any).title ?? null,
+          //   })
+          // }
           loading={templatesIsLoading}
         />
       </Sheet>
