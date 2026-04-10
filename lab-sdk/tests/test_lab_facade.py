@@ -1208,6 +1208,7 @@ async def test_copy_file_mounts_without_lab_init(tmp_path, monkeypatch):
     ws = tmp_path / ".tfl_ws"
     home.mkdir()
     ws.mkdir()
+    (home / ".tfl_home").mkdir()
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("TFL_HOME_DIR", str(home / ".tfl_home"))
     monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
