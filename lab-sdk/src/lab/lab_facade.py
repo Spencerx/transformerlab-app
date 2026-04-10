@@ -336,7 +336,9 @@ class Lab:
         """
         Copy all files in the task directory to the user's home directory,
         or to ~/sky_workdir if that directory already exists.
-        Uses _TFL_JOB_ID to get the job, reads task_id from job_data, then copies
+        Uses _TFL_JOB_ID plus the same experiment id resolution as lab.init() when
+        lab.init() was not called (_TFL_EXPERIMENT_ID if set, else "alpha"), then reads
+        task_id from job_data and copies
         from the task dir (workspace/task/<task_id>) to the chosen destination. No network/URL;
         assumes the runner has access to the same storage (e.g. mounted workspace).
         No-op if _TFL_JOB_ID is not set or job_data has no task_id.
@@ -348,8 +350,15 @@ class Lab:
 
     async def _copy_file_mounts_async(self, job_id: str) -> None:
         """Async implementation of copy_file_mounts."""
-        job = await Job.get(job_id, self._experiment.id)
-        if job is None:
+        if self._experiment is not None:
+            experiment_id = self._experiment.id
+        else:
+            # Match init() when experiment_id argument was not passed (lines 93–98).
+            env_experiment_id = os.environ.get("_TFL_EXPERIMENT_ID")
+            experiment_id = env_experiment_id if env_experiment_id else "alpha"
+        try:
+            job = await Job.get(job_id, experiment_id)
+        except FileNotFoundError:
             return
         job_data = await job.get_job_data()
         if not isinstance(job_data, dict):
