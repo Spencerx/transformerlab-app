@@ -81,22 +81,11 @@ def require_organization_id() -> str:
 
 
 async def get_workspace_dir() -> str:
-    storage.trace_copy_file_mounts(
-        "dirs.get_workspace_dir",
-        f"enter TFL_STORAGE_URI_set={os.getenv('TFL_STORAGE_URI') is not None} "
-        f"TFL_WORKSPACE_DIR={os.environ.get('TFL_WORKSPACE_DIR')!r} "
-        f"STORAGE_PROVIDER={STORAGE_PROVIDER!r} org_id_context={_current_org_id.get()!r}",
-    )
     # Remote SkyPilot workspace override (highest precedence)
     # Only return container workspace path when value is exactly "true"
     # In localfs mode, workspace is TFL_STORAGE_URI/orgs/<org_id>/workspace; HOME_DIR stays app home
     if os.getenv("TFL_STORAGE_URI") is not None and STORAGE_PROVIDER != "localfs":
-        storage.trace_copy_file_mounts(
-            "dirs.get_workspace_dir",
-            "branch: TFL_STORAGE_URI set and not localfs -> await storage.root_uri()",
-        )
         root = await storage.root_uri()
-        storage.trace_copy_file_mounts("dirs.get_workspace_dir", f"return (remote root_uri) -> {root!r}")
         return root
 
     # Explicit override wins
@@ -104,10 +93,6 @@ async def get_workspace_dir() -> str:
         _current_tfl_storage_uri.get() is not None and os.getenv("TFL_STORAGE_URI") is not None
     ):
         value = os.environ["TFL_WORKSPACE_DIR"]
-        storage.trace_copy_file_mounts(
-            "dirs.get_workspace_dir",
-            f"branch: TFL_WORKSPACE_DIR -> {value!r}",
-        )
         if not os.path.exists(value):
             logger.error(f"Error: Workspace directory {value} does not exist")
             exit(1)
@@ -119,36 +104,19 @@ async def get_workspace_dir() -> str:
         # Cloud: _current_tfl_storage_uri is the org workspace root. Localfs: TFL_STORAGE_URI/orgs/org_id/workspace
         if _current_tfl_storage_uri.get() is not None and STORAGE_PROVIDER != "localfs":
             ctx = _current_tfl_storage_uri.get()
-            storage.trace_copy_file_mounts(
-                "dirs.get_workspace_dir",
-                f"branch: org_id + context storage uri -> {ctx!r}",
-            )
             return ctx
         if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI"):
             path = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", org_id, "workspace")
         else:
             path = storage.join(HOME_DIR, "orgs", org_id, "workspace")
-        storage.trace_copy_file_mounts(
-            "dirs.get_workspace_dir",
-            f"branch: org_id local path under HOME/localfs -> {path!r}",
-        )
         await storage.makedirs(path, exist_ok=True)
         return path
 
     if os.getenv("TFL_STORAGE_URI") and STORAGE_PROVIDER != "localfs":
-        storage.trace_copy_file_mounts(
-            "dirs.get_workspace_dir",
-            "branch: no org_id, TFL_STORAGE_URI + not localfs -> await storage.root_uri()",
-        )
         root = await storage.root_uri()
-        storage.trace_copy_file_mounts("dirs.get_workspace_dir", f"return -> {root!r}")
         return root
 
     path = storage.join(HOME_DIR, "workspace")
-    storage.trace_copy_file_mounts(
-        "dirs.get_workspace_dir",
-        f"branch: default HOME workspace -> {path!r}",
-    )
     await storage.makedirs(path, exist_ok=True)
     return path
 

@@ -17,13 +17,6 @@ logging.getLogger("aiobotocore").setLevel(logging.CRITICAL)
 logging.getLogger("s3fs").setLevel(logging.CRITICAL)
 
 
-def trace_copy_file_mounts(where: str, msg: str) -> None:
-    """Opt-in trace for local provider copy_file_mounts / storage resolution (stderr so it appears in setup error tails)."""
-    if os.environ.get("TFL_TRACE_COPY_FILE_MOUNTS", "").lower() not in ("1", "true", "yes"):
-        return
-    print(f"[TFL_TRACE_COPY_FILE_MOUNTS {where}] {msg}", file=sys.stderr, flush=True)
-
-
 class AsyncFileWrapper:
     """
     Wrapper to make sync file objects work with async context managers.
@@ -306,28 +299,16 @@ def _get_fs_and_root():
     uses_localfs_multi_org = STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI")
     env_scoped_localfs = uses_localfs_multi_org and _is_localfs_org_scoped_uri(tfl_uri)
     env_scoped_remote = tfl_remote_storage_enabled and _is_remote_team_workspace_uri(tfl_uri)
-    trace_copy_file_mounts(
-        "storage._get_fs_and_root",
-        f"context_uri={_current_tfl_storage_uri.get()!r} resolved_tfl_uri={tfl_uri!r} "
-        f"STORAGE_PROVIDER={STORAGE_PROVIDER!r} TFL_REMOTE_STORAGE_ENABLED={tfl_remote_storage_enabled} "
-        f"uses_localfs_multi_org={uses_localfs_multi_org} "
-        f"env_scoped_localfs={env_scoped_localfs} env_scoped_remote_workspace={env_scoped_remote}",
-    )
     if (tfl_remote_storage_enabled or uses_localfs_multi_org) and _current_tfl_storage_uri.get() is None:
         # Subprocesses may get an explicit org-scoped URI without contextvars: localfs
         # .../orgs/<id>/workspace, or remote s3|gs|abfs://workspace-<team_id>/...
         if not env_scoped_localfs and not env_scoped_remote:
-            trace_copy_file_mounts(
-                "storage._get_fs_and_root",
-                "raising RuntimeError: org context required (no env-scoped workspace escape)",
-            )
             raise RuntimeError(
                 "Organization context is required but not set. "
                 "Ensure set_organization_id() is called before accessing storage "
                 "(e.g. in request middleware or at the start of a background task)."
             )
 
-    trace_copy_file_mounts("storage._get_fs_and_root", f"ok, _get_fs_for_uri({tfl_uri!r})")
     return _get_fs_for_uri(tfl_uri)
 
 

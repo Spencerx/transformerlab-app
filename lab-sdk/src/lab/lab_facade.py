@@ -349,16 +349,9 @@ class Lab:
         No-op if _TFL_JOB_ID is not set or job_data has no task_id.
         """
         job_id = os.environ.get("_TFL_JOB_ID")
-        storage.trace_copy_file_mounts(
-            "lab.copy_file_mounts",
-            f"enter job_id={job_id!r} _TFL_EXPERIMENT_ID={os.environ.get('_TFL_EXPERIMENT_ID')!r} "
-            f"TFL_EXPERIMENT_ID={os.environ.get('TFL_EXPERIMENT_ID')!r}",
-        )
         if not job_id:
-            storage.trace_copy_file_mounts("lab.copy_file_mounts", "exit: no _TFL_JOB_ID")
             return
         _run_async(self._copy_file_mounts_async(job_id))
-        storage.trace_copy_file_mounts("lab.copy_file_mounts", "sync wrapper finished _copy_file_mounts_async")
 
     async def _copy_file_mounts_async(self, job_id: str) -> None:
         """Async implementation of copy_file_mounts."""
@@ -368,43 +361,19 @@ class Lab:
             # Match init() when experiment_id argument was not passed (lines 93–98).
             env_experiment_id = _launch_experiment_id_from_env()
             experiment_id = env_experiment_id if env_experiment_id else "alpha"
-        storage.trace_copy_file_mounts(
-            "lab._copy_file_mounts_async",
-            f"resolve job experiment_id={experiment_id!r} (from init/env)",
-        )
         try:
             job = await Job.get(job_id, experiment_id)
         except FileNotFoundError:
-            storage.trace_copy_file_mounts(
-                "lab._copy_file_mounts_async",
-                f"exit: Job.get FileNotFoundError job_id={job_id!r}",
-            )
             return
         job_data = await job.get_job_data()
         if not isinstance(job_data, dict):
-            storage.trace_copy_file_mounts(
-                "lab._copy_file_mounts_async",
-                "exit: job_data not a dict",
-            )
             return
         task_id = job_data.get("task_id")
         if not task_id:
-            storage.trace_copy_file_mounts(
-                "lab._copy_file_mounts_async",
-                "exit: no task_id in job_data",
-            )
             return
         task_template = TaskTemplate(task_id)
         task_dir = await task_template.get_dir()
-        storage.trace_copy_file_mounts(
-            "lab._copy_file_mounts_async",
-            f"task_id={task_id!r} task_dir={task_dir!r}",
-        )
         if not await storage.exists(task_dir):
-            storage.trace_copy_file_mounts(
-                "lab._copy_file_mounts_async",
-                f"exit: task_dir missing or storage.exists false -> {task_dir!r}",
-            )
             return
         home_dir = os.path.expanduser("~")
         sky_workdir = os.path.join(home_dir, "sky_workdir")
@@ -412,10 +381,6 @@ class Lab:
             dest_dir = sky_workdir
         else:
             dest_dir = home_dir
-        storage.trace_copy_file_mounts(
-            "lab._copy_file_mounts_async",
-            f"dest_dir={dest_dir!r} is_remote_task_dir={storage.is_remote_path(task_dir)}",
-        )
 
         # Determine if we're working with a remote URI (e.g., s3://)
         is_remote = storage.is_remote_path(task_dir)
@@ -477,11 +442,6 @@ class Lab:
             os.makedirs(os.path.dirname(local_path), exist_ok=True)
             with open(local_path, "wb") as out:
                 out.write(data)
-
-        storage.trace_copy_file_mounts(
-            "lab._copy_file_mounts_async",
-            f"done copied {len(files)} file entries from task_dir",
-        )
 
     # ------------- convenience logging -------------
     def log(self, message: str) -> None:
