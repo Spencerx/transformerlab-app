@@ -4,7 +4,8 @@ import configparser
 import os
 from typing import Optional, Tuple
 
-# lab.init() not required; copy_file_mounts uses _TFL_JOB_ID, _TFL_EXPERIMENT_ID (as in launch), and job_data
+# lab.init() not required; copy_file_mounts uses _TFL_JOB_ID, _TFL_EXPERIMENT_ID / TFL_EXPERIMENT_ID, and job_data
+# Launch sets TFL_TRACE_COPY_FILE_MOUNTS=true for [TFL_TRACE_COPY_FILE_MOUNTS ...] trace lines (remove when done debugging).
 COPY_FILE_MOUNTS_SETUP = 'python -c "from lab import lab; lab.copy_file_mounts()"'
 
 # RunPod (and similar) use /workspace as a writable persistent path

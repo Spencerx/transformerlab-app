@@ -1,6 +1,7 @@
 import asyncio
 import os
 import posixpath
+import sys
 import contextvars
 import threading
 from types import TracebackType
@@ -14,6 +15,13 @@ import logging
 # Suppress the specific task exception log if it's polluting your logs
 logging.getLogger("aiobotocore").setLevel(logging.CRITICAL)
 logging.getLogger("s3fs").setLevel(logging.CRITICAL)
+
+
+def trace_copy_file_mounts(where: str, msg: str) -> None:
+    """Opt-in trace for local provider copy_file_mounts / storage resolution (stderr so it appears in setup error tails)."""
+    if os.environ.get("TFL_TRACE_COPY_FILE_MOUNTS", "").lower() not in ("1", "true", "yes"):
+        return
+    print(f"[TFL_TRACE_COPY_FILE_MOUNTS {where}] {msg}", file=sys.stderr, flush=True)
 
 
 class AsyncFileWrapper:
@@ -156,6 +164,37 @@ def _is_localfs_org_scoped_uri(uri: str | None) -> bool:
     return False
 
 
+def _remote_workspace_bucket_or_container(uri: str) -> str:
+    """First bucket (S3/GCS) or container segment (abfs) after the scheme."""
+    if uri.startswith("s3://"):
+        tail = uri[5:].lstrip("/")
+        return tail.split("/")[0] if tail else ""
+    if uri.startswith("gs://"):
+        tail = uri[5:].lstrip("/")
+        return tail.split("/")[0] if tail else ""
+    if uri.startswith("gcs://"):
+        tail = uri[6:].lstrip("/")
+        return tail.split("/")[0] if tail else ""
+    if uri.startswith("abfs://"):
+        tail = uri[7:]
+        authority = tail.split("/")[0] if tail else ""
+        if "@" in authority:
+            return authority.split("@", 1)[0]
+        return authority
+    return ""
+
+
+def _is_remote_team_workspace_uri(uri: str | None) -> bool:
+    """
+    True when TFL_STORAGE_URI is already a per-team workspace root from remote_workspace
+    (e.g. s3://workspace-<team_id>). Subprocesses get this from the launcher without org contextvars.
+    """
+    if not uri or not is_remote_path(uri):
+        return False
+    name = _remote_workspace_bucket_or_container(uri)
+    return name.startswith("workspace-") and len(name) > len("workspace-")
+
+
 def is_remote_path(path: str) -> bool:
     """
     Return True if the given path represents a remote storage location.
@@ -220,15 +259,13 @@ def _get_fs_for_uri(uri: str):
 
     # Build storage options as kwargs (not as nested dict)
     # This ensures they're passed correctly to the filesystem, not to AioSession
-    fs_kwargs = {"asynchronous": False}  # Explicitly force sync mode
+    fs_kwargs: dict = {"asynchronous": False}  # GCS/Azure: force sync fsspec entrypoint
     if protocol == "s3":
-        # For S3, explicitly prevent async session creation by ensuring we use boto3 (sync)
-        # instead of aiobotocore (async). This avoids RuntimeError when async sessions
-        # are cleaned up in wrong event loop via weakref callbacks.
+        # Do NOT pass `asynchronous` to s3fs: older s3fs forwards it to botocore.session.Session,
+        # which raises TypeError. Sync S3FileSystem is the default without this kwarg.
+        fs_kwargs = {}
         if _AWS_PROFILE:
             fs_kwargs["profile"] = _AWS_PROFILE
-        # Ensure we're using sync boto3, not async aiobotocore
-        # The asynchronous=False should be enough, but we also ensure no async clients are created
         fs_kwargs["default_fill_cache"] = False
         fs_kwargs["use_listings_cache"] = False
     elif protocol in ("gcs", "gs") and _GCP_PROJECT:
@@ -267,17 +304,30 @@ def _get_fs_and_root():
     # "not found" errors for org-specific resources (jobs, models, etc.).
     tfl_remote_storage_enabled = os.getenv("TFL_REMOTE_STORAGE_ENABLED", "false").lower() == "true"
     uses_localfs_multi_org = STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI")
+    env_scoped_localfs = uses_localfs_multi_org and _is_localfs_org_scoped_uri(tfl_uri)
+    env_scoped_remote = tfl_remote_storage_enabled and _is_remote_team_workspace_uri(tfl_uri)
+    trace_copy_file_mounts(
+        "storage._get_fs_and_root",
+        f"context_uri={_current_tfl_storage_uri.get()!r} resolved_tfl_uri={tfl_uri!r} "
+        f"STORAGE_PROVIDER={STORAGE_PROVIDER!r} TFL_REMOTE_STORAGE_ENABLED={tfl_remote_storage_enabled} "
+        f"uses_localfs_multi_org={uses_localfs_multi_org} "
+        f"env_scoped_localfs={env_scoped_localfs} env_scoped_remote_workspace={env_scoped_remote}",
+    )
     if (tfl_remote_storage_enabled or uses_localfs_multi_org) and _current_tfl_storage_uri.get() is None:
-        # Local provider subprocesses may receive an explicit org-scoped
-        # TFL_STORAGE_URI (<base>/orgs/<org_id>/workspace). In that case, allow
-        # storage access even without a propagated contextvar.
-        if not (uses_localfs_multi_org and _is_localfs_org_scoped_uri(tfl_uri)):
+        # Subprocesses may get an explicit org-scoped URI without contextvars: localfs
+        # .../orgs/<id>/workspace, or remote s3|gs|abfs://workspace-<team_id>/...
+        if not env_scoped_localfs and not env_scoped_remote:
+            trace_copy_file_mounts(
+                "storage._get_fs_and_root",
+                "raising RuntimeError: org context required (no env-scoped workspace escape)",
+            )
             raise RuntimeError(
                 "Organization context is required but not set. "
                 "Ensure set_organization_id() is called before accessing storage "
                 "(e.g. in request middleware or at the start of a background task)."
             )
 
+    trace_copy_file_mounts("storage._get_fs_and_root", f"ok, _get_fs_for_uri({tfl_uri!r})")
     return _get_fs_for_uri(tfl_uri)
 
 
