@@ -38,6 +38,10 @@ const REQUIRED_SPECIAL_SECRETS = [
   { key: '_NGROK_AUTH_TOKEN', label: 'ngrok auth token' },
 ] as const;
 
+const NGROK_AUTH_TOKEN_SECRET_LABEL = REQUIRED_SPECIAL_SECRETS.find(
+  (s) => s.key === '_NGROK_AUTH_TOKEN',
+)!.label;
+
 type SpecialSecretStatus = {
   exists?: boolean;
 };
@@ -1204,8 +1208,9 @@ export default function Interactive() {
             <Typography level="body-sm">
               Interactive sessions may fail without required secrets. Missing:{' '}
               <b>{missingSpecialSecrets.join(', ')}</b>.
-              {hasNonLocalProvider &&
-                ' ngrok auth token is required for interactive tasks on remote providers.'}{' '}
+              {missingSpecialSecrets.includes(NGROK_AUTH_TOKEN_SECRET_LABEL) &&
+                hasNonLocalProvider &&
+                ` ${NGROK_AUTH_TOKEN_SECRET_LABEL} is required for interactive tasks on remote providers.`}{' '}
               Set them in{' '}
               <Typography
                 component={RouterLink}
