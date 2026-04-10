@@ -399,15 +399,19 @@ async def initialize_team_local_provider(
     if _local_providers_disabled():
         return None
 
+    # Detect accelerators for this machine without blocking the event loop
+    supported_accelerators = await asyncio.to_thread(detect_local_supported_accelerators)
+    config: dict = {"supported_accelerators": supported_accelerators}
+
     # Check for any existing local provider (name does not matter)
     existing_providers = await list_team_providers(session, team_id)
     for provider in existing_providers:
         if provider.type == ProviderType.LOCAL.value:
+            # Re-detect and update accelerators in case hardware changed since first setup
+            existing_config = dict(provider.config or {})
+            existing_config["supported_accelerators"] = supported_accelerators
+            await update_team_provider(session, provider, config=existing_config)
             return None
-
-    # Detect accelerators for this machine without blocking the event loop
-    supported_accelerators = await asyncio.to_thread(detect_local_supported_accelerators)
-    config: dict = {"supported_accelerators": supported_accelerators}
 
     provider = await create_team_provider(
         session=session,
