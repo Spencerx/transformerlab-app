@@ -234,6 +234,26 @@ def _render_artifacts(artifacts: list[str]) -> str:
     return "\n".join(filenames)
 
 
+def _format_size(size_bytes: int) -> str:
+    """Format bytes into human-readable size."""
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes //= 1024
+    return f"{size_bytes:.1f} TB"
+
+
+def _fetch_job_files(experiment_id: str, job_id: str) -> list[dict]:
+    """Fetch the list of files in a job's directory."""
+    try:
+        response = api.get(f"/experiment/{experiment_id}/jobs/{job_id}/files")
+        if response.status_code == 200:
+            return response.json().get("files", [])
+    except Exception:
+        pass
+    return []
+
+
 def _render_job(job) -> None:
     """Render all details of a job."""
     job_data = job.get("job_data", {})
@@ -325,6 +345,27 @@ def info_job(job_id: str, experiment_id: str):
     if job:
         console.print(f"[bold success]Job Details for ID {job_id}:[/bold success]")
         _render_job(job)
+
+        # Fetch and display job files
+        with console.status("[bold success]Fetching job files[/bold success]", spinner="dots"):
+            files = _fetch_job_files(experiment_id, job_id)
+        if files:
+            file_table = Table(title="Files", show_header=True, header_style="bold")
+            file_table.add_column("Name")
+            file_table.add_column("Type", width=6)
+            file_table.add_column("Size", justify="right")
+            for f in files:
+                name = f.get("name", "")
+                is_dir = f.get("is_dir", False)
+                size = f.get("size", 0)
+                file_table.add_row(
+                    name,
+                    "dir" if is_dir else "file",
+                    "" if is_dir else _format_size(size),
+                )
+            console.print(file_table)
+        else:
+            console.print("[dim]No files found in job directory.[/dim]")
     else:
         console.print(f"[error]Error:[/error] Job with ID {job_id} not found.")
 
