@@ -1,7 +1,6 @@
 import asyncio
 import os
 import posixpath
-import sys
 import contextvars
 import threading
 from types import TracebackType
