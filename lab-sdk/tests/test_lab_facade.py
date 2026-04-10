@@ -1234,7 +1234,7 @@ async def test_copy_file_mounts_without_lab_init(tmp_path, monkeypatch):
 
     lab = Lab()
     assert lab._experiment is None
-    lab.copy_file_mounts()
+    await lab.async_copy_file_mounts()
 
     dest = os.path.join(str(home), "hello.txt")
     assert os.path.isfile(dest)

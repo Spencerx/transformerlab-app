@@ -353,6 +353,13 @@ class Lab:
             return
         _run_async(self._copy_file_mounts_async(job_id))
 
+    async def async_copy_file_mounts(self) -> None:
+        """Same behavior as copy_file_mounts() for callers that already have a running event loop."""
+        job_id = os.environ.get("_TFL_JOB_ID")
+        if not job_id:
+            return
+        await self._copy_file_mounts_async(job_id)
+
     async def _copy_file_mounts_async(self, job_id: str) -> None:
         """Async implementation of copy_file_mounts."""
         if self._experiment is not None:
