@@ -895,7 +895,8 @@ async def import_task_from_gallery(
         # 3. inline setup/command fields on the gallery entry
         github_repo_url = gallery_entry.get("github_repo_url")
         github_repo_dir = gallery_entry.get("github_repo_dir")
-        github_branch = gallery_entry.get("github_branch")
+        # Support both canonical github_repo_branch and legacy github_branch.
+        github_branch = gallery_entry.get("github_repo_branch") or gallery_entry.get("github_branch")
         local_task_dir = gallery_entry.get("local_task_dir")
         source_yaml_data = {}
 
