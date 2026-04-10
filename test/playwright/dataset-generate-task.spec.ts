@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { login, selectFirstExperiment } from './helpers';
+import { hideAllVisibleJobs, login, selectFirstExperiment } from './helpers';
 
 const TASK_NAME = 'sample-generate-task';
 const REGISTRY_DATASET_NAME = 'sample-generate-task-registry-dataset';
@@ -55,6 +55,7 @@ test.describe('Dataset Generation Task', () => {
     await expect(page.getByRole('button', { name: 'New' })).toBeVisible({
       timeout: 10000,
     });
+    await hideAllVisibleJobs(page);
 
     // Create a blank task.
     await page.getByRole('button', { name: 'New' }).click();
@@ -96,18 +97,22 @@ test.describe('Dataset Generation Task', () => {
       timeout: 120000,
     });
 
-    // Open Artifacts -> View Datasets.
+    // Open Artifacts (now opens the datasets/artifacts modal directly).
     await page.getByRole('button', { name: 'Artifacts' }).first().click();
-    await page.getByRole('menuitem', { name: 'View Datasets' }).first().click();
 
-    const datasetsDialog = page
+    const artifactsDialog = page
       .getByRole('dialog')
-      .filter({ hasText: 'Datasets for Job' })
+      .filter({ hasText: 'Artifacts for Job' })
       .first();
-    await expect(datasetsDialog).toBeVisible({
+    await expect(artifactsDialog).toBeVisible({
       timeout: 10000,
     });
-    const saveToRegistryButton = datasetsDialog
+    const datasetsSection = artifactsDialog.locator('section').filter({
+      has: artifactsDialog.getByRole('heading', { name: /^Datasets/ }),
+    });
+    await expect(datasetsSection.first()).toBeVisible({ timeout: 10000 });
+    const saveToRegistryButton = datasetsSection
+      .first()
       .getByRole('button', { name: 'Save to Registry' })
       .first();
     await saveToRegistryButton.scrollIntoViewIfNeeded();
@@ -134,9 +139,9 @@ test.describe('Dataset Generation Task', () => {
 
     // As soon as the in-modal notification appears, treat save-start as success.
     await expect(
-      datasetsDialog
+      artifactsDialog
         .getByRole('alert')
-        .filter({ hasText: /dataset save to registry started/i })
+        .filter({ hasText: /publishing\s+.+\s+to registry/i })
         .first(),
     ).toBeVisible({
       timeout: 15000,

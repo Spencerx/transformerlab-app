@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, selectFirstExperiment } from './helpers';
+import { hideAllVisibleJobs, login, selectFirstExperiment } from './helpers';
 
 const GITHUB_REPO_URL =
   'https://github.com/transformerlab/transformerlab-examples';
@@ -19,6 +19,7 @@ test.describe('Dataset Generation Task From GitHub', () => {
     await expect(page.getByRole('button', { name: 'New' })).toBeVisible({
       timeout: 10000,
     });
+    await hideAllVisibleJobs(page);
 
     // Create a task from GitHub repo + subdirectory.
     await page.getByRole('button', { name: 'New' }).click();
