@@ -33,14 +33,16 @@ const duration = require('dayjs/plugin/duration');
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
 
+const NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY = '_NGROK_AUTH_TOKEN' as const;
+const NGROK_AUTH_TOKEN_SECRET_LABEL = 'ngrok auth token';
+
 const REQUIRED_SPECIAL_SECRETS = [
   { key: '_HF_TOKEN', label: 'Hugging Face token' },
-  { key: '_NGROK_AUTH_TOKEN', label: 'ngrok auth token' },
+  {
+    key: NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY,
+    label: NGROK_AUTH_TOKEN_SECRET_LABEL,
+  },
 ] as const;
-
-const NGROK_AUTH_TOKEN_SECRET_LABEL = REQUIRED_SPECIAL_SECRETS.find(
-  (s) => s.key === '_NGROK_AUTH_TOKEN',
-)!.label;
 
 type SpecialSecretStatus = {
   exists?: boolean;
@@ -152,7 +154,7 @@ export default function Interactive() {
         >;
 
         const requiredSecrets = REQUIRED_SPECIAL_SECRETS.filter(({ key }) => {
-          if (key === '_NGROK_AUTH_TOKEN') {
+          if (key === NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY) {
             return hasNonLocalProvider;
           }
           return true;
@@ -632,7 +634,7 @@ export default function Interactive() {
           !envVarsForImport.NGROK_AUTH_TOKEN?.trim() &&
           (galleryPorts.length > 0 || hasNgrokField);
         if (shouldInjectNgrokSecret) {
-          envVarsForImport.NGROK_AUTH_TOKEN = '{{secret._NGROK_AUTH_TOKEN}}';
+          envVarsForImport.NGROK_AUTH_TOKEN = `{{secret.${NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY}}}`;
         }
         const envVarsForImportClean = omitNgrokAuthTokenForLocal(
           envVarsForImport,
@@ -671,7 +673,7 @@ export default function Interactive() {
           providerMeta.type !== 'local' &&
           !envVars.NGROK_AUTH_TOKEN
         ) {
-          envVars.NGROK_AUTH_TOKEN = '{{secret._NGROK_AUTH_TOKEN}}';
+          envVars.NGROK_AUTH_TOKEN = `{{secret.${NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY}}}`;
         }
         const envVarsClean = omitNgrokAuthTokenForLocal(
           envVars,
