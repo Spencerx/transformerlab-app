@@ -119,7 +119,7 @@ export default function ModelsSection({
         experimentId: experimentInfo?.id,
         jobId: jobId.toString(),
         modelName,
-        targetName: info.groupId || info.groupName,
+        targetName: info.groupName,
         mode: info.mode,
         tag: info.tag,
         description: info.description,

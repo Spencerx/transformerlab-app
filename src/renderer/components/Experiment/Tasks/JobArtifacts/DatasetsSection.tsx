@@ -119,7 +119,7 @@ export default function DatasetsSection({
         experimentId: experimentInfo?.id,
         jobId: jobId.toString(),
         datasetName,
-        targetName: info.groupId || info.groupName,
+        targetName: info.groupName,
         mode: info.mode,
         tag: info.tag,
         description: info.description,

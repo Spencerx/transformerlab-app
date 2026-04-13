@@ -1529,15 +1529,12 @@ async def _compute_next_version(group_dir: str) -> str:
 
     highest = 0
     if await storage.exists(group_dir):
-        try:
-            entries = await storage.ls(group_dir, detail=False)
-            for entry in entries:
-                name = entry.rstrip("/").split("/")[-1]
-                match = re.match(r"^v(\d+)$", name)
-                if match:
-                    highest = max(highest, int(match.group(1)))
-        except Exception:
-            pass
+        entries = await storage.ls(group_dir, detail=False)
+        for entry in entries:
+            name = entry.rstrip("/").split("/")[-1]
+            match = re.match(r"^v(\d+)$", name)
+            if match:
+                highest = max(highest, int(match.group(1)))
     return f"v{highest + 1}"
 
 
@@ -1596,6 +1593,16 @@ async def save_dataset_to_registry(
         # Build destination path and asset_id
         dest_path = storage.join(datasets_registry_dir, group_name, version_label)
         asset_id = f"{group_name}/{version_label}"
+
+        # Eagerly create the destination directory as a reservation to prevent
+        # concurrent saves from computing the same version label (TOCTOU).
+        try:
+            await storage.makedirs(dest_path, exist_ok=False)
+        except FileExistsError:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Version '{version_label}' for group '{group_name}' already exists — please retry",
+            )
 
         asyncio.create_task(
             _save_dataset_to_registry(
@@ -1659,6 +1666,8 @@ async def save_model_to_registry(
     mode: str = Query("new", description="'new' to create a new entry, 'existing' to add version to existing group"),
     tag: str = Query("latest", description="Tag to assign to the new version"),
     description: Optional[str] = Query(None, description="Human-readable description for the version"),
+    user_and_team=Depends(get_user_and_team),
+    session: AsyncSession = Depends(get_async_session),
 ):
     """Copy a model from job's models directory to the global models registry."""
 
@@ -1703,6 +1712,16 @@ async def save_model_to_registry(
         # Build destination path and asset_id
         dest_path = storage.join(models_registry_dir, group_name, version_label)
         asset_id = f"{group_name}/{version_label}"
+
+        # Eagerly create the destination directory as a reservation to prevent
+        # concurrent saves from computing the same version label (TOCTOU).
+        try:
+            await storage.makedirs(dest_path, exist_ok=False)
+        except FileExistsError:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Version '{version_label}' for group '{group_name}' already exists — please retry",
+            )
 
         asyncio.create_task(
             _save_model_to_registry(
