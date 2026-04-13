@@ -6,6 +6,8 @@ from fastapi import (
     Depends,
     Request,
     Response,
+    File,
+    UploadFile,
 )
 from fastapi.responses import StreamingResponse
 from typing import Optional
@@ -252,7 +254,10 @@ async def task_get_file(task_id: str, file_path: str):
 
     # Files for upload-from-directory tasks are materialized under workspace/task/{task_id}
     task_dir = storage.join(workspace_dir, "task", str(task_id))
-    target = storage.join(task_dir, file_path)
+    safe_rel = posixpath.normpath(file_path).lstrip("/")
+    if safe_rel.startswith("..") or "/.." in safe_rel:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    target = storage.join(task_dir, safe_rel)
 
     if not await storage.exists(target) or not await storage.isfile(target):
         raise HTTPException(status_code=404, detail="File not found")
@@ -337,6 +342,91 @@ async def task_get_file(task_id: str, file_path: str):
         media_type=media_type,
         headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
+
+
+@router.put(
+    "/{task_id}/file/{file_path:path}",
+    summary="Save a text file in a task's local workspace directory",
+)
+async def task_update_file(experimentId: str, task_id: str, file_path: str, request: Request):
+    """
+    Save a UTF-8 text file to workspace/task/{task_id}/{file_path}.
+
+    This endpoint is intended for editable source/config/document files (for example:
+    .py, .md, .yaml/.yml, .json, .txt). Request bodies are decoded as UTF-8 and
+    written in text mode. Binary uploads should use the file-upload endpoint.
+    """
+    task = await task_service.task_get_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    workspace_dir = await get_workspace_dir()
+    if not workspace_dir:
+        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
+
+    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    safe_rel = posixpath.normpath(file_path).lstrip("/")
+    if safe_rel.startswith("..") or "/.." in safe_rel:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    target = storage.join(task_dir, safe_rel)
+    target_parent = os.path.dirname(target)
+    if target_parent:
+        await storage.makedirs(target_parent, exist_ok=True)
+
+    body = (await request.body()).decode("utf-8")
+    async with await storage.open(target, "w", encoding="utf-8") as f:
+        await f.write(body)
+
+    if not task.get("file_mounts"):
+        await task_service.update_task(task_id, {"file_mounts": True})
+
+    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    return {"message": "OK"}
+
+
+@router.post(
+    "/{task_id}/file-upload",
+    summary="Upload one or more files into a task's local workspace directory",
+)
+async def task_upload_file(
+    experimentId: str,
+    task_id: str,
+    files: list[UploadFile] = File(...),
+):
+    task = await task_service.task_get_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    workspace_dir = await get_workspace_dir()
+    if not workspace_dir:
+        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
+
+    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    await storage.makedirs(task_dir, exist_ok=True)
+
+    saved_files: list[str] = []
+    for uploaded in files:
+        original_name = (uploaded.filename or "").strip()
+        if not original_name:
+            continue
+        safe_name = secure_filename(original_name)
+        if not safe_name:
+            continue
+        target = storage.join(task_dir, safe_name)
+        content = await uploaded.read()
+        async with await storage.open(target, "wb") as f:
+            await f.write(content)
+        saved_files.append(safe_name)
+
+    if not saved_files:
+        raise HTTPException(status_code=400, detail="No valid files uploaded")
+
+    if not task.get("file_mounts"):
+        await task_service.update_task(task_id, {"file_mounts": True})
+
+    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    return {"status": "success", "files": saved_files}
 
 
 @router.get(

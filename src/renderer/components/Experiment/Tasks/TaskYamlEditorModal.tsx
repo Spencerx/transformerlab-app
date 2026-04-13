@@ -17,7 +17,7 @@ import {
   Box,
   CircularProgress,
 } from '@mui/joy';
-import { FileIcon } from 'lucide-react';
+import { FileIcon, UploadIcon } from 'lucide-react';
 import { Editor } from '@monaco-editor/react';
 import { setTheme, getMonacoEditorOptions } from 'renderer/lib/monacoConfig';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
@@ -61,9 +61,17 @@ export default function TaskYamlEditorModal({
   const [fileList, setFileList] = React.useState<TaskFile[]>([]);
   const [filesLoading, setFilesLoading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<string | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const isTaskYaml =
     selectedFile === 'task.yaml' || selectedFile === 'task.yml';
+  const selectedTaskFile =
+    fileList.find((file) => file.name === selectedFile) ?? null;
+  const selectedExtension = selectedFile ? getFileExtension(selectedFile) : '';
+  const isSelectedTextFile = TEXT_FILE_EXTENSIONS.has(selectedExtension);
+  const isEditableFile =
+    selectedTaskFile?.source === 'local' && isSelectedTextFile;
 
   const loadFiles = React.useCallback(async () => {
     if (!experimentId || !taskId) return;
@@ -261,18 +269,19 @@ export default function TaskYamlEditorModal({
   };
 
   const handleSave = async () => {
+    if (!selectedFile || !isEditableFile) return;
     setSaving(true);
     setError(null);
     setValidationMessage(null);
     try {
-      const response = await chatAPI.authenticatedFetch(
-        chatAPI.Endpoints.Task.UpdateYaml(experimentId, taskId),
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'text/plain' },
-          body: content,
-        },
-      );
+      const endpoint = isTaskYaml
+        ? chatAPI.Endpoints.Task.UpdateYaml(experimentId, taskId)
+        : chatAPI.Endpoints.Task.UpdateFile(experimentId, taskId, selectedFile);
+      const response = await chatAPI.authenticatedFetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/plain' },
+        body: content,
+      });
       if (!response.ok) {
         let message = `Failed to save: ${response.status}`;
         try {
@@ -294,12 +303,73 @@ export default function TaskYamlEditorModal({
         setError(message);
         return;
       }
+      setValidationMessage('Saved successfully.');
       onSaved?.();
-      onClose();
+      await loadFiles();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const uploadFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (!fileArray.length) return;
+    setUploading(true);
+    setError(null);
+    setValidationMessage(null);
+    try {
+      const formData = new FormData();
+      fileArray.forEach((file) => formData.append('files', file));
+      const response = await chatAPI.authenticatedFetch(
+        chatAPI.Endpoints.Task.UploadFile(experimentId, taskId),
+        {
+          method: 'POST',
+          body: formData,
+        },
+      );
+      if (!response.ok) {
+        const text = await response.text();
+        setError(text || `Upload failed: ${response.status}`);
+        return;
+      }
+      const data = await response.json();
+      const uploaded: string[] = Array.isArray(data?.files) ? data.files : [];
+      await loadFiles();
+      if (uploaded.length > 0) {
+        const first = uploaded[0];
+        setSelectedFile(first);
+        await loadFileContent({ name: first, source: 'local' });
+      }
+      setValidationMessage(
+        uploaded.length > 0
+          ? `Uploaded ${uploaded.length} file${uploaded.length === 1 ? '' : 's'}.`
+          : 'Upload complete.',
+      );
+      onSaved?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInputChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      await uploadFiles(files);
+    }
+    event.target.value = '';
+  };
+
+  const handleDrop = async (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+      await uploadFiles(files);
     }
   };
 
@@ -405,31 +475,68 @@ export default function TaskYamlEditorModal({
                 </Typography>
               </Box>
             ) : (
-              <List size="sm">
-                {fileList.map((file) => (
-                  <ListItemButton
-                    key={file.name}
-                    selected={selectedFile === file.name}
-                    onClick={() => handleFileSelect(file)}
+              <>
+                <List size="sm">
+                  {fileList.map((file) => (
+                    <ListItemButton
+                      key={`${file.source}:${file.name}`}
+                      selected={selectedFile === file.name}
+                      onClick={() => handleFileSelect(file)}
+                    >
+                      <ListItemDecorator>
+                        <FileIcon size={14} />
+                      </ListItemDecorator>
+                      <ListItemContent>
+                        <Typography
+                          level="body-sm"
+                          sx={{
+                            whiteSpace: 'nowrap',
+                            textOverflow: 'ellipsis',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {file.name}
+                        </Typography>
+                      </ListItemContent>
+                    </ListItemButton>
+                  ))}
+                </List>
+                <Box sx={{ p: 1.5 }}>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    color="primary"
+                    startDecorator={<UploadIcon size={14} />}
+                    loading={uploading}
+                    onClick={() => fileInputRef.current?.click()}
+                    sx={{ width: '100%', mb: 1 }}
                   >
-                    <ListItemDecorator>
-                      <FileIcon size={14} />
-                    </ListItemDecorator>
-                    <ListItemContent>
-                      <Typography
-                        level="body-sm"
-                        sx={{
-                          whiteSpace: 'nowrap',
-                          textOverflow: 'ellipsis',
-                          overflow: 'hidden',
-                        }}
-                      >
-                        {file.name}
-                      </Typography>
-                    </ListItemContent>
-                  </ListItemButton>
-                ))}
-              </List>
+                    Upload Files
+                  </Button>
+                  <Box
+                    onDrop={handleDrop}
+                    onDragOver={(event) => event.preventDefault()}
+                    sx={{
+                      border: '1px dashed',
+                      borderColor: 'divider',
+                      borderRadius: '8px',
+                      p: 1,
+                      textAlign: 'center',
+                      color: 'text.tertiary',
+                      fontSize: '12px',
+                    }}
+                  >
+                    Drop files here
+                  </Box>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleFileInputChange}
+                  />
+                </Box>
+              </>
             )}
           </Sheet>
 
@@ -505,7 +612,7 @@ export default function TaskYamlEditorModal({
                   }}
                   options={{
                     ...getMonacoEditorOptions(),
-                    readOnly: !isTaskYaml,
+                    readOnly: !isEditableFile,
                   }}
                 />
               )}
@@ -548,7 +655,7 @@ export default function TaskYamlEditorModal({
                     Validate
                   </Button>
                 )}
-                {isTaskYaml && (
+                {isEditableFile && (
                   <Button
                     color="success"
                     onClick={handleSave}
