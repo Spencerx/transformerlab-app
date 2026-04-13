@@ -98,8 +98,10 @@ async def _poll_pending_remote_entries() -> list[JobQueue]:
 async def _mark_entry_dispatched(entry_id: str) -> None:
     """Transition a job_queue row from PENDING to DISPATCHED."""
     async with async_session() as session:
-        stmt = update(JobQueue).where(JobQueue.id == entry_id).values(
-            status="DISPATCHED", updated_at=datetime.now(timezone.utc)
+        stmt = (
+            update(JobQueue)
+            .where(JobQueue.id == entry_id)
+            .values(status="DISPATCHED", updated_at=datetime.now(timezone.utc))
         )
         await session.execute(stmt)
         await session.commit()
@@ -108,8 +110,10 @@ async def _mark_entry_dispatched(entry_id: str) -> None:
 async def _mark_entry_failed(entry_id: str) -> None:
     """Transition a job_queue row to FAILED (could not reconstruct work item)."""
     async with async_session() as session:
-        stmt = update(JobQueue).where(JobQueue.id == entry_id).values(
-            status="FAILED", updated_at=datetime.now(timezone.utc)
+        stmt = (
+            update(JobQueue)
+            .where(JobQueue.id == entry_id)
+            .values(status="FAILED", updated_at=datetime.now(timezone.utc))
         )
         await session.execute(stmt)
         await session.commit()

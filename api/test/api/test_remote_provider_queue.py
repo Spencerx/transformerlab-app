@@ -1,6 +1,5 @@
 import json
 
-import pytest
 
 from transformerlab.services.remote_provider_queue import _reconstruct_work_item, RemoteLaunchWorkItem
 
