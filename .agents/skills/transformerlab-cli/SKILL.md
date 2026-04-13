@@ -20,6 +20,14 @@ Verify: `lab version`
 
 ## First-Time Setup & Authentication
 
+**If the CLI returns `Missing required configuration keys: team_id, user_email` (or any other auth/config error), do NOT ask the user for an API key.** Instead, tell them to run:
+
+```bash
+lab login
+```
+
+This launches the interactive login flow in their terminal. Wait for them to complete it, then retry the original command. Never prompt the user to paste an API key into the conversation.
+
 **The CLI only supports API key authentication.** There is no `--email` or `--password` flag. To connect:
 
 ```bash
@@ -89,11 +97,13 @@ lab status
 lab task list
 
 # 3. Queue a task on a compute provider
+#    NOTE: --no-interactive silently picks the DEFAULT provider (Local).
+#    To pick a specific provider, run interactively (see "Selecting a provider" below).
 lab task queue TASK_ID --no-interactive
 
 # 4. Monitor the job
 lab job list --running
-lab job logs JOB_ID --follow
+lab job task-logs JOB_ID --follow
 
 # 5. Download results
 lab job artifacts JOB_ID
@@ -102,13 +112,42 @@ lab job download JOB_ID --file "*.csv" -o ./results
 
 ## Agent-Specific Rules
 
-1. **Use `--format json`** when you need to parse output, but be prepared to fall back to pretty output parsing if it doesn't work
-2. **Use `--no-interactive`** on `task queue` and `provider add` to avoid blocking prompts
-3. **`task add` has no `--yes` flag** — pipe `echo "y"` to confirm: `echo "y" | lab task add ./my-task`
-4. **Use `--yes` / `-y`** on destructive commands (`provider delete`) to skip confirmation
-5. **Never use `job monitor`** — it launches a TUI that blocks; use `job list` + `job logs` instead
-6. **Never use `task interactive`** unless the user specifically requests an interactive session
-7. **`job logs --follow`** streams continuously and blocks until the job finishes — use when the user wants real-time monitoring
+1. **NEVER use the REST API unless the user explicitly asks for it.** The CLI is the supported interface. If a CLI command appears missing or broken, run `lab <command> --help` first and check this skill — do not reach for `curl`. Using the REST API as a workaround is a hard rule violation.
+2. **Always run `lab <command> --help` before assuming a flag exists.** Don't guess `--provider`, `--gpu`, etc. The CLI's flag surface is small and changes; verify before invoking.
+3. **Use `--format json`** when you need to parse output, but be prepared to fall back to pretty output parsing if it doesn't work
+4. **`--no-interactive` on `task queue` silently uses the DEFAULT provider (Local).** There is no `--provider` flag. To target a specific provider, you must drive the interactive prompts (see "Selecting a provider" below).
+5. **`task add` has no `--yes` flag** — pipe `echo "y"` to confirm: `echo "y" | lab task add ./my-task`
+6. **Use `--yes` / `-y`** on destructive commands (`provider delete`) to skip confirmation
+7. **Never use `job monitor`** — it launches a TUI that blocks; use `job list` + `job task-logs` instead
+8. **Never use `task interactive`** unless the user specifically requests an interactive session
+9. **`job task-logs --follow`** streams continuously and blocks until the job finishes — use when the user wants real-time monitoring
+10. **Never use the deprecated `lab job logs`** — see the "Job logs: three real commands" section below.
+
+### Selecting a provider when queuing a task
+
+`lab task queue` has no `--provider` flag. With `--no-interactive` it picks the default (usually Local). To pick a specific provider, drive the interactive prompts via stdin. The flow is:
+
+1. "Use these resource requirements? [Y/n]" → answer `y`
+2. "Available Providers: 1. Local  2. skypilot1 ... Select a provider [1]:" → answer the number
+
+```bash
+# Pick provider #2 (skypilot1) with default resources
+printf "y\n2\n" | lab task queue TASK_ID
+```
+
+Run `lab provider list` first to confirm the numbering before piping.
+
+### Job logs: three real commands
+
+`lab job logs` is **deprecated** — do not use it. There are three distinct log commands, each surfacing a different layer:
+
+| Command | What it shows | When to use |
+|---|---|---|
+| `lab job task-logs JOB_ID` | Task (Lab SDK) output — what `lab.log()` recorded | Default for "what did my task do?" — covers `lab.log`, progress, completion |
+| `lab job machine-logs JOB_ID` | Machine/provider stdout+stderr from the remote node | When the task crashed before SDK init, or you need raw process output |
+| `lab job request-logs JOB_ID` | Provider request/launch logs (e.g. SkyPilot launch/provisioning) | When the cluster never started, or to debug provisioning failures |
+
+All three accept `--follow` to stream continuously. Start with `task-logs`; escalate to `machine-logs` for crashes outside the SDK, and `request-logs` for cluster/provisioning issues.
 
 ## Debugging Failed Jobs
 
@@ -119,19 +158,13 @@ lab job download JOB_ID --file "*.csv" -o ./results
 lab job info JOB_ID
 # Look for: Completion Status (success/failed/N/A) and Completion Details
 
-# CLI: get provider execution logs (what the task actually printed)
-lab job logs JOB_ID
+# CLI: get logs (see "Job logs: three real commands" above)
+lab job task-logs JOB_ID      # task/SDK output
+lab job machine-logs JOB_ID   # raw process stdout+stderr
+lab job request-logs JOB_ID   # provider launch/provisioning logs
 ```
 
-If `lab job logs` fails or returns empty, fall back to the REST API:
-
-```bash
-# Get provider logs directly — this is the most reliable way to see task output
-curl -s -H "Authorization: Bearer API_KEY" \
-  -H "X-Team-Id: TEAM_ID" \
-  "https://SERVER/experiment/EXPERIMENT/jobs/JOB_ID/provider_logs" | python3 -m json.tool
-# Returns: {"logs": "...actual stdout/stderr from the task..."}
-```
+**Do NOT fall back to the REST API** if a log command returns empty — try the other two log commands first. The three layers surface different things; sparse output from one doesn't mean failure.
 
 **Common failure patterns:**
 
@@ -144,70 +177,17 @@ curl -s -H "Authorization: Bearer API_KEY" \
 
 ### Checking Cluster Status (SkyPilot providers)
 
-```bash
-curl -s -H "Authorization: Bearer API_KEY" \
-  -H "X-Team-Id: TEAM_ID" \
-  "https://SERVER/compute_provider/providers/PROVIDER_ID/clusters/CLUSTER_NAME/status" | python3 -m json.tool
-```
+Use `lab job info JOB_ID` — it shows `cluster_name` and provisioning state. For more detail use `lab job request-logs JOB_ID` (provider launch logs). If a cluster never provisioned, the request-logs will show why (wrong accelerator type, quota, etc.).
 
-The `cluster_name` is in the job info output. If `state` is "unknown" or "Cluster not found", the cluster never provisioned — likely wrong accelerator type or provider issue.
+## Do NOT use the REST API
 
-## Launching Jobs via REST API (Fallback)
+The CLI is the supported, sanctioned interface. **Never call the REST API directly with `curl` unless the user explicitly asks you to.** If the CLI seems to be missing a capability:
 
-If `lab task queue` fails (e.g., `provider list` returns 404 on the server), you can launch jobs directly via the REST API. This is the **most reliable method** and bypasses CLI limitations.
+1. Run `lab <command> --help` and `lab <subcommand> --help` to verify
+2. Re-read this skill for the right pattern (e.g. interactive prompts via stdin)
+3. Tell the user the CLI doesn't support it — don't silently switch to `curl`
 
-**Find the correct endpoint** from the server's OpenAPI spec:
-```bash
-curl -s https://SERVER/openapi.json | python3 -c "
-import sys, json
-paths = json.load(sys.stdin).get('paths', {})
-for p in sorted(paths):
-    if 'launch' in p or 'compute' in p:
-        print(list(paths[p].keys()), p)
-"
-```
-
-**Launch a task:**
-```bash
-curl -s -X POST \
-  -H "Authorization: Bearer API_KEY" \
-  -H "X-Team-Id: TEAM_ID" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "experiment_id": "EXPERIMENT_NAME",
-    "task_id": "TASK_UUID",
-    "task_name": "my-task",
-    "run": "python ~/my-task/main.py",
-    "accelerators": "RTX3090:1",
-    "setup": "pip install ...",
-    "env_vars": {"KEY": "VALUE"},
-    "file_mounts": true,
-    "parameters": {...},
-    "config": {...},
-    "provider_name": "ProviderName"
-  }' \
-  "https://SERVER/compute_provider/providers/PROVIDER_ID/launch/"
-```
-
-**Important:** The trailing slash on `/launch/` is required. The CLI uses an outdated endpoint path (`/compute_provider/{id}/task/launch`) — always use `/compute_provider/providers/{id}/launch/` when calling the API directly.
-
-**Auth for REST API calls:** Use `Authorization: Bearer API_KEY` (not `x-api-key`). Always include `X-Team-Id` header. The API key works the same as the CLI's stored key.
-
-## Getting Job Details via REST API
-
-```bash
-# Full job details including job_data, completion status, launch progress
-curl -s -H "Authorization: Bearer API_KEY" \
-  -H "X-Team-Id: TEAM_ID" \
-  "https://SERVER/experiment/EXPERIMENT/jobs/JOB_ID" | python3 -m json.tool
-
-# Provider execution logs (stdout/stderr from the actual task)
-curl -s -H "Authorization: Bearer API_KEY" \
-  -H "X-Team-Id: TEAM_ID" \
-  "https://SERVER/experiment/EXPERIMENT/jobs/JOB_ID/provider_logs" | python3 -m json.tool
-```
-
-The `provider_logs` endpoint is the single best debugging tool — it returns what the task actually printed to stdout/stderr on the remote node.
+This applies to launching jobs, fetching logs, checking cluster status, and everything else.
 
 ## Command Overview
 
@@ -227,7 +207,9 @@ The `provider_logs` endpoint is the single best debugging tool — it returns wh
 | `lab task gallery` | Browse/import from task gallery | Yes |
 | `lab job list` | List jobs (`--running` for active only) | Yes |
 | `lab job info <id>` | Get detailed job information | Yes |
-| `lab job logs <id>` | Fetch provider logs (`--follow` to stream) | Yes |
+| `lab job task-logs <id>` | Fetch task/SDK output (`--follow` to stream) | Yes |
+| `lab job machine-logs <id>` | Fetch raw machine/provider stdout+stderr (`--follow`) | Yes |
+| `lab job request-logs <id>` | Fetch provider launch/provisioning logs | Yes |
 | `lab job artifacts <id>` | List job artifacts | Yes |
 | `lab job download <id>` | Download artifacts (`--file` for glob) | Yes |
 | `lab job stop <id>` | Stop a running job | Yes |
