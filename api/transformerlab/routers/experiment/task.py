@@ -885,7 +885,8 @@ async def import_task_from_gallery(
                 raise HTTPException(status_code=404, detail="Gallery entry not found")
 
         # Create interactive task template (store interactive_gallery_id for launch-time run resolution)
-        task_name = gallery_entry.get("name", "Interactive Task")
+        requested_name = (request.name or "").strip()
+        task_name = requested_name or gallery_entry.get("name", "Interactive Task")
         interactive_type = gallery_entry.get("interactive_type") or "custom"
         interactive_gallery_id = gallery_entry.get("id")
 
