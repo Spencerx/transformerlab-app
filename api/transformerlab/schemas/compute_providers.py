@@ -12,6 +12,7 @@ class ProviderConfigBase(BaseModel):
     # SkyPilot-specific config
     server_url: Optional[str] = None
     api_token: Optional[str] = None
+    dstack_project: Optional[str] = None
     default_env_vars: Dict[str, str] = Field(default_factory=dict)
     default_entrypoint_run: Optional[str] = None
 
@@ -84,7 +85,7 @@ def mask_sensitive_config(config: Dict[str, Any], provider_type: str) -> Dict[st
     """
     masked = config.copy()
 
-    # Mask API tokens
+    # Mask API tokens for all providers.
     if "api_token" in masked and masked["api_token"]:
         masked["api_token"] = "***"
 
@@ -134,13 +135,9 @@ class ProviderTemplateLaunchRequest(BaseModel):
         description="Configuration values to override for this specific run. These will be merged with parameters defaults.",
     )
     provider_name: Optional[str] = None
-    # Canonical GitHub fields (preferred)
     github_repo_url: Optional[str] = None
     github_repo_dir: Optional[str] = None
     github_repo_branch: Optional[str] = None
-    # Legacy fields kept for backward compatibility; new code should prefer github_repo_*.
-    github_directory: Optional[str] = None
-    github_branch: Optional[str] = None
     # Sweep configuration
     run_sweeps: Optional[bool] = Field(
         default=False,
