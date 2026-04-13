@@ -199,6 +199,7 @@ async def resume_remote_job_from_checkpoint(
     env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
     env_vars["_TFL_JOB_ID"] = str(new_job_id)
     env_vars["_TFL_EXPERIMENT_ID"] = experiment_id
+    env_vars["TFL_EXPERIMENT_ID"] = experiment_id
     if user:
         env_vars["_TFL_USER_ID"] = str(user.id)
 

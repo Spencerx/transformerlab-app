@@ -337,6 +337,7 @@ async def launch_template_on_provider(
     env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
     env_vars["_TFL_JOB_ID"] = str(job_id)
     env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
+    env_vars["TFL_EXPERIMENT_ID"] = request.experiment_id
     env_vars["_TFL_USER_ID"] = user_id
 
     # Enable Trackio auto-init for this job if requested. When set, the lab SDK
