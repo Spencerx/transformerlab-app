@@ -33,14 +33,16 @@ const duration = require('dayjs/plugin/duration');
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
 
+const NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY = '_NGROK_AUTH_TOKEN' as const;
+const NGROK_AUTH_TOKEN_SECRET_LABEL = 'ngrok auth token';
+
 const REQUIRED_SPECIAL_SECRETS = [
   { key: '_HF_TOKEN', label: 'Hugging Face token' },
-  { key: '_NGROK_AUTH_TOKEN', label: 'ngrok auth token' },
+  {
+    key: NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY,
+    label: NGROK_AUTH_TOKEN_SECRET_LABEL,
+  },
 ] as const;
-
-const NGROK_AUTH_TOKEN_SECRET_LABEL = REQUIRED_SPECIAL_SECRETS.find(
-  (s) => s.key === '_NGROK_AUTH_TOKEN',
-)!.label;
 
 type SpecialSecretStatus = {
   exists?: boolean;
@@ -152,7 +154,7 @@ export default function Interactive() {
         >;
 
         const requiredSecrets = REQUIRED_SPECIAL_SECRETS.filter(({ key }) => {
-          if (key === '_NGROK_AUTH_TOKEN') {
+          if (key === NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY) {
             return hasNonLocalProvider;
           }
           return true;
@@ -632,7 +634,7 @@ export default function Interactive() {
           !envVarsForImport.NGROK_AUTH_TOKEN?.trim() &&
           (galleryPorts.length > 0 || hasNgrokField);
         if (shouldInjectNgrokSecret) {
-          envVarsForImport.NGROK_AUTH_TOKEN = '{{secret._NGROK_AUTH_TOKEN}}';
+          envVarsForImport.NGROK_AUTH_TOKEN = `{{secret.${NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY}}}`;
         }
         const envVarsForImportClean = omitNgrokAuthTokenForLocal(
           envVarsForImport,
@@ -646,6 +648,7 @@ export default function Interactive() {
             body: JSON.stringify({
               gallery_id: templateId,
               experiment_id: experimentInfo.id,
+              name: data.title,
               is_interactive: true,
               env_vars:
                 Object.keys(envVarsForImportClean).length > 0
@@ -671,7 +674,7 @@ export default function Interactive() {
           providerMeta.type !== 'local' &&
           !envVars.NGROK_AUTH_TOKEN
         ) {
-          envVars.NGROK_AUTH_TOKEN = '{{secret._NGROK_AUTH_TOKEN}}';
+          envVars.NGROK_AUTH_TOKEN = `{{secret.${NGROK_AUTH_TOKEN_SPECIAL_SECRET_KEY}}}`;
         }
         const envVarsClean = omitNgrokAuthTokenForLocal(
           envVars,
@@ -697,7 +700,7 @@ export default function Interactive() {
           env_vars:
             Object.keys(envVarsClean).length > 0 ? envVarsClean : undefined,
           github_repo_url: galleryTemplate?.github_repo_url || undefined,
-          github_directory: galleryTemplate?.github_repo_dir || undefined,
+          github_repo_dir: galleryTemplate?.github_repo_dir || undefined,
         };
 
         response = await chatAPI.authenticatedFetch(
@@ -849,16 +852,8 @@ export default function Interactive() {
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: providerMeta.name,
         github_repo_url: cfg.github_repo_url || task.github_repo_url,
-        github_repo_dir:
-          cfg.github_repo_dir ||
-          cfg.github_directory ||
-          task.github_repo_dir ||
-          task.github_directory,
-        github_repo_branch:
-          cfg.github_repo_branch ||
-          cfg.github_branch ||
-          task.github_repo_branch ||
-          task.github_branch,
+        github_repo_dir: cfg.github_repo_dir || task.github_repo_dir,
+        github_repo_branch: cfg.github_repo_branch || task.github_repo_branch,
         run_sweeps: cfg.run_sweeps || task.run_sweeps || undefined,
         sweep_config: cfg.sweep_config || task.sweep_config || undefined,
         sweep_metric:
@@ -1001,16 +996,8 @@ export default function Interactive() {
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: providerMeta.name,
         github_repo_url: cfg.github_repo_url || task.github_repo_url,
-        github_repo_dir:
-          cfg.github_repo_dir ||
-          cfg.github_directory ||
-          task.github_repo_dir ||
-          task.github_directory,
-        github_repo_branch:
-          cfg.github_repo_branch ||
-          cfg.github_branch ||
-          task.github_repo_branch ||
-          task.github_branch,
+        github_repo_dir: cfg.github_repo_dir || task.github_repo_dir,
+        github_repo_branch: cfg.github_repo_branch || task.github_repo_branch,
         run_sweeps: cfg.run_sweeps || task.run_sweeps || undefined,
         sweep_config: cfg.sweep_config || task.sweep_config || undefined,
         sweep_metric:
@@ -1316,6 +1303,8 @@ export default function Interactive() {
           loading={jobsIsLoading || !experimentInfo?.id}
           onDeleteJob={handleDeleteJob}
           hideOutputButton
+          hideJobId
+          showInteractiveType
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));
