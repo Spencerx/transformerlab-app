@@ -27,15 +27,12 @@ import EditInteractiveTaskModal from './EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from './DeleteTaskConfirmModal';
 import QueueTaskModal from './QueueTaskModal';
 import ViewOutputModalStreaming from './ViewOutputModalStreaming';
-import ViewArtifactsModal from './ViewArtifactsModal';
-import ViewProfilingModal from './ViewProfilingModal';
 import ViewCheckpointsModal from './ViewCheckpointsModal';
 import ViewEvalResultsModal from './ViewEvalResultsModal';
 import CompareEvalResultsModal from './CompareEvalResultsModal';
 import PreviewDatasetModal from '../../Data/PreviewDatasetModal';
 import ViewSweepResultsModal from './ViewSweepResultsModal';
-import ViewJobDatasetsModal from './ViewJobDatasetsModal';
-import ViewJobModelsModal from './ViewJobModelsModal';
+import JobArtifactsModal from './JobArtifacts/JobArtifactsModal';
 import FileBrowserModal from './FileBrowserModal';
 import SafeJSONParse from '../../Shared/SafeJSONParse';
 import NewTaskModal2 from './NewTaskModal/NewTaskModal2';
@@ -62,12 +59,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const [viewCheckpointsFromJob, setViewCheckpointsFromJob] = useState<
     string | null
   >(null);
-  const [viewArtifactsFromJob, setViewArtifactsFromJob] = useState<
-    string | null
-  >(null);
-  const [viewProfilingFromJob, setViewProfilingFromJob] = useState<
-    string | null
-  >(null);
   const [viewEvalImagesFromJob, setViewEvalImagesFromJob] = useState<
     string | null
   >(null);
@@ -81,10 +72,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const [interactiveJobForModal, setInteractiveJobForModal] = useState<
     string | null
   >(null);
-  const [viewJobDatasetsFromJob, setViewJobDatasetsFromJob] = useState<
-    string | null
-  >(null);
-  const [viewJobModelsFromJob, setViewJobModelsFromJob] = useState<
+  const [viewAllArtifactsFromJob, setViewAllArtifactsFromJob] = useState<
     string | null
   >(null);
   const [previewDatasetModal, setPreviewDatasetModal] = useState<{
@@ -705,10 +693,8 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         parameters: data.parameters || undefined,
         file_mounts: data.file_mounts || undefined,
         github_repo_url: data.github_repo_url || undefined,
-        github_repo_dir:
-          data.github_repo_dir || data.github_directory || undefined,
-        github_repo_branch:
-          data.github_repo_branch || data.github_branch || undefined,
+        github_repo_dir: data.github_repo_dir || undefined,
+        github_repo_branch: data.github_repo_branch || undefined,
         run_sweeps: data.run_sweeps || undefined,
         sweep_config: data.sweep_config || undefined,
         sweep_metric:
@@ -725,7 +711,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
       }
 
       const response = await fetchWithAuth(
-        chatAPI.Endpoints.Task.NewTemplate(experimentInfo?.id || ''),
+        chatAPI.Endpoints.Task.CreateTemplate(experimentInfo?.id || ''),
         {
           method: 'POST',
           headers: {
@@ -878,11 +864,11 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           provider_name: providerMeta.name,
           env_vars: Object.keys(envVars).length > 0 ? envVars : undefined,
           github_repo_url: template?.github_repo_url || undefined,
-          github_directory: template?.github_repo_dir || undefined,
+          github_repo_dir: template?.github_repo_dir || undefined,
         };
 
         response = await fetchWithAuth(
-          chatAPI.Endpoints.Task.NewTemplate(experimentInfo?.id || ''),
+          chatAPI.Endpoints.Task.CreateTemplate(experimentInfo?.id || ''),
           {
             method: 'POST',
             headers: {
@@ -1038,16 +1024,8 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: config?.provider_name ?? providerMeta.name,
         github_repo_url: cfg.github_repo_url || task.github_repo_url,
-        github_repo_dir:
-          cfg.github_repo_dir ||
-          cfg.github_directory ||
-          task.github_repo_dir ||
-          task.github_directory,
-        github_repo_branch:
-          cfg.github_repo_branch ||
-          cfg.github_branch ||
-          task.github_repo_branch ||
-          task.github_branch,
+        github_repo_dir: cfg.github_repo_dir || task.github_repo_dir,
+        github_repo_branch: cfg.github_repo_branch || task.github_repo_branch,
         run_sweeps: cfg.run_sweeps || task.run_sweeps || undefined,
         sweep_config: cfg.sweep_config || task.sweep_config || undefined,
         sweep_metric:
@@ -1378,7 +1356,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           )}
         </Stack>
       </Stack>
-      <Sheet sx={{ px: 1, mt: 1, mb: 2, flex: 2, overflow: 'auto' }}>
+      <Sheet sx={{ px: 1, mt: 1, mb: 1, flex: 2, overflow: 'auto' }}>
         <JobsList
           jobs={filteredJobsForDisplay as any}
           launchProgressByJobId={launchProgressByJobId}
@@ -1392,11 +1370,8 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewCheckpoints={(jobId) =>
             setViewCheckpointsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
           }
-          onViewArtifacts={(jobId) =>
-            setViewArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewProfiling={(jobId) =>
-            setViewProfilingFromJob(jobId && jobId !== 'NaN' ? jobId : null)
+          onViewAllArtifacts={(jobId) =>
+            setViewAllArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
           }
           onViewEvalImages={(jobId) =>
             setViewEvalImagesFromJob(jobId && jobId !== 'NaN' ? jobId : null)
@@ -1407,12 +1382,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewGeneratedDataset={(jobId, datasetId) => {
             setPreviewDatasetModal({ open: true, datasetId });
           }}
-          onViewJobDatasets={(jobId) =>
-            setViewJobDatasetsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewJobModels={(jobId) =>
-            setViewJobModelsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));
@@ -1457,23 +1426,30 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         jobId={viewSweepResultsFromJob}
         setJobId={(jobId: string | null) => setViewSweepResultsFromJob(jobId)}
       />
-      <ViewOutputModalStreaming
-        jobId={viewOutputFromJob}
-        setJobId={(jobId: string | null) => setViewOutputFromJob(jobId)}
-        jobStatus={
-          jobs?.find((j: any) => String(j.id) === viewOutputFromJob)?.status ||
-          ''
-        }
-      />
-      <ViewArtifactsModal
-        open={viewArtifactsFromJob !== null}
-        onClose={() => setViewArtifactsFromJob(null)}
-        jobId={viewArtifactsFromJob}
-      />
-      <ViewProfilingModal
-        open={viewProfilingFromJob !== null}
-        onClose={() => setViewProfilingFromJob(null)}
-        jobId={viewProfilingFromJob}
+      {(() => {
+        const outputJob = jobs?.find(
+          (j: any) => String(j.id) === viewOutputFromJob,
+        );
+        return (
+          <ViewOutputModalStreaming
+            jobId={viewOutputFromJob}
+            setJobId={(jobId: string | null) => setViewOutputFromJob(jobId)}
+            jobStatus={outputJob?.status || ''}
+            tabs={
+              outputJob?.job_data?.provider_type === 'skypilot'
+                ? ['output', 'provider', 'skypilot']
+                : ['output', 'provider']
+            }
+            skypilotRequestId={
+              outputJob?.job_data?.provider_launch_result?.request_id || ''
+            }
+          />
+        );
+      })()}
+      <JobArtifactsModal
+        open={viewAllArtifactsFromJob !== null}
+        onClose={() => setViewAllArtifactsFromJob(null)}
+        jobId={viewAllArtifactsFromJob}
       />
       <ViewCheckpointsModal
         open={viewCheckpointsFromJob !== null}
@@ -1502,20 +1478,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         dataset_id={previewDatasetModal.datasetId}
         viewType="preview"
       />
-      {viewJobDatasetsFromJob !== null && (
-        <ViewJobDatasetsModal
-          open
-          onClose={() => setViewJobDatasetsFromJob(null)}
-          jobId={viewJobDatasetsFromJob}
-        />
-      )}
-      {viewJobModelsFromJob !== null && (
-        <ViewJobModelsModal
-          open
-          onClose={() => setViewJobModelsFromJob(null)}
-          jobId={viewJobModelsFromJob}
-        />
-      )}
       <FileBrowserModal
         mode="job"
         open={viewFileBrowserFromJob !== null}

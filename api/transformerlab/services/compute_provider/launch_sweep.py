@@ -177,6 +177,9 @@ async def launch_sweep_jobs(
                 if env_vars and team_secrets:
                     env_vars = replace_secrets_in_dict(env_vars, team_secrets)
 
+                # Explicitly pass storage provider to launched jobs so runtime
+                # behavior does not depend on inherited parent env.
+                env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
                 env_vars["_TFL_JOB_ID"] = str(child_job_id)
                 env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
                 env_vars["_TFL_USER_ID"] = user_id
@@ -198,15 +201,18 @@ async def launch_sweep_jobs(
                     )
 
                 tfl_storage_uri = None
-                try:
-                    storage_root = await storage.root_uri()
-                    if storage_root:
-                        if storage.is_remote_path(storage_root):
-                            tfl_storage_uri = storage_root
-                        elif STORAGE_PROVIDER == "localfs":
-                            tfl_storage_uri = storage_root
-                except Exception:
-                    pass
+                if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI") and team_id:
+                    tfl_storage_uri = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", str(team_id), "workspace")
+                else:
+                    try:
+                        storage_root = await storage.root_uri()
+                        if storage_root:
+                            if storage.is_remote_path(storage_root):
+                                tfl_storage_uri = storage_root
+                            elif STORAGE_PROVIDER == "localfs":
+                                tfl_storage_uri = storage_root
+                    except Exception:
+                        pass
 
                 if tfl_storage_uri:
                     env_vars["TFL_STORAGE_URI"] = tfl_storage_uri
@@ -278,8 +284,8 @@ async def launch_sweep_jobs(
                 if request.github_repo_url:
                     workspace_dir = await get_workspace_dir()
                     github_pat = await read_github_pat_from_workspace(workspace_dir, user_id=user_id)
-                    directory = request.github_repo_dir or request.github_directory
-                    branch = request.github_repo_branch or request.github_branch
+                    directory = request.github_repo_dir
+                    branch = request.github_repo_branch
                     github_setup = generate_github_clone_setup(
                         repo_url=request.github_repo_url,
                         directory=directory,

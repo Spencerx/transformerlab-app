@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import time
 from typing import Any, Dict, Optional
 
@@ -161,8 +162,6 @@ async def resume_remote_job_from_checkpoint(
         "github_repo_url",
         "github_repo_dir",
         "github_repo_branch",
-        "github_directory",
-        "github_branch",
         "user_info",
         "team_id",
     ]
@@ -195,6 +194,9 @@ async def resume_remote_job_from_checkpoint(
     provider_display_name = job_data.get("provider_name") or provider.name
 
     env_vars = (job_data.get("env_vars") or {}).copy()
+    # Explicitly pass storage provider to launched jobs so runtime behavior
+    # does not depend on inherited parent env.
+    env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
     env_vars["_TFL_JOB_ID"] = str(new_job_id)
     env_vars["_TFL_EXPERIMENT_ID"] = experiment_id
     if user:
@@ -223,15 +225,18 @@ async def resume_remote_job_from_checkpoint(
         )
 
     tfl_storage_uri = None
-    try:
-        storage_root = await storage.root_uri()
-        if storage_root:
-            if storage.is_remote_path(storage_root):
-                tfl_storage_uri = storage_root
-            elif STORAGE_PROVIDER == "localfs":
-                tfl_storage_uri = storage_root
-    except Exception:
-        pass
+    if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI") and team_id:
+        tfl_storage_uri = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", str(team_id), "workspace")
+    else:
+        try:
+            storage_root = await storage.root_uri()
+            if storage_root:
+                if storage.is_remote_path(storage_root):
+                    tfl_storage_uri = storage_root
+                elif STORAGE_PROVIDER == "localfs":
+                    tfl_storage_uri = storage_root
+        except Exception:
+            pass
 
     if tfl_storage_uri:
         env_vars["TFL_STORAGE_URI"] = tfl_storage_uri
@@ -253,9 +258,9 @@ async def resume_remote_job_from_checkpoint(
         github_pat = await read_github_pat_from_workspace(workspace_dir, user_id=user_id_for_pat)
         github_setup = generate_github_clone_setup(
             repo_url=github_repo_url,
-            directory=job_data.get("github_directory"),
+            directory=job_data.get("github_repo_dir"),
             github_pat=github_pat,
-            branch=job_data.get("github_branch"),
+            branch=job_data.get("github_repo_branch"),
         )
         setup_commands.append(github_setup)
 
