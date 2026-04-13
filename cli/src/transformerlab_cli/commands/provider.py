@@ -223,12 +223,12 @@ def command_provider_update(
 @app.command("delete")
 def command_provider_delete(
     provider_id: str = typer.Argument(..., help="Provider ID to delete"),
-    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip confirmation prompt"),
 ):
     """Delete a compute provider."""
     check_configs(output_format=cli_state.output_format)
 
-    if not yes:
+    if not no_interactive:
         typer.confirm(f"Delete provider {provider_id}?", abort=True)
 
     with console.status(f"[bold success]Deleting provider {provider_id}...[/bold success]", spinner="dots"):
