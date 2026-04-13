@@ -43,6 +43,10 @@ type TaskYamlEditorModalProps = {
   onSaved?: () => void;
 };
 
+function isTaskYamlPath(path: string): boolean {
+  return /(?:^|\/)task\.ya?ml$/i.test(path);
+}
+
 export default function TaskYamlEditorModal({
   open,
   onClose,
@@ -91,7 +95,10 @@ export default function TaskYamlEditorModal({
       const allFiles: TaskFile[] = [];
       if (Array.isArray(data.github_files)) {
         for (const f of data.github_files) {
-          allFiles.push({ name: f, source: 'github' });
+          if (!isTaskYamlPath(f)) {
+            // Prefer the local editable task YAML and hide duplicate GitHub entry.
+            allFiles.push({ name: f, source: 'github' });
+          }
         }
       }
       if (Array.isArray(data.local_files)) {
@@ -199,7 +206,10 @@ export default function TaskYamlEditorModal({
         const allFiles: TaskFile[] = [];
         if (Array.isArray(data.github_files)) {
           for (const f of data.github_files) {
-            allFiles.push({ name: f, source: 'github' });
+            if (!isTaskYamlPath(f)) {
+              // Prefer the local editable task YAML and hide duplicate GitHub entry.
+              allFiles.push({ name: f, source: 'github' });
+            }
           }
         }
         if (Array.isArray(data.local_files)) {
