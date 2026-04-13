@@ -58,6 +58,8 @@ interface JobsListProps {
   onToggleJobSelected?: (jobId: string) => void;
   onToggleFavorite?: (jobId: string, currentValue: boolean) => void;
   onToggleHidden?: (jobId: string, currentValue: boolean) => void;
+  hideJobId?: boolean;
+  showInteractiveType?: boolean;
 }
 
 const JobsList: React.FC<JobsListProps> = ({
@@ -82,6 +84,8 @@ const JobsList: React.FC<JobsListProps> = ({
   onToggleJobSelected,
   onToggleFavorite,
   onToggleHidden,
+  hideJobId = false,
+  showInteractiveType = false,
 }) => {
   const showTrackioForStatus = (status?: string): boolean => {
     return String(status || '') === 'RUNNING' || isTerminalJobStatus(status);
@@ -89,6 +93,10 @@ const JobsList: React.FC<JobsListProps> = ({
 
   const formatJobConfig = (job: any) => {
     const jobData = job?.job_data || {};
+    const interactiveType =
+      jobData?.interactive_type ||
+      job?.interactive_type ||
+      jobData?.template_config?.interactive_type;
 
     // Handle sweep child jobs
     if (jobData?.parent_sweep_job_id) {
@@ -167,6 +175,11 @@ const JobsList: React.FC<JobsListProps> = ({
               <b>Provider:</b> {providerDisplay}
             </Typography>
           )}
+          {showInteractiveType && interactiveType && (
+            <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+              <b>Interactive Type:</b> {String(interactiveType)}
+            </Typography>
+          )}
         </>
       );
     }
@@ -240,7 +253,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         sx={{ mr: 1 }}
                       />
                     )}
-                  <b title={fullJobId}>{displayJobId}</b>
+                  {!hideJobId && <b title={fullJobId}>{displayJobId}</b>}
                 </td>
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
                   {formatJobConfig(job)}
