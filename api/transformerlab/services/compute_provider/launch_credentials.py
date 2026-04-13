@@ -4,8 +4,8 @@ import configparser
 import os
 from typing import Optional, Tuple
 
-# lab.init() not required; copy_file_mounts uses _TFL_JOB_ID and job_data only
-COPY_FILE_MOUNTS_SETUP = 'pip install -q transformerlab && python -c "from lab import lab; lab.copy_file_mounts()"'
+# lab.init() not required; copy_file_mounts uses _TFL_JOB_ID, _TFL_EXPERIMENT_ID / TFL_EXPERIMENT_ID, and job_data
+COPY_FILE_MOUNTS_SETUP = 'python -c "from lab import lab; lab.copy_file_mounts()"'
 
 # RunPod (and similar) use /workspace as a writable persistent path
 RUNPOD_AWS_CREDENTIALS_DIR = "/workspace/.aws"
