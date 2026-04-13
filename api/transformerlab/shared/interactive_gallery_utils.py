@@ -1,13 +1,16 @@
 """
 Utilities for resolving interactive gallery commands by environment (local/remote).
 See galleries.py for the interactive gallery schema documentation.
+
+Run/setup text comes from the task (e.g. task.yaml from the GitHub example repo).
+Gallery entries supply metadata (ports, interactive_type) for ngrok and local URL hints only.
 """
 
 import re
 from typing import Any, Optional, Tuple
 
 # Prepended to interactive remote setup in the launch route so $SUDO is defined
-# without putting that logic in the gallery JSON. Setup content stays in the gallery.
+# without putting that logic in the gallery JSON. Setup content stays on the task.
 INTERACTIVE_SUDO_PREFIX = (
     'SUDO=""; if [ "$(id -u)" -ne 0 ]; then SUDO="sudo"; fi; export DEBIAN_FRONTEND=noninteractive;'
 )
@@ -88,7 +91,7 @@ def build_ngrok_tunnel_command(entry_id: str, ports: list[dict[str, Any]]) -> st
 
     # Build printf args: each line single-quoted; authtoken line must expand $NGROK_AUTH_TOKEN
     printf_parts = ["printf '%s\\n'"]
-    for i, line in enumerate(yaml_lines):
+    for line in yaml_lines:
         if line == "authtoken: $NGROK_AUTH_TOKEN":
             printf_parts.append("'authtoken: '\"$NGROK_AUTH_TOKEN\"")
         else:
@@ -102,108 +105,31 @@ def build_ngrok_tunnel_command(entry_id: str, ports: list[dict[str, Any]]) -> st
     return f"{install_and_auth}; {printf_cmd} && {start_cmd}"
 
 
-def _compose_command_from_logic(
-    logic: dict,
-    interactive_type: str,
-    environment: str,
-    template_entry: Optional[dict] = None,
-) -> Optional[str]:
-    """
-    Compose a command from the logic block:
-      - core: required
-      - tunnel: optional
-      - tail_logs: optional
-
-    The caller chooses environment:
-      - local: tunnel is omitted
-      - remote: tunnel is included if present
-    """
-    core = logic.get("core")
-    if not isinstance(core, str) or not core.strip():
-        return None
-
-    tail_logs = logic.get("tail_logs")
-
-    parts: list[str] = []
-
-    def _clean(fragment: Optional[str]) -> Optional[str]:
-        if not isinstance(fragment, str):
-            return None
-        cleaned = fragment.strip().rstrip(";").strip()
-        return cleaned or None
-
-    def _strip_ngrok_log_from_tail(cmd: str) -> str:
-        # Best-effort: if tail command includes /tmp/ngrok.log, remove it for local runs.
-        stripped = cmd
-        if stripped.startswith("tail -f ") or stripped.startswith("tail -F "):
-            tokens = stripped.split()
-            # tokens like: ["tail","-f","/tmp/a.log","/tmp/ngrok.log"]
-            kept = [tok for tok in tokens if tok != "/tmp/ngrok.log"]
-            stripped = " ".join(kept)
-        return stripped
-
-    core_clean = _clean(core)
-    if not core_clean:
-        return None
-    if environment == "local":
-        echo_cmd = _build_local_url_echo_command(interactive_type)
-        if echo_cmd:
-            parts.append(echo_cmd)
-
-    parts.append(core_clean)
-
-    # For remote interactive jobs, auto-start ngrok whenever ports are defined.
-    if environment == "remote" and template_entry:
-        entry_id = template_entry.get("id") or "default"
-        ports = template_entry.get("ports") or []
-        if isinstance(ports, list) and ports:
-            ngrok_cmd = build_ngrok_tunnel_command(entry_id, ports)
-            if ngrok_cmd:
-                parts.append(ngrok_cmd)
-
-    tail_clean = _clean(tail_logs)
-    if tail_clean:
-        if environment == "local":
-            tail_clean = _strip_ngrok_log_from_tail(tail_clean)
-            if tail_clean.strip() in {"tail", "tail -f", "tail -F"}:
-                tail_clean = ""
-        parts.append(tail_clean)
-
-    parts = [p for p in parts if isinstance(p, str) and p.strip()]
-    if not parts:
-        return None
-    return "; ".join(parts)
-
-
 def resolve_interactive_command(
     template_entry: dict,
     environment: str,
     base_command: str = "",
 ) -> Tuple[str, Optional[str]]:
     """
-    Resolve the run command and optional setup override for an interactive template
-    based on environment (local/remote).
+    Augment the task run command for an interactive template based on environment (local/remote).
+
+    The run command itself always comes from ``base_command`` (task.yaml / stored task run),
+    not from the gallery entry.
 
     Args:
         template_entry: One entry from the interactive gallery (e.g. from get_interactive_gallery).
         environment: "local" or "remote".
-        base_command: Existing run command already resolved from task data (e.g. task.yaml run).
+        base_command: Run command from the task (e.g. task.yaml ``run``).
 
     Returns:
-        (command, setup_override). setup_override is None if the entry-level "setup"
-        should be used; otherwise the caller should use setup_override for this run.
+        (command, setup_override). ``setup_override`` is always None; setup is not taken from
+        gallery entries.
     """
     env = "local" if environment == "local" else "remote"
     interactive_type = str(template_entry.get("interactive_type") or template_entry.get("id") or "").strip()
 
-    logic = template_entry.get("logic")
-    if isinstance(logic, dict):
-        composed = _compose_command_from_logic(logic, interactive_type, env, template_entry)
-        if composed:
-            return (composed, None)
+    resolved_base = (base_command or "").strip()
 
-    # Fallback path: compose from existing command (task.yaml run) or legacy top-level command.
-    resolved_base = (base_command or "").strip() or str(template_entry.get("command", "") or "").strip()
     if env == "remote":
         entry_id = template_entry.get("id") or "default"
         ports = template_entry.get("ports") or []
