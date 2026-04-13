@@ -648,6 +648,7 @@ export default function Interactive() {
             body: JSON.stringify({
               gallery_id: templateId,
               experiment_id: experimentInfo.id,
+              name: data.title,
               is_interactive: true,
               env_vars:
                 Object.keys(envVarsForImportClean).length > 0
@@ -1302,6 +1303,8 @@ export default function Interactive() {
           loading={jobsIsLoading || !experimentInfo?.id}
           onDeleteJob={handleDeleteJob}
           hideOutputButton
+          hideJobId
+          showInteractiveType
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));

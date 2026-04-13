@@ -354,9 +354,10 @@ class LocalProvider(ComputeProvider):
 
         tmp_pyproject = os.path.join(tmp_project_dir, "pyproject.toml")
         lab_sdk_dir = _resolve_lab_sdk_dir(localprovider_pyproject)
+        lab_sdk_editable_cmd: Optional[List[str]] = None
         if lab_sdk_dir is not None:
             _strip_transformerlab_version_pin(tmp_pyproject)
-            ed_cmd = [
+            lab_sdk_editable_cmd = [
                 str(_CONDA_BIN),
                 "run",
                 "--prefix",
@@ -370,7 +371,7 @@ class LocalProvider(ComputeProvider):
                 str(lab_sdk_dir),
             ]
             ed_result = subprocess.run(
-                ed_cmd,
+                lab_sdk_editable_cmd,
                 cwd=tmp_project_dir,
                 env=env,
                 capture_output=True,
@@ -397,11 +398,31 @@ class LocalProvider(ComputeProvider):
             text=True,
             timeout=900,
         )
-        shutil.rmtree(tmp_project_dir, ignore_errors=True)
         if result.returncode != 0:
+            shutil.rmtree(tmp_project_dir, ignore_errors=True)
             raise RuntimeError(
                 f"uv pip install failed for job venv: {result.stderr or result.stdout or 'unknown error'}"
             )
+
+        # `uv pip install .[extra]` can pull transformerlab from PyPI as a transitive dep (same version
+        # pin), replacing the editable lab-sdk with a flat site-packages copy. Re-apply -e last.
+        if lab_sdk_editable_cmd is not None:
+            ed_final = subprocess.run(
+                lab_sdk_editable_cmd,
+                cwd=tmp_project_dir,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=900,
+            )
+            if ed_final.returncode != 0:
+                shutil.rmtree(tmp_project_dir, ignore_errors=True)
+                raise RuntimeError(
+                    "uv pip install -e lab-sdk (post-deps) failed for job venv: "
+                    f"{ed_final.stderr or ed_final.stdout or 'unknown error'}"
+                )
+
+        shutil.rmtree(tmp_project_dir, ignore_errors=True)
 
     def launch_cluster(
         self,
@@ -535,13 +556,23 @@ class LocalProvider(ComputeProvider):
                 stderr_log.flush()
 
                 if setup_result.returncode != 0:
-                    tail = ""
-                    try:
-                        with open(os.path.join(job_dir, "stderr.log")) as f:
-                            lines = f.readlines()
-                            tail = "".join(lines[-20:])
-                    except OSError:
-                        pass
+                    tail_parts: list[str] = []
+                    _n = 25
+
+                    def _tail_file(label: str, name: str) -> None:
+                        path = os.path.join(job_dir, name)
+                        try:
+                            with open(path) as f:
+                                lines = f.readlines()
+                            chunk = "".join(lines[-_n:])
+                            if chunk.strip():
+                                tail_parts.append(f"--- {label} (last {_n} lines of {name}) ---\n{chunk}")
+                        except OSError:
+                            pass
+
+                    _tail_file("stderr", "stderr.log")
+                    _tail_file("stdout", "stdout.log")
+                    tail = "\n".join(tail_parts) if tail_parts else "(no log output captured)"
                     print(f"[LocalProvider] Setup failed with code {setup_result.returncode}")
                     raise RuntimeError(f"Setup failed (exit {setup_result.returncode}). Last lines:\n{tail}")
 
