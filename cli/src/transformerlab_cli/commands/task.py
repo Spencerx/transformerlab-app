@@ -67,7 +67,9 @@ def info_task(task_id: str, experiment_id: str) -> None:
         console.print(f"[error]Error:[/error] Failed to fetch task info. Status code: {response.status_code}")
 
 
-def add_task_from_directory(task_directory_path: str, experiment_id: str, dry_run: bool = False) -> None:
+def add_task_from_directory(
+    task_directory_path: str, experiment_id: str, dry_run: bool = False, interactive: bool = True
+) -> None:
     """Add a task from a local directory containing task.yaml."""
     task_dir = os.path.realpath(task_directory_path)
 
@@ -132,7 +134,7 @@ def add_task_from_directory(task_directory_path: str, experiment_id: str, dry_ru
         console.print("\n[warning]Dry run mode:[/warning] Task would be created but was not submitted.")
         return
 
-    if cli_state.output_format != "json" and not typer.confirm("\nProceed with task creation?"):
+    if interactive and cli_state.output_format != "json" and not typer.confirm("\nProceed with task creation?"):
         console.print("[warning]Cancelled.[/warning]")
         raise typer.Exit(0)
 
@@ -237,6 +239,7 @@ def command_task_add(
     task_directory: str = typer.Argument(None, help="Path to the task directory containing task.yaml"),
     from_git: str = typer.Option(None, "--from-git", help="Git URL to fetch the task from"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview the task without creating it"),
+    no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip confirmation prompt"),
 ):
     """Add a new task. Provide a directory path directly, or use --from-git to fetch from a Git repository."""
     current_experiment = require_current_experiment()
@@ -244,7 +247,9 @@ def command_task_add(
     if from_git:
         add_task_from_github(from_git, experiment_id=current_experiment)
     elif task_directory:
-        add_task_from_directory(task_directory, experiment_id=current_experiment, dry_run=dry_run)
+        add_task_from_directory(
+            task_directory, experiment_id=current_experiment, dry_run=dry_run, interactive=not no_interactive
+        )
     else:
         console.print("[error]Error:[/error] Provide a task directory path or use --from-git <url>")
         raise typer.Exit(1)
@@ -253,9 +258,14 @@ def command_task_add(
 @app.command("delete")
 def command_task_delete(
     task_id: str = typer.Argument(..., help="Task ID to delete"),
+    no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip confirmation prompt"),
 ):
     """Delete a task."""
     current_experiment = require_current_experiment()
+
+    if not no_interactive:
+        typer.confirm(f"Delete task {task_id}?", abort=True)
+
     delete_task(task_id, experiment_id=current_experiment)
 
 
@@ -313,10 +323,11 @@ def build_launch_payload(
         "env_vars": task.get("env_vars", {}),
         "parameters": task.get("parameters", {}),
         "config": param_values if param_values else None,
+        "file_mounts": cfg.get("file_mounts") or task.get("file_mounts"),
         "provider_name": provider_name,
         "github_repo_url": task.get("github_repo_url"),
-        "github_repo_dir": task.get("github_repo_dir") or task.get("github_directory"),
-        "github_repo_branch": task.get("github_repo_branch") or task.get("github_branch"),
+        "github_repo_dir": task.get("github_repo_dir"),
+        "github_repo_branch": task.get("github_repo_branch"),
     }
 
 

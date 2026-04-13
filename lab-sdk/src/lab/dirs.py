@@ -85,7 +85,8 @@ async def get_workspace_dir() -> str:
     # Only return container workspace path when value is exactly "true"
     # In localfs mode, workspace is TFL_STORAGE_URI/orgs/<org_id>/workspace; HOME_DIR stays app home
     if os.getenv("TFL_STORAGE_URI") is not None and STORAGE_PROVIDER != "localfs":
-        return await storage.root_uri()
+        root = await storage.root_uri()
+        return root
 
     # Explicit override wins
     if "TFL_WORKSPACE_DIR" in os.environ and not (
@@ -102,7 +103,8 @@ async def get_workspace_dir() -> str:
     if org_id:
         # Cloud: _current_tfl_storage_uri is the org workspace root. Localfs: TFL_STORAGE_URI/orgs/org_id/workspace
         if _current_tfl_storage_uri.get() is not None and STORAGE_PROVIDER != "localfs":
-            return _current_tfl_storage_uri.get()
+            ctx = _current_tfl_storage_uri.get()
+            return ctx
         if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI"):
             path = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", org_id, "workspace")
         else:
@@ -111,7 +113,8 @@ async def get_workspace_dir() -> str:
         return path
 
     if os.getenv("TFL_STORAGE_URI") and STORAGE_PROVIDER != "localfs":
-        return await storage.root_uri()
+        root = await storage.root_uri()
+        return root
 
     path = storage.join(HOME_DIR, "workspace")
     await storage.makedirs(path, exist_ok=True)
