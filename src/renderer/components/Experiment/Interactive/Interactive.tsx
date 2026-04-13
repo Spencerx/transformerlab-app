@@ -1303,6 +1303,8 @@ export default function Interactive() {
           loading={jobsIsLoading || !experimentInfo?.id}
           onDeleteJob={handleDeleteJob}
           hideOutputButton
+          hideJobId
+          showInteractiveType
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));
