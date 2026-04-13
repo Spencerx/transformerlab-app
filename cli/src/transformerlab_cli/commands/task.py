@@ -326,8 +326,8 @@ def build_launch_payload(
         "file_mounts": cfg.get("file_mounts") or task.get("file_mounts"),
         "provider_name": provider_name,
         "github_repo_url": task.get("github_repo_url"),
-        "github_repo_dir": task.get("github_repo_dir") or task.get("github_directory"),
-        "github_repo_branch": task.get("github_repo_branch") or task.get("github_branch"),
+        "github_repo_dir": task.get("github_repo_dir"),
+        "github_repo_branch": task.get("github_repo_branch"),
     }
 
 
