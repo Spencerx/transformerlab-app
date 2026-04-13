@@ -47,32 +47,26 @@ def test_build_ngrok_empty_ports_returns_empty():
     assert build_ngrok_tunnel_command("id", []) == ""
 
 
-# ---- resolve_interactive_command: logic (preferred); tunnel "ngrok" built from ports ----
-def test_resolve_logic_remote_tunnel_ngrok_uses_builder():
-    """When tunnel is 'ngrok', remote command includes API-generated ngrok (YAML + start --all)."""
+# ---- resolve_interactive_command: task run + ngrok from gallery ports ----
+def test_resolve_remote_uses_base_command_and_ngrok_from_ports():
+    """Remote: task run from base_command; ngrok built from gallery ports."""
     entry = {
         "id": "jupyter",
         "interactive_type": "jupyter",
-        "logic": {
-            "core": "start-core",
-            "tunnel": "ngrok",
-            "tail_logs": "tail-logs",
-        },
         "ports": [{"port": 8888, "label": "Jupyter Lab", "protocol": "http"}],
     }
-    cmd, setup = resolve_interactive_command(entry, "remote")
+    cmd, setup = resolve_interactive_command(entry, "remote", base_command="start-core")
     assert "start-core" in cmd
-    assert "tail-logs" in cmd
     assert 'ngrok config add-authtoken "$NGROK_AUTH_TOKEN"' in cmd
     assert "~/ngrok-jupyter.yml" in cmd
     assert "ngrok start --all" in cmd
     assert setup is None
 
 
-def test_resolve_fallback_local_appends_local_echo():
-    """Fallback local path appends local URL echo for known interactive types."""
-    entry = {"id": "ollama", "command": "python run.py"}
-    cmd, setup = resolve_interactive_command(entry, "local")
+def test_resolve_local_appends_local_echo_with_base_command():
+    """Local path appends local URL echo for known interactive types; run from base_command."""
+    entry = {"id": "ollama", "interactive_type": "ollama"}
+    cmd, setup = resolve_interactive_command(entry, "local", base_command="python run.py")
     assert "python run.py" in cmd
     assert "Local Ollama API: http://localhost:11434" in cmd
     assert "Local Open WebUI: http://localhost:8080" in cmd
