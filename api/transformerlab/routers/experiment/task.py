@@ -385,6 +385,36 @@ async def task_update_file(experimentId: str, task_id: str, file_path: str, requ
     return {"message": "OK"}
 
 
+@router.delete(
+    "/{task_id}/file/{file_path:path}",
+    summary="Delete a file from a task's local workspace directory",
+)
+async def task_delete_file(experimentId: str, task_id: str, file_path: str):
+    task = await task_service.task_get_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    workspace_dir = await get_workspace_dir()
+    if not workspace_dir:
+        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
+
+    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    safe_rel = posixpath.normpath(file_path).lstrip("/")
+    if safe_rel.startswith("..") or "/.." in safe_rel:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    base_name = os.path.basename(safe_rel).lower()
+    if base_name in {"task.yaml", "task.yml"}:
+        raise HTTPException(status_code=400, detail="task.yaml cannot be deleted")
+
+    target = storage.join(task_dir, safe_rel)
+    if not await storage.exists(target) or not await storage.isfile(target):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    await storage.rm(target)
+    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    return {"message": "OK"}
+
+
 @router.post(
     "/{task_id}/file-upload",
     summary="Upload one or more files into a task's local workspace directory",

@@ -111,6 +111,10 @@ Endpoints.Task = {
     `${API_URL()}experiment/${experimentId}/task/${taskId}/file/${encodeURIComponent(
       filePath,
     )}`,
+  DeleteFile: (experimentId: string, taskId: string, filePath: string) =>
+    `${API_URL()}experiment/${experimentId}/task/${taskId}/file/${encodeURIComponent(
+      filePath,
+    )}`,
   UploadFile: (experimentId: string, taskId: string) =>
     `${API_URL()}experiment/${experimentId}/task/${taskId}/file-upload`,
   GetGithubFile: (experimentId: string, taskId: string, filePath: string) =>

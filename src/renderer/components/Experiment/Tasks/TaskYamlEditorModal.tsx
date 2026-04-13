@@ -16,8 +16,9 @@ import {
   Typography,
   Box,
   CircularProgress,
+  IconButton,
 } from '@mui/joy';
-import { FileIcon, UploadIcon } from 'lucide-react';
+import { FileIcon, Trash2Icon, UploadIcon } from 'lucide-react';
 import { Editor } from '@monaco-editor/react';
 import { setTheme, getMonacoEditorOptions } from 'renderer/lib/monacoConfig';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
@@ -66,6 +67,8 @@ export default function TaskYamlEditorModal({
 
   const isTaskYaml =
     selectedFile === 'task.yaml' || selectedFile === 'task.yml';
+  const isTaskYamlFile = (fileName: string): boolean =>
+    fileName === 'task.yaml' || fileName === 'task.yml';
   const selectedTaskFile =
     fileList.find((file) => file.name === selectedFile) ?? null;
   const selectedExtension = selectedFile ? getFileExtension(selectedFile) : '';
@@ -373,6 +376,53 @@ export default function TaskYamlEditorModal({
     }
   };
 
+  const handleDeleteFile = async (
+    event: React.MouseEvent<HTMLElement>,
+    file: TaskFile,
+  ) => {
+    event.stopPropagation();
+    if (file.source !== 'local') return;
+    if (isTaskYamlFile(file.name)) return;
+    const ok = window.confirm(`Delete ${file.name}?`);
+    if (!ok) return;
+
+    setError(null);
+    setValidationMessage(null);
+    try {
+      const response = await chatAPI.authenticatedFetch(
+        chatAPI.Endpoints.Task.DeleteFile(experimentId, taskId, file.name),
+        { method: 'DELETE' },
+      );
+      if (!response.ok) {
+        const text = await response.text();
+        setError(text || `Delete failed: ${response.status}`);
+        return;
+      }
+      await loadFiles();
+      if (selectedFile === file.name) {
+        const remaining = fileList.filter(
+          (candidate) =>
+            !(candidate.name === file.name && candidate.source === file.source),
+        );
+        const next = remaining.find(
+          (candidate) =>
+            candidate.name === 'task.yaml' || candidate.name === 'task.yml',
+        );
+        const fallback = next || remaining[0] || null;
+        setSelectedFile(fallback?.name ?? null);
+        if (fallback) {
+          await loadFileContent(fallback);
+        } else {
+          setContent('');
+        }
+      }
+      setValidationMessage('File deleted.');
+      onSaved?.();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+    }
+  };
+
   const handleValidate = async () => {
     setError(null);
     setValidationMessage(null);
@@ -498,6 +548,17 @@ export default function TaskYamlEditorModal({
                           {file.name}
                         </Typography>
                       </ListItemContent>
+                      {file.source === 'local' &&
+                        !isTaskYamlFile(file.name) && (
+                          <IconButton
+                            size="sm"
+                            variant="plain"
+                            color="danger"
+                            onClick={(event) => handleDeleteFile(event, file)}
+                          >
+                            <Trash2Icon size={14} />
+                          </IconButton>
+                        )}
                     </ListItemButton>
                   ))}
                 </List>
