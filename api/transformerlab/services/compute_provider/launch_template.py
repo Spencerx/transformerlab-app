@@ -589,6 +589,10 @@ async def launch_template_on_provider(
     if trackio_run_name_for_job is not None:
         job_data["trackio_run_name"] = trackio_run_name_for_job
 
+    # Store quota_hold_id so the background worker can release it on failure.
+    if quota_hold:
+        job_data["quota_hold_id"] = str(quota_hold.id)
+
     await job_service.job_update_job_data_insert_key_values(
         job_id, {k: v for k, v in job_data.items() if v is not None}, request.experiment_id
     )
@@ -675,6 +679,12 @@ async def launch_template_on_provider(
         use_spot=skypilot_use_spot,
     )
 
+    # Persist cluster_config into job_data so the DB-backed queue workers
+    # can reconstruct the work item without the in-memory object.
+    await job_service.job_update_job_data_insert_key_value(
+        job_id, "cluster_config", cluster_config.model_dump(), request.experiment_id
+    )
+
     await job_service.job_update_launch_progress(
         job_id,
         request.experiment_id,
@@ -718,13 +728,7 @@ async def launch_template_on_provider(
     await enqueue_remote_launch(
         job_id=str(job_id),
         experiment_id=str(request.experiment_id),
-        provider_id=str(provider.id),
         team_id=str(team_id),
-        user_id=str(user.id),
-        cluster_name=formatted_cluster_name,
-        cluster_config=cluster_config,
-        quota_hold_id=str(quota_hold.id) if quota_hold else None,
-        subtype=request.subtype,
     )
 
     return {
