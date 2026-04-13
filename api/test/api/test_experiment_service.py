@@ -24,6 +24,7 @@ def tmp_experiments_dir(monkeypatch, tmp_path):
 
 @pytest.mark.asyncio
 async def test_experiment_create_and_get_real(tmp_experiments_dir):
+    _ = tmp_experiments_dir
     name = f"real_exp_{uuid.uuid4().hex[:8]}"
     cfg = {"description": "integration test experiment"}
     exp_id = await experiment_service.experiment_create(name, cfg)
@@ -40,6 +41,7 @@ async def test_experiment_create_and_get_real(tmp_experiments_dir):
 
 @pytest.mark.asyncio
 async def test_missing_experiment_returns_none(tmp_experiments_dir):
+    _ = tmp_experiments_dir
     # experiment_get should return None for non-existent id (FileNotFoundError handled)
     assert await experiment_service.experiment_get("no_such_experiment") is None
 
@@ -47,6 +49,7 @@ async def test_missing_experiment_returns_none(tmp_experiments_dir):
 # Added test to hit the new FileNotFoundError except-clauses in experiment_service
 @pytest.mark.asyncio
 async def test_missing_experiment_operations_handle_FileNotFound(tmp_experiments_dir):
+    _ = tmp_experiments_dir
     """
     Call the service functions that now catch FileNotFoundError to ensure those
     branches are executed and no exceptions are raised.
@@ -61,6 +64,7 @@ async def test_missing_experiment_operations_handle_FileNotFound(tmp_experiments
 
 @pytest.mark.asyncio
 async def test_update_and_delete_flow_real(tmp_experiments_dir):
+    _ = tmp_experiments_dir
     name = f"cycle_exp_{uuid.uuid4().hex[:8]}"
     await experiment_service.experiment_create(name, {"a": 1})
 

@@ -44,7 +44,7 @@ def test_task_help():
 
 @patch("transformerlab_cli.commands.task.api.get", return_value=_mock_resp(SAMPLE_TASKS))
 @patch("transformerlab_cli.commands.task.require_current_experiment", return_value="exp1")
-def test_task_list_json_output(mock_exp, mock_api):
+def test_task_list_json_output(_mock_exp, _mock_api):
     """task list --format json emits valid JSON array."""
     result = runner.invoke(app, ["--format", "json", "task", "list"])
     assert result.exit_code == 0
@@ -55,7 +55,7 @@ def test_task_list_json_output(mock_exp, mock_api):
 
 @patch("transformerlab_cli.commands.task.api.get", return_value=_mock_resp(SAMPLE_TASKS))
 @patch("transformerlab_cli.commands.task.require_current_experiment", return_value="exp1")
-def test_task_list_json_no_spinner(mock_exp, mock_api):
+def test_task_list_json_no_spinner(_mock_exp, _mock_api):
     """task list --format json does not mix spinner text with JSON."""
     result = runner.invoke(app, ["--format", "json", "task", "list"])
     json.loads(result.output.strip())  # must not raise

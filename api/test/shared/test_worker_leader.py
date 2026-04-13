@@ -42,6 +42,8 @@ def mock_lock_path(tmp_path, monkeypatch):
 
 
 def test_try_acquire_leadership_success(reset_worker_leader_state, mock_lock_path):
+    _ = reset_worker_leader_state
+    _ = mock_lock_path
     """Test successful leadership acquisition."""
     import transformerlab.shared.worker_leader as wl
 
@@ -54,6 +56,8 @@ def test_try_acquire_leadership_success(reset_worker_leader_state, mock_lock_pat
 
 
 def test_try_acquire_leadership_already_leader(reset_worker_leader_state, mock_lock_path):
+    _ = reset_worker_leader_state
+    _ = mock_lock_path
     """Test that acquiring leadership when already leader returns True immediately."""
     import transformerlab.shared.worker_leader as wl
 
@@ -68,6 +72,8 @@ def test_try_acquire_leadership_already_leader(reset_worker_leader_state, mock_l
 
 
 def test_try_acquire_leadership_failure(reset_worker_leader_state, mock_lock_path):
+    _ = reset_worker_leader_state
+    _ = mock_lock_path
     """Test that leadership acquisition fails when lock cannot be acquired."""
     import transformerlab.shared.worker_leader as wl
 
@@ -87,6 +93,8 @@ def test_try_acquire_leadership_failure(reset_worker_leader_state, mock_lock_pat
 
 
 def test_lock_file_created_on_success(reset_worker_leader_state, mock_lock_path):
+    _ = reset_worker_leader_state
+    _ = mock_lock_path
     """Test that lock file is created when leadership is acquired."""
     import transformerlab.shared.worker_leader as wl
 
@@ -106,6 +114,7 @@ def test_lock_file_created_on_success(reset_worker_leader_state, mock_lock_path)
 
 
 def test_is_leader_initial_state(reset_worker_leader_state):
+    _ = reset_worker_leader_state
     """Test that is_leader returns False initially."""
     import transformerlab.shared.worker_leader as wl
 
@@ -113,6 +122,8 @@ def test_is_leader_initial_state(reset_worker_leader_state):
 
 
 def test_fcntl_unavailable_fallback(reset_worker_leader_state, mock_lock_path, caplog, monkeypatch):
+    _ = reset_worker_leader_state
+    _ = mock_lock_path
     """Test fallback behavior when fcntl is unavailable (e.g., Windows)."""
     import transformerlab.shared.worker_leader as wl
     import logging
