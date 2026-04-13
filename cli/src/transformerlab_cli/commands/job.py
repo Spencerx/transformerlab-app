@@ -257,6 +257,7 @@ def _fetch_job_files(experiment_id: str, job_id: str) -> list[dict]:
 def _render_job(job) -> None:
     """Render all details of a job."""
     job_data = job.get("job_data", {})
+    run_command = job_data.get("run") or job_data.get("command", "N/A")
 
     # Render progress bar
     progress = job.get("progress", 0)
@@ -274,7 +275,7 @@ def _render_job(job) -> None:
         "ID": job.get("id", "N/A"),
         "Experiment ID": job.get("experiment_id", "N/A"),
         "Task Name": job_data.get("task_name", "N/A"),
-        "Command": job_data.get("command", "N/A"),
+        "Command": run_command,
         "Cluster Name": job_data.get("cluster_name", "N/A"),
         "CPUs": job_data.get("cpus", "N/A"),
         "Memory": job_data.get("memory", "N/A"),
