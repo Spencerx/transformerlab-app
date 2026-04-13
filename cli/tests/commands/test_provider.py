@@ -96,7 +96,7 @@ def test_provider_add_non_interactive(mock_check, mock_api):
 @patch("transformerlab_cli.commands.provider.check_configs")
 def test_provider_delete(mock_check, mock_api):
     """Test deleting a provider."""
-    result = runner.invoke(app, ["provider", "delete", "p1", "--yes"])
+    result = runner.invoke(app, ["provider", "delete", "p1", "--no-interactive"])
     assert result.exit_code == 0
     assert "deleted" in result.output
 
