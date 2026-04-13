@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
  */
 export function formatBytes(bytes: number, decimals = 2): string {
   // Handle invalid inputs (NaN, undefined, null, negative values)
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 Bytes';
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 Bytes';
 
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
