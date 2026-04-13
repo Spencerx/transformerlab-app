@@ -823,7 +823,7 @@ export default function Interactive() {
       }
 
       if (!cfg.run && !cfg.github_repo_url && !task.github_repo_url) {
-        return { ok: false, error: 'Task is missing a command to run.' };
+        return { ok: false, error: 'Something went wrong. Please try again.' };
       }
 
       const payload = {

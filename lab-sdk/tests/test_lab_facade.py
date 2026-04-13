@@ -473,8 +473,7 @@ def test_lab_save_dataset(tmp_path, monkeypatch):
         def __len__(self):
             return len(self.data)
 
-        def to_json(self, path_or_buf, orient, lines):
-            _ = orient
+        def to_json(self, path_or_buf, lines):
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -541,8 +540,7 @@ def test_lab_save_dataset_with_metadata(tmp_path, monkeypatch):
         def __len__(self):
             return len(self.data)
 
-        def to_json(self, path_or_buf, orient, lines):
-            _ = orient
+        def to_json(self, path_or_buf):
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -588,8 +586,7 @@ def test_lab_save_dataset_image_format(tmp_path, monkeypatch):
         def __len__(self):
             return len(self.data)
 
-        def to_json(self, path_or_buf, orient, lines):
-            _ = orient
+        def to_json(self, path_or_buf):
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -634,8 +631,7 @@ def test_lab_save_dataset_duplicate_error(tmp_path, monkeypatch):
         def __len__(self):
             return len(self.data)
 
-        def to_json(self, path_or_buf, orient, lines):
-            _ = orient
+        def to_json(self, path_or_buf):
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
