@@ -89,9 +89,11 @@ lab task list
 #    To pick a specific provider, run interactively (see "Selecting a provider" below).
 lab task queue TASK_ID --no-interactive
 
-# 4. Monitor the job
+# 4. Monitor the job (three log streams — see "Job logs: three real commands" below)
 lab job list --running
-lab job task-logs JOB_ID --follow
+lab job task-logs JOB_ID --follow      # Lab SDK output (lab.log, progress) — start here
+lab job machine-logs JOB_ID --follow   # Raw process stdout+stderr from the remote node
+lab job request-logs JOB_ID --follow   # Provider launch/provisioning logs (e.g. SkyPilot)
 
 # 5. Download results
 lab job artifacts JOB_ID
