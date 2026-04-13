@@ -395,7 +395,8 @@ async def launch_template_on_provider(
         if workspace_dir and not storage.is_remote_path(workspace_dir):
             env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
 
-    # Resolve run command (and optional setup override) for interactive sessions from gallery
+    # Resolve run command for interactive sessions: run/setup from task or request only;
+    # gallery supplies ports / interactive_type for ngrok and local URL hints.
     base_command = request.run
     setup_override_from_gallery = None
     interactive_setup_added = False
@@ -407,11 +408,10 @@ async def launch_template_on_provider(
         )
         if gallery_entry:
             environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
-            # Run gallery/task setup for both local and remote interactive (SUDO prefix so $SUDO is defined).
-            # Ngrok is installed only when tunnel logic runs (remote); setup has no ngrok.
+            # Task/request setup for interactive (SUDO prefix so $SUDO is defined). Not from gallery JSON.
             from transformerlab.shared.interactive_gallery_utils import INTERACTIVE_SUDO_PREFIX
 
-            raw_setup = (gallery_entry.get("setup") or "").strip() or (request.setup or "").strip()
+            raw_setup = (request.setup or "").strip()
             if raw_setup:
                 setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
                 interactive_setup_added = True
