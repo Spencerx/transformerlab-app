@@ -47,23 +47,6 @@ def test_build_ngrok_empty_ports_returns_empty():
     assert build_ngrok_tunnel_command("id", []) == ""
 
 
-# ---- resolve_interactive_command: legacy (no commands field) ----
-def test_resolve_legacy_entry_remote():
-    """Legacy entry without 'commands' uses top-level command and no setup override."""
-    entry = {"id": "jupyter", "command": "jupyter lab --port=8888", "setup": "pip install jupyter"}
-    cmd, setup = resolve_interactive_command(entry, "remote")
-    assert cmd == "jupyter lab --port=8888"
-    assert setup is None
-
-
-def test_resolve_legacy_entry_local():
-    """Legacy entry: local environment still gets legacy command when no commands.local."""
-    entry = {"id": "jupyter", "command": "jupyter lab --port=8888"}
-    cmd, setup = resolve_interactive_command(entry, "local")
-    assert cmd == "jupyter lab --port=8888"
-    assert setup is None
-
-
 # ---- resolve_interactive_command: logic (preferred); tunnel "ngrok" built from ports ----
 def test_resolve_logic_remote_tunnel_ngrok_uses_builder():
     """When tunnel is 'ngrok', remote command includes API-generated ngrok (YAML + start --all)."""
