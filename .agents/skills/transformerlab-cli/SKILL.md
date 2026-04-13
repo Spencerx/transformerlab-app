@@ -122,6 +122,7 @@ lab job download JOB_ID --file "*.csv" -o ./results
 8. **Never use `task interactive`** unless the user specifically requests an interactive session
 9. **`job task-logs --follow`** streams continuously and blocks until the job finishes — use when the user wants real-time monitoring
 10. **Never use the deprecated `lab job logs`** — see the "Job logs: three real commands" section below.
+11. **After queuing a task, ASK the user if they'd like you to watch the logs.** Don't start streaming or polling automatically — jobs can take minutes to hours, and `--follow` blocks. Report the Job ID and ask: "Want me to watch the logs and report back?"
 
 ### Selecting a provider when queuing a task
 

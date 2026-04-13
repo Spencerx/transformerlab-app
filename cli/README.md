@@ -41,7 +41,7 @@ For a full list of all commands with detailed options and example usage, see [CO
 Want Claude Code (or other AI coding agents) to manage Transformer Lab for you? Install the skill:
 
 ```bash
-npx skills add transformerlab/transformerlab-app
+npx skills add transformerlab/transformerlab-app --skill transformerlab-cli
 ```
 
 This teaches your AI agent how to use the `lab` CLI to check job status, stream logs, download artifacts, queue tasks, manage providers, and more. See [.agents/skills/transformerlab-cli/](https://github.com/transformerlab/transformerlab-app/tree/main/.agents/skills/transformerlab-cli) for the full skill definition.
