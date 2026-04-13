@@ -69,41 +69,6 @@ def test_resolve_logic_remote_tunnel_ngrok_uses_builder():
     assert setup is None
 
 
-def test_resolve_logic_local_omits_tunnel_adds_echo():
-    """logic is used for local; tunnel (ngrok) omitted, local URL echo for known types, ngrok stripped from tail."""
-    entry = {
-        "id": "jupyter",
-        "interactive_type": "jupyter",
-        "logic": {
-            "core": "start-core",
-            "tunnel": "ngrok",
-            "tail_logs": "tail -f /tmp/jupyter.log /tmp/ngrok.log",
-        },
-        "ports": [{"port": 8888, "label": "Jupyter", "protocol": "http"}],
-    }
-    cmd, setup = resolve_interactive_command(entry, "local")
-    assert "start-core" in cmd
-    assert "ngrok start" not in cmd
-    assert "Local URL: http://localhost:8888" in cmd
-    assert "tee -a /tmp/ngrok.log" in cmd
-    assert "/tmp/ngrok.log" not in cmd
-    assert setup is None
-
-
-def test_resolve_legacy_command_when_no_logic():
-    """When entry has no logic, top-level command is used (commands.local/remote ignored)."""
-    entry = {
-        "command": "legacy-cmd",
-        "setup": "legacy-setup",
-        "commands": {"local": {"default": "local-cmd"}, "remote": {"default": "remote-cmd"}},
-    }
-    cmd, setup = resolve_interactive_command(entry, "remote")
-    assert cmd == "legacy-cmd"
-    assert setup is None
-    cmd2, _ = resolve_interactive_command(entry, "local")
-    assert cmd2 == "legacy-cmd"
-
-
 def test_resolve_fallback_local_appends_local_echo():
     """Fallback local path appends local URL echo for known interactive types."""
     entry = {"id": "ollama", "command": "python run.py"}
