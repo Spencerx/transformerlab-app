@@ -30,6 +30,24 @@ def _sanitize_tunnel_name(label: Optional[str], port: int) -> str:
     return f"port_{port}"
 
 
+def _build_local_url_echo_command(interactive_type: str) -> Optional[str]:
+    """Return shell command that prints local URLs and appends them to /tmp/ngrok.log."""
+    # These echoed lines are parsed by tunnel_parser for local provider UX.
+    if interactive_type == "jupyter":
+        return "echo 'Local URL: http://localhost:8888' | tee -a /tmp/ngrok.log"
+    if interactive_type == "vllm":
+        return (
+            "echo 'Local vLLM API: http://localhost:8000' | tee -a /tmp/ngrok.log; "
+            "echo 'Local Open WebUI: http://localhost:8080' | tee -a /tmp/ngrok.log"
+        )
+    if interactive_type == "ollama":
+        return (
+            "echo 'Local Ollama API: http://localhost:11434' | tee -a /tmp/ngrok.log; "
+            "echo 'Local Open WebUI: http://localhost:8080' | tee -a /tmp/ngrok.log"
+        )
+    return None
+
+
 def build_ngrok_tunnel_command(entry_id: str, ports: list[dict[str, Any]]) -> str:
     """
     Build the full ngrok tunnel shell command (install + auth + YAML + start).
@@ -114,16 +132,6 @@ def _compose_command_from_logic(
         cleaned = fragment.strip().rstrip(";").strip()
         return cleaned or None
 
-    def _local_url_echo(t: str) -> Optional[str]:
-        # These echoed lines are parsed by tunnel_parser for local provider UX.
-        if t == "jupyter":
-            return "echo 'Local URL: http://localhost:8888'"
-        if t == "vllm":
-            return "echo 'Local vLLM API: http://localhost:8000'; echo 'Local Open WebUI: http://localhost:8080'"
-        if t == "ollama":
-            return "echo 'Local Ollama API: http://localhost:11434'; echo 'Local Open WebUI: http://localhost:8080'"
-        return None
-
     def _strip_ngrok_log_from_tail(cmd: str) -> str:
         # Best-effort: if tail command includes /tmp/ngrok.log, remove it for local runs.
         stripped = cmd
@@ -137,12 +145,12 @@ def _compose_command_from_logic(
     core_clean = _clean(core)
     if not core_clean:
         return None
-    parts.append(core_clean)
-
     if environment == "local":
-        echo_cmd = _local_url_echo(interactive_type)
+        echo_cmd = _build_local_url_echo_command(interactive_type)
         if echo_cmd:
             parts.append(echo_cmd)
+
+    parts.append(core_clean)
 
     # For remote interactive jobs, auto-start ngrok whenever ports are defined.
     if environment == "remote" and template_entry:
@@ -205,6 +213,12 @@ def resolve_interactive_command(
                 if resolved_base:
                     return (f"{ngrok_cmd}; {resolved_base}", None)
                 return (ngrok_cmd, None)
+    elif env == "local":
+        echo_cmd = _build_local_url_echo_command(interactive_type)
+        if echo_cmd:
+            if resolved_base:
+                return (f"{echo_cmd}; {resolved_base}", None)
+            return (echo_cmd, None)
 
     return (resolved_base, None)
 

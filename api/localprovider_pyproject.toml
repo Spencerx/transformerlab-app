@@ -41,6 +41,8 @@ dependencies = [
   "google-cloud-storage==2.18.2",
   "azure-storage-blob==12.28.0",
   "cashews==7.5.0",
+  "gradio",
+  "openai",
 ]
 
 [project.optional-dependencies]
@@ -106,4 +108,5 @@ cpu = [
   "tensorboard==2.18.0",
   "tiktoken==0.8.0",
   "watchfiles==1.0.4",
+  "mlx-lm ; sys_platform == 'darwin'",
 ]
