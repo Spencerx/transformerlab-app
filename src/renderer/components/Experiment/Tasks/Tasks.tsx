@@ -1366,7 +1366,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           )}
         </Stack>
       </Stack>
-      <Sheet sx={{ px: 1, mt: 1, mb: 2, flex: 2, overflow: 'auto' }}>
+      <Sheet sx={{ px: 1, mt: 1, mb: 1, flex: 2, overflow: 'auto' }}>
         <JobsList
           jobs={filteredJobsForDisplay as any}
           launchProgressByJobId={launchProgressByJobId}
