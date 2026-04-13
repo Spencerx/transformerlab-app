@@ -102,6 +102,7 @@ def test_resolve_logic_local_omits_tunnel_adds_echo():
     assert "start-core" in cmd
     assert "ngrok start" not in cmd
     assert "Local URL: http://localhost:8888" in cmd
+    assert "tee -a /tmp/ngrok.log" in cmd
     assert "/tmp/ngrok.log" not in cmd
     assert setup is None
 
@@ -118,6 +119,17 @@ def test_resolve_legacy_command_when_no_logic():
     assert setup is None
     cmd2, _ = resolve_interactive_command(entry, "local")
     assert cmd2 == "legacy-cmd"
+
+
+def test_resolve_fallback_local_appends_local_echo():
+    """Fallback local path appends local URL echo for known interactive types."""
+    entry = {"id": "ollama", "command": "python run.py"}
+    cmd, setup = resolve_interactive_command(entry, "local")
+    assert "python run.py" in cmd
+    assert "Local Ollama API: http://localhost:11434" in cmd
+    assert "Local Open WebUI: http://localhost:8080" in cmd
+    assert "tee -a /tmp/ngrok.log" in cmd
+    assert setup is None
 
 
 # ---- find_interactive_gallery_entry ----
