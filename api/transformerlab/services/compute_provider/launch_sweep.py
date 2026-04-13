@@ -182,6 +182,7 @@ async def launch_sweep_jobs(
                 env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
                 env_vars["_TFL_JOB_ID"] = str(child_job_id)
                 env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
+                env_vars["TFL_EXPERIMENT_ID"] = request.experiment_id
                 env_vars["_TFL_USER_ID"] = user_id
 
                 trackio_project_name_for_child: str | None = None
@@ -284,8 +285,8 @@ async def launch_sweep_jobs(
                 if request.github_repo_url:
                     workspace_dir = await get_workspace_dir()
                     github_pat = await read_github_pat_from_workspace(workspace_dir, user_id=user_id)
-                    directory = request.github_repo_dir or request.github_directory
-                    branch = request.github_repo_branch or request.github_branch
+                    directory = request.github_repo_dir
+                    branch = request.github_repo_branch
                     github_setup = generate_github_clone_setup(
                         repo_url=request.github_repo_url,
                         directory=directory,

@@ -38,19 +38,7 @@ lab status
 
 `login` validates the key and automatically configures `server`, `team_id`, `user_email`, and `team_name`.
 
-**Getting an API key:** API keys are created in the Transformer Lab web UI under team settings, or via the REST API using a JWT token. If the user gives you email/password credentials, get a JWT token first, then use it to create an API key:
-
-```bash
-# Get JWT token from email/password
-TOKEN=$(curl -s -X POST https://SERVER/auth/jwt/login \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=EMAIL&password=PASSWORD" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-
-# Use the JWT to find team info
-curl -s -H "Authorization: Bearer $TOKEN" https://SERVER/users/me/teams
-```
-
-Then ask the user to provide or create an API key from the UI.
+**Getting an API key:** If `lab status` fails with auth errors, **stop and ask the user to provide an API key.** Do NOT attempt to create API keys programmatically by logging in with email/password. API keys are created in the Transformer Lab web UI under team settings. The user must provide the key to you.
 
 ### Verifying You're Connected to the Right Server
 
@@ -100,15 +88,115 @@ lab job artifacts JOB_ID
 lab job download JOB_ID --file "*.csv" -o ./results
 ```
 
+## Creating Tasks
+
+### task.yaml Structure
+
+Full docs: https://lab.cloud/for-teams/running-a-task/task-yaml-structure
+
+```yaml
+name: my-task                          # Required — task identifier
+resources:                             # Optional but recommended
+  cpus: 2                              # CPU count (integer or string)
+  memory: 4                            # RAM in GB (integer or string, NOT "4Gi")
+  disk_space: 100                      # Storage in GB
+  accelerators: "H100:8"              # GPU spec as "TYPE:COUNT"
+  num_nodes: 2                         # For distributed training
+  compute_provider: my-provider        # Target provider name
+setup: |                               # Optional — runs before main task
+  pip install transformerlab
+  pip install -r requirements.txt
+run: python main.py                    # Required — main entry point
+envs:                                  # Optional environment variables
+  HF_TOKEN: "${HF_TOKEN}"
+parameters:                            # Optional — accessible via lab.get_config()
+  learning_rate: 0.001
+  batch_size: 32
+sweeps:                                # Optional — hyperparameter sweep
+  sweep_config:
+    learning_rate: ["1e-5", "3e-5"]
+  sweep_metric: "eval/loss"
+  lower_is_better: true
+minutes_requested: 60                  # Optional time limit
+github_repo_url: https://...           # Optional — clone from git
+github_repo_dir: path/in/repo
+github_repo_branch: main
+```
+
+**Important:** `memory` and `disk_space` are plain numbers in GB (e.g., `4`, `16`), NOT Kubernetes-style strings like `4Gi`. The schema accepts both but the canonical format is plain integers.
+
+### Validation
+
+`lab task add` automatically validates task.yaml against the server schema before uploading. There is no standalone `lab task validate` command yet (TODO: add one).
+
+To validate without creating, use `lab task add ./my-task --dry-run`.
+
+### Lab SDK Quick Reference
+
+Tasks use the Lab SDK (`transformerlab` PyPI package). Import pattern:
+
+```python
+from lab import lab
+
+lab.init()                                    # Required — connects to the job
+lab.log("message")                            # Write to job output log
+lab.update_progress(50)                       # Set progress 0-100
+config = lab.get_config()                     # Read parameters from task.yaml
+
+lab.finish(message="Done!")                   # Mark job as SUCCESS
+lab.error(message="Something went wrong")     # Mark job as FAILED
+```
+
+**Common mistakes:**
+- `lab.finish()` has NO `status` parameter — just `message`. For failures, use `lab.error()`.
+- Always call `lab.init()` before any other SDK call.
+- Always call `lab.finish()` or `lab.error()` at the end — otherwise the job stays in RUNNING state.
+
+### Example: Minimal Hello World Task
+
+**task.yaml:**
+```yaml
+name: hello-world
+setup: pip install transformerlab
+run: python main.py
+resources:
+  cpus: 2
+  memory: 4
+```
+
+**main.py:**
+```python
+import time
+from lab import lab
+
+lab.init()
+lab.log("Hello from Transformer Lab!")
+lab.update_progress(25)
+time.sleep(3)
+lab.log("Working...")
+lab.update_progress(75)
+time.sleep(2)
+lab.log("Done!")
+lab.update_progress(100)
+lab.finish(message="Hello world complete!")
+```
+
+**Add it:**
+```bash
+lab task add ./hello-world-task --no-interactive
+```
+
 ## Agent-Specific Rules
 
 1. **Use `--format json`** when you need to parse output, but be prepared to fall back to pretty output parsing if it doesn't work
 2. **Use `--no-interactive`** on `task queue` and `provider add` to avoid blocking prompts
-3. **`task add` has no `--yes` flag** — pipe `echo "y"` to confirm: `echo "y" | lab task add ./my-task`
-4. **Use `--yes` / `-y`** on destructive commands (`provider delete`) to skip confirmation
+3. **`task add`**: Use `--no-interactive` to skip confirmation (e.g., `lab task add ./my-task --no-interactive`). Use `--dry-run` to validate without creating.
+4. **Use `--no-interactive`** on destructive commands (`task delete`, `provider delete`) to skip confirmation
 5. **Never use `job monitor`** — it launches a TUI that blocks; use `job list` + `job logs` instead
 6. **Never use `task interactive`** unless the user specifically requests an interactive session
 7. **`job logs --follow`** streams continuously and blocks until the job finishes — use when the user wants real-time monitoring
+8. **Never create API keys programmatically** — if auth fails, ask the user to provide an API key from the web UI
+9. **task.yaml docs**: Full reference at https://lab.cloud/for-teams/running-a-task/task-yaml-structure
 
 ## Debugging Failed Jobs
 
@@ -221,8 +309,8 @@ The `provider_logs` endpoint is the single best debugging tool — it returns wh
 | `lab version` | Show CLI version | No |
 | `lab task list` | List tasks in current experiment | Yes |
 | `lab task info <id>` | Get task details | Yes |
-| `lab task add [dir]` | Add task from directory or `--from-git` URL | Yes |
-| `lab task delete <id>` | Delete a task | Yes |
+| `lab task add [dir]` | Add task from directory or `--from-git` URL (`--no-interactive`, `--dry-run`) | Yes |
+| `lab task delete <id>` | Delete a task (`--no-interactive` to skip confirmation) | Yes |
 | `lab task queue <id>` | Queue task on compute provider | Yes |
 | `lab task gallery` | Browse/import from task gallery | Yes |
 | `lab job list` | List jobs (`--running` for active only) | Yes |
@@ -235,7 +323,7 @@ The `provider_logs` endpoint is the single best debugging tool — it returns wh
 | `lab provider info <id>` | Show provider details | No |
 | `lab provider add` | Add a new provider | No |
 | `lab provider update <id>` | Update provider config | No |
-| `lab provider delete <id>` | Delete a provider (`--yes` to skip prompt) | No |
+| `lab provider delete <id>` | Delete a provider (`--no-interactive` to skip prompt) | No |
 | `lab provider check <id>` | Check provider health | No |
 | `lab provider enable <id>` | Enable a provider | No |
 | `lab provider disable <id>` | Disable a provider | No |
