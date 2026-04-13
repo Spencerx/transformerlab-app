@@ -93,9 +93,12 @@ export default function TaskYamlEditorModal({
       }
       const data = await response.json();
       const allFiles: TaskFile[] = [];
+      const hasLocalTaskYaml =
+        Array.isArray(data.local_files) &&
+        data.local_files.some((f: string) => isTaskYamlPath(f));
       if (Array.isArray(data.github_files)) {
         for (const f of data.github_files) {
-          if (!isTaskYamlPath(f)) {
+          if (!hasLocalTaskYaml || !isTaskYamlPath(f)) {
             // Prefer the local editable task YAML and hide duplicate GitHub entry.
             allFiles.push({ name: f, source: 'github' });
           }
@@ -204,9 +207,12 @@ export default function TaskYamlEditorModal({
         }
         const data = await response.json();
         const allFiles: TaskFile[] = [];
+        const hasLocalTaskYaml =
+          Array.isArray(data.local_files) &&
+          data.local_files.some((f: string) => isTaskYamlPath(f));
         if (Array.isArray(data.github_files)) {
           for (const f of data.github_files) {
-            if (!isTaskYamlPath(f)) {
+            if (!hasLocalTaskYaml || !isTaskYamlPath(f)) {
               // Prefer the local editable task YAML and hide duplicate GitHub entry.
               allFiles.push({ name: f, source: 'github' });
             }
@@ -318,6 +324,10 @@ export default function TaskYamlEditorModal({
       }
       setValidationMessage('Saved successfully.');
       onSaved?.();
+      if (isTaskYaml) {
+        onClose();
+        return;
+      }
       await loadFiles();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save');
