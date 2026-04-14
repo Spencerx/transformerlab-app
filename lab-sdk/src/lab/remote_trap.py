@@ -327,9 +327,10 @@ def main(argv: List[str] | None = None) -> int:
             pending_log_lines.append(line)
 
             now = time.monotonic()
-            should_flush = len(pending_log_lines) >= periodic_flush_min_lines or (
-                now - last_periodic_flush_ts
-            ) >= periodic_flush_interval_s
+            should_flush = (
+                len(pending_log_lines) >= periodic_flush_min_lines
+                or (now - last_periodic_flush_ts) >= periodic_flush_interval_s
+            )
             if should_flush:
                 _append_provider_logs("".join(pending_log_lines))
                 pending_log_lines.clear()
