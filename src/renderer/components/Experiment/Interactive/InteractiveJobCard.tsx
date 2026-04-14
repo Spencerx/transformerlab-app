@@ -183,6 +183,7 @@ export default function InteractiveJobCard({
     job.status === 'INTERACTIVE' ||
     job.status === 'RUNNING' ||
     job.status === 'STOPPING';
+  const isStopping = job.status === 'STOPPING';
   const isLaunching = job.status === 'LAUNCHING' || job.status === 'WAITING';
   const showDeleteAction =
     isTerminalJobStatus(job.status) || job.status === 'STOPPING';
@@ -340,6 +341,7 @@ export default function InteractiveJobCard({
                 variant="soft"
                 color="neutral"
                 size="sm"
+                disabled={isStopping}
                 onClick={() => setConnectOpen(true)}
               >
                 Logs
@@ -348,7 +350,7 @@ export default function InteractiveJobCard({
                 variant="soft"
                 color={tunnelReady ? 'success' : 'neutral'}
                 size="sm"
-                disabled={!tunnelReady}
+                disabled={isStopping || !tunnelReady}
                 onClick={() => setInteractOpen(true)}
               >
                 {tunnelReady
