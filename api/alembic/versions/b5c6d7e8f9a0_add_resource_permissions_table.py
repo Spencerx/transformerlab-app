@@ -1,7 +1,7 @@
 """Add resource_permissions table
 
 Revision ID: b5c6d7e8f9a0
-Revises: 84accba9dc2c
+Revises: b3c4d5e6f7a8
 Create Date: 2026-04-09 00:00:00.000000
 
 """
@@ -12,7 +12,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision: str = "b5c6d7e8f9a0"
-down_revision: Union[str, Sequence[str], None] = "84accba9dc2c"
+down_revision: Union[str, Sequence[str], None] = "b3c4d5e6f7a8"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
