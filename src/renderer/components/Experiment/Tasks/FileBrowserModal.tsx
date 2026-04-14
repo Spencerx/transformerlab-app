@@ -403,7 +403,7 @@ export default function FileBrowserModal({
                           <FileIcon size={16} />
                         )}
                       </ListItemDecorator>
-                      <ListItemContent>
+                      <ListItemContent sx={{ minWidth: 0 }}>
                         <Typography
                           level="body-sm"
                           sx={{
@@ -454,7 +454,11 @@ export default function FileBrowserModal({
                         <ChevronRightIcon size={14} />
                       )}
                       {mode === 'job' && !file.is_dir && (
-                        <Typography level="body-xs" color="neutral">
+                        <Typography
+                          level="body-xs"
+                          color="neutral"
+                          sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
                           {formatBytes(file.size)}
                         </Typography>
                       )}
