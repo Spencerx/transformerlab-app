@@ -191,6 +191,7 @@ export default function InteractiveJobCard({
     jobData.cluster_name ||
     jobData.template_name ||
     (isPlaceholder ? '' : `Job ${job.id}`);
+  const providerName = jobData.provider_name || job.provider_name || null;
   const jobIdValue = job?.id == null ? null : String(job.id);
 
   const tunnelInfoUrl = React.useMemo(() => {
@@ -294,6 +295,14 @@ export default function InteractiveJobCard({
                 typeConfig?.label ||
                 '\u00A0'}
             </Chip>
+            <Typography
+              level="body-xs"
+              color="neutral"
+              noWrap
+              title={providerName ?? 'Not specified'}
+            >
+              Provider: {providerName ?? 'Not specified'}
+            </Typography>
           </Stack>
           {showDeleteAction && (
             <IconButton
