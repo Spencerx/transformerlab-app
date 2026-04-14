@@ -312,7 +312,9 @@ class ResourcePermission(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "team_id", "resource_type", "resource_id", name="uq_resource_permission"),
         Index("idx_resource_permissions_user_team", "user_id", "team_id"),
-      
+    )
+
+
 class JobQueue(Base):
     """Persistent queue for jobs waiting to be dispatched by a background worker.
 

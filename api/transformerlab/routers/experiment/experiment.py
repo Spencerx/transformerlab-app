@@ -2,8 +2,7 @@ import os
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Request, Depends
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import transformerlab.services.experiment_service as experiment_service
@@ -17,7 +16,6 @@ from transformerlab.routers.experiment import (
 from transformerlab.routers.auth import get_user_and_team
 from transformerlab.services.permission_service import check_permission, require_permission
 from transformerlab.shared.models.user_model import get_async_session
-from lab.dirs import get_workspace_dir
 
 from werkzeug.utils import secure_filename
 
