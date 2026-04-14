@@ -290,20 +290,28 @@ export default function InteractiveJobCard({
             >
               {title}
             </Typography>
-            <Chip variant="soft" color={chipColor} size="sm">
-              {galleryEntry?.name ||
-                jobData.template_name ||
-                typeConfig?.label ||
-                '\u00A0'}
-            </Chip>
-            <Typography
-              level="body-xs"
-              color="neutral"
-              noWrap
-              title={providerName ?? 'Not specified'}
-            >
-              Provider: {providerName ?? 'Not specified'}
-            </Typography>
+            <Stack direction="row" spacing={0.75} sx={{ minWidth: 0 }}>
+              <Chip
+                variant="soft"
+                color={chipColor}
+                size="sm"
+                sx={{ minWidth: 0, maxWidth: '100%' }}
+              >
+                {galleryEntry?.name ||
+                  jobData.template_name ||
+                  typeConfig?.label ||
+                  '\u00A0'}
+              </Chip>
+              <Chip
+                variant="soft"
+                color="neutral"
+                size="sm"
+                sx={{ minWidth: 0, maxWidth: '100%' }}
+                title={providerName ?? 'Not specified'}
+              >
+                {providerName ?? 'Not specified'}
+              </Chip>
+            </Stack>
           </Stack>
           {showDeleteAction && (
             <IconButton
