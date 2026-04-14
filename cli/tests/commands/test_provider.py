@@ -44,7 +44,7 @@ def test_provider_help():
 
 @patch("transformerlab_cli.commands.provider.api.get", return_value=_mock_response(200, SAMPLE_PROVIDERS))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_list(mock_check, mock_api):
+def test_provider_list(_mock_check, _mock_api):
     """Test listing providers."""
     result = runner.invoke(app, ["provider", "list"])
     assert result.exit_code == 0
@@ -54,7 +54,7 @@ def test_provider_list(mock_check, mock_api):
 
 @patch("transformerlab_cli.commands.provider.api.get", return_value=_mock_response(200, SAMPLE_PROVIDERS[0]))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_info(mock_check, mock_api):
+def test_provider_info(_mock_check, _mock_api):
     """Test getting provider info."""
     result = runner.invoke(app, ["provider", "info", "p1"])
     assert result.exit_code == 0
@@ -63,7 +63,7 @@ def test_provider_info(mock_check, mock_api):
 
 @patch("transformerlab_cli.commands.provider.api.get", return_value=_mock_response(404))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_info_not_found(mock_check, mock_api):
+def test_provider_info_not_found(_mock_check, _mock_api):
     """Test getting info for non-existent provider."""
     result = runner.invoke(app, ["provider", "info", "nonexistent"])
     assert result.exit_code == 1
@@ -72,7 +72,7 @@ def test_provider_info_not_found(mock_check, mock_api):
 
 @patch("transformerlab_cli.commands.provider.api.post_json", return_value=_mock_response(200, {"id": "p3"}))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_add_non_interactive(mock_check, mock_api):
+def test_provider_add_non_interactive(_mock_check, _mock_api):
     """Test adding a provider non-interactively."""
     result = runner.invoke(
         app,
@@ -94,16 +94,16 @@ def test_provider_add_non_interactive(mock_check, mock_api):
 
 @patch("transformerlab_cli.commands.provider.api.delete", return_value=_mock_response(200))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_delete(mock_check, mock_api):
+def test_provider_delete(_mock_check, _mock_api):
     """Test deleting a provider."""
-    result = runner.invoke(app, ["provider", "delete", "p1", "--yes"])
+    result = runner.invoke(app, ["provider", "delete", "p1", "--no-interactive"])
     assert result.exit_code == 0
     assert "deleted" in result.output
 
 
 @patch("transformerlab_cli.commands.provider.api.patch", return_value=_mock_response(200))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_enable(mock_check, mock_api):
+def test_provider_enable(_mock_check, _mock_api):
     """Test enabling a provider."""
     result = runner.invoke(app, ["provider", "enable", "p1"])
     assert result.exit_code == 0
@@ -112,7 +112,7 @@ def test_provider_enable(mock_check, mock_api):
 
 @patch("transformerlab_cli.commands.provider.api.patch", return_value=_mock_response(200))
 @patch("transformerlab_cli.commands.provider.check_configs")
-def test_provider_disable(mock_check, mock_api):
+def test_provider_disable(_mock_check, _mock_api):
     """Test disabling a provider."""
     result = runner.invoke(app, ["provider", "disable", "p1"])
     assert result.exit_code == 0

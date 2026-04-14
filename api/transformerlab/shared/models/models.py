@@ -312,4 +312,32 @@ class ResourcePermission(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "team_id", "resource_type", "resource_id", name="uq_resource_permission"),
         Index("idx_resource_permissions_user_team", "user_id", "team_id"),
+      
+class JobQueue(Base):
+    """Persistent queue for jobs waiting to be dispatched by a background worker.
+
+    Rows are inserted when a job is enqueued (e.g. via ``enqueue_remote_launch``)
+    and transition from ``PENDING`` → ``DISPATCHED`` once the worker picks them up.
+    The worker queries ``status = 'PENDING'`` ordered by ``created_at`` to drain
+    the queue in FIFO order.
+
+    The DISPATCHED status is terminal for this queue table; we don't track what
+    happens to the job after dispatch. In the future, we may add a CANCELLED status
+    for jobs that should be removed from the queue.
+    """
+
+    __tablename__ = "job_queue"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_id: Mapped[str] = mapped_column(String, nullable=False)
+    experiment_id: Mapped[str] = mapped_column(String, nullable=False)
+    team_id: Mapped[str] = mapped_column(String, nullable=False)
+    queue_type: Mapped[str] = mapped_column(String, nullable=False)  # e.g. "REMOTE"
+    status: Mapped[str] = mapped_column(String, nullable=False)  # "PENDING", "DISPATCHED", "FAILED"
+    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("idx_job_queue_status_type", "status", "queue_type"),
+        Index("idx_job_queue_job_id", "job_id"),
     )
