@@ -488,16 +488,6 @@ export default function Interactive() {
     });
   }, [jobs, historySearchQuery]);
 
-  const totalHistoryCount = useMemo(() => {
-    const baseJobs = Array.isArray(jobs) ? jobs : [];
-    return baseJobs.filter(
-      (job: any) =>
-        job.status === 'COMPLETE' ||
-        job.status === 'FAILED' ||
-        job.status === 'STOPPED',
-    ).length;
-  }, [jobs]);
-
   const handleDeleteTask = (taskId: string, taskName?: string) => {
     setTaskToDelete({ id: taskId, name: taskName });
   };
@@ -1367,9 +1357,7 @@ export default function Interactive() {
           sx={{ width: 240 }}
         />
         <Chip size="sm" variant="soft" color="neutral">
-          {historySearchQuery.trim()
-            ? `${historyJobs.length} / ${totalHistoryCount}`
-            : totalHistoryCount}
+          {historyJobs.length}
         </Chip>
       </Stack>
       <Sheet
