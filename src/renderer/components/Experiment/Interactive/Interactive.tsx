@@ -453,37 +453,22 @@ export default function Interactive() {
         jd?.interactive_type ||
         j?.interactive_type ||
         jd?.template_config?.interactive_type;
-      return (
-        String(j?.id ?? '')
+      const searchableFields = [
+        j?.id,
+        j?.short_id,
+        j?.status,
+        jd?.template_name,
+        jd?.cluster_name,
+        jd?.provider_name,
+        jd?.user_info?.name,
+        jd?.user_info?.email,
+        interactiveType,
+        jd?.error_msg,
+      ];
+      return searchableFields.some((f) =>
+        String(f ?? '')
           .toLowerCase()
-          .includes(q) ||
-        String(j?.short_id ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(j?.status ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(jd?.template_name ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(jd?.cluster_name ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(jd?.provider_name ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(jd?.user_info?.name ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(jd?.user_info?.email ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(interactiveType ?? '')
-          .toLowerCase()
-          .includes(q) ||
-        String(jd?.error_msg ?? '')
-          .toLowerCase()
-          .includes(q)
+          .includes(q),
       );
     });
   }, [jobs, historySearchQuery]);
