@@ -1,5 +1,6 @@
 """Remote launch: cloud credential materialization helpers for setup scripts."""
 
+import base64
 import configparser
 import os
 from typing import Optional, Tuple
@@ -65,20 +66,15 @@ def generate_aws_credentials_setup(
     return setup_script
 
 
-def generate_gcp_credentials_setup(service_account_json: str, credentials_path: Optional[str] = None) -> str:
-    target_path = credentials_path or "$HOME/.config/gcloud/tfl-service-account.json"
+GCP_CREDENTIALS_PATH = "/tmp/tfl-gcp-service-account.json"
 
-    def escape_bash_single_quoted(s: str) -> str:
-        return s.replace("'", "'\"'\"'")
 
-    escaped_json = escape_bash_single_quoted(service_account_json)
-
+def generate_gcp_credentials_setup(service_account_json: str) -> str:
+    encoded = base64.b64encode(service_account_json.encode()).decode()
     setup_script = (
         "echo 'Setting up GCP service account credentials...'; "
-        'mkdir -p "$HOME/.config/gcloud"; '
-        f"echo '{escaped_json}' > {target_path}; "
-        f"chmod 600 {target_path}; "
-        f"export GOOGLE_APPLICATION_CREDENTIALS={target_path}; "
+        f"echo '{encoded}' | base64 -d > {GCP_CREDENTIALS_PATH}; "
+        f"chmod 600 {GCP_CREDENTIALS_PATH}; "
         "echo 'GCP credentials configured successfully'"
     )
     return setup_script
