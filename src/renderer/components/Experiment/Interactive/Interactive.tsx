@@ -6,7 +6,16 @@ import React, {
   useRef,
 } from 'react';
 import Sheet from '@mui/joy/Sheet';
-import { Button, Stack, Typography, Box, Skeleton, Alert } from '@mui/joy';
+import {
+  Button,
+  Chip,
+  Input,
+  Stack,
+  Typography,
+  Box,
+  Skeleton,
+  Alert,
+} from '@mui/joy';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { PlusIcon } from 'lucide-react';
@@ -27,6 +36,7 @@ import InteractiveJobCard from './InteractiveJobCard';
 import JobsList from '../Tasks/JobsList';
 import FileBrowserModal from '../Tasks/FileBrowserModal';
 import { API_URL } from 'renderer/lib/api-client/urls';
+import { isJobStopPending } from 'renderer/lib/utils';
 
 const duration = require('dayjs/plugin/duration');
 
@@ -92,6 +102,9 @@ export default function Interactive() {
   );
   const [isCheckingSpecialSecrets, setIsCheckingSpecialSecrets] =
     useState(false);
+  const [stopPendingByJobId, setStopPendingByJobId] = useState<
+    Record<string, boolean>
+  >({});
 
   const { experimentInfo } = useExperimentInfo();
   const { addNotification } = useNotification();
@@ -99,6 +112,7 @@ export default function Interactive() {
 
   // Trigger to force re-render when localStorage changes
   const [pendingIdsTrigger, setPendingIdsTrigger] = useState(0);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   const {
     data: providerListData,
@@ -263,6 +277,38 @@ export default function Interactive() {
     return Array.isArray(jobsRemote) ? jobsRemote : [];
   }, [jobsRemote]);
 
+  const handleStopPendingChange = useCallback(
+    (jobId: string, stopPending: boolean) => {
+      setStopPendingByJobId((prev) => {
+        if (stopPending) {
+          return { ...prev, [jobId]: true };
+        }
+        if (!prev[jobId]) return prev;
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(jobs) || jobs.length === 0) return;
+    setStopPendingByJobId((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const job of jobs as any[]) {
+        const id = String(job?.id ?? '');
+        if (!id || !next[id]) continue;
+        if (isJobStopPending(job?.status, job?.job_data?.stop_requested)) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [jobs]);
+
   // Derive a stable string of job IDs that need launch-progress polling.
   // This avoids resetting the 3s interval on every SWR revalidation.
   const launchPollingJobIds = useMemo(() => {
@@ -415,17 +461,67 @@ export default function Interactive() {
     return [...placeholders, ...filteredJobs];
   }, [jobs, getPendingJobIds, pendingIdsTrigger]);
 
+  const jobsWithUiState = useMemo(() => {
+    return jobsWithPlaceholders.map((job: any) => {
+      const id = String(job?.id ?? '');
+      if (!id || !stopPendingByJobId[id]) return job;
+      return {
+        ...job,
+        job_data: {
+          ...(job?.job_data || {}),
+          stop_requested: true,
+        },
+      };
+    });
+  }, [jobsWithPlaceholders, stopPendingByJobId]);
+
   // Completed / failed / stopped interactive jobs for the History section
   const historyJobs = useMemo(() => {
     const baseJobs = Array.isArray(jobs) ? jobs : [];
-    return baseJobs.filter((job: any) => {
+    const completed = baseJobs.filter((job: any) => {
       return (
         job.status === 'COMPLETE' ||
         job.status === 'FAILED' ||
         job.status === 'STOPPED'
       );
     });
-  }, [jobs]);
+    if (!historySearchQuery.trim()) return completed;
+    const q = historySearchQuery.trim().toLowerCase();
+    return completed.filter((j: any) => {
+      const rawJd = j?.job_data ?? {};
+      const jd =
+        typeof rawJd === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(rawJd);
+              } catch {
+                return {};
+              }
+            })()
+          : rawJd;
+      const interactiveType =
+        jd?.interactive_type ||
+        j?.interactive_type ||
+        jd?.template_config?.interactive_type;
+      const searchableFields = [
+        j?.id,
+        j?.short_id,
+        j?.status,
+        jd?.template_name,
+        jd?.cluster_name,
+        jd?.provider_name,
+        jd?.user_info?.name,
+        jd?.user_info?.email,
+        interactiveType,
+        jd?.error_msg,
+      ];
+      return searchableFields.some((f) =>
+        String(f ?? '')
+          .toLowerCase()
+          .includes(q),
+      );
+    });
+  }, [jobs, historySearchQuery]);
 
   const handleDeleteTask = (taskId: string, taskName?: string) => {
     setTaskToDelete({ id: taskId, name: taskName });
@@ -1262,7 +1358,7 @@ export default function Interactive() {
               </Typography>
             </Box>
           )}
-        {!jobsIsLoading && jobsWithPlaceholders.length > 0 && (
+        {!jobsIsLoading && jobsWithUiState.length > 0 && (
           <Box
             sx={{
               display: 'grid',
@@ -1275,18 +1371,31 @@ export default function Interactive() {
               gap: 2,
             }}
           >
-            {jobsWithPlaceholders.map((job: any) => (
+            {jobsWithUiState.map((job: any) => (
               <InteractiveJobCard
                 key={job.id}
                 job={job}
                 onDeleteJob={handleDeleteJob}
                 launchProgress={launchProgressByJobId[String(job.id)]}
+                onStopPendingChange={handleStopPendingChange}
               />
             ))}
           </Box>
         )}
       </Sheet>
-      <Typography level="title-md">History</Typography>
+      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 1 }}>
+        <Typography level="title-md">History</Typography>
+        <Input
+          size="sm"
+          placeholder="Search history…"
+          value={historySearchQuery}
+          onChange={(e) => setHistorySearchQuery(e.target.value)}
+          sx={{ width: 240 }}
+        />
+        <Chip size="sm" variant="soft" color="neutral">
+          {historyJobs.length}
+        </Chip>
+      </Stack>
       <Sheet
         variant="soft"
         sx={{

@@ -1,18 +1,27 @@
-"""Best-effort Sentry telemetry for the CLI installer.
+"""Best-effort Segment telemetry for the CLI installer.
 
-All public functions silently swallow exceptions so telemetry never
-interferes with the installer's normal operation.
+Events are sent to Segment, which fans out to Mixpanel (and any other
+destinations configured in the Segment workspace). All public functions
+silently swallow exceptions so telemetry never interferes with the
+installer's normal operation.
 """
 
+import os
 import platform
 import sys
+import uuid
+from pathlib import Path
 
 _initialized = False
+_anonymous_id: str | None = None
+_context: dict[str, str] = {}
+_breadcrumbs: list[dict] = []
 
-# Sentry DSN for installer telemetry.
-# Injected at build time by the CI release workflow (sed replacement).
-# When empty, all telemetry is silently disabled.
-_INSTALLER_DSN = "__SENTRY_DSN_PLACEHOLDER__"
+# Segment write key for the CLI installer source. Write keys are not
+# secrets — the Electron app ships its own write key in the client bundle.
+_SEGMENT_WRITE_KEY = "Fsc2l1NSR6T2r4ulQp6XSehXRPIkDeEb"
+
+_ANON_ID_PATH = Path.home() / ".transformerlab" / "installer_id"
 
 
 def _get_cli_version() -> str:
@@ -24,66 +33,110 @@ def _get_cli_version() -> str:
         return "unknown"
 
 
+def _get_or_create_anonymous_id() -> str:
+    try:
+        if _ANON_ID_PATH.exists():
+            existing = _ANON_ID_PATH.read_text().strip()
+            if existing:
+                return existing
+        _ANON_ID_PATH.parent.mkdir(parents=True, exist_ok=True)
+        new_id = str(uuid.uuid4())
+        _ANON_ID_PATH.write_text(new_id)
+        return new_id
+    except Exception:
+        return str(uuid.uuid4())
+
+
+def _user_opted_out() -> bool:
+    val = os.environ.get("DO_NOT_TRACK", "").strip().lower()
+    return val in ("1", "true", "yes")
+
+
 def init(app_version: str | None = None) -> None:
-    """Initialise Sentry for installer telemetry.
+    """Initialise Segment for installer telemetry.
 
     Call once at the start of the install command. *app_version* is the
     currently-installed Transformer Lab server version (may be ``None``
     if the server has not been installed yet).
     """
-    global _initialized
-    if not _INSTALLER_DSN or _INSTALLER_DSN.startswith("__"):
+    global _initialized, _anonymous_id, _context, _breadcrumbs
+    if not _SEGMENT_WRITE_KEY:
+        return
+    if _user_opted_out():
         return
     try:
-        import sentry_sdk
+        from segment import analytics
 
-        sentry_sdk.init(
-            dsn=_INSTALLER_DSN,
-            default_integrations=False,
-            send_default_pii=False,
-            traces_sample_rate=0,
-        )
-        sentry_sdk.set_attribute("cli_version", _get_cli_version())
-        sentry_sdk.set_attribute("python_version", platform.python_version())
-        sentry_sdk.set_attribute("platform", sys.platform)
-        sentry_sdk.set_attribute("app_version", app_version or "not_installed")
+        analytics.write_key = _SEGMENT_WRITE_KEY
+        analytics.max_retries = 1
+        analytics.sync_mode = False
+
+        _anonymous_id = _get_or_create_anonymous_id()
+        _context = {
+            "source": "cli_installer",
+            "cli_version": _get_cli_version(),
+            "python_version": platform.python_version(),
+            "platform": sys.platform,
+            "app_version": app_version or "not_installed",
+        }
+        _breadcrumbs = []
         _initialized = True
     except Exception:
         pass
 
 
 def incr(key: str, value: int = 1, **tags: str) -> None:
-    """Increment a Sentry metric counter."""
+    """Track an event."""
     if not _initialized:
         return
     try:
-        from sentry_sdk import metrics
+        from segment import analytics
 
-        metrics.count(key, float(value), attributes=tags)
+        properties = {**_context, "value": value, **tags}
+        analytics.track(
+            anonymous_id=_anonymous_id,
+            event=key,
+            properties=properties,
+        )
     except Exception:
         pass
 
 
 def breadcrumb(message: str, **data: str) -> None:
-    """Record a breadcrumb (only sent to Sentry if an error is captured)."""
+    """Record a breadcrumb. Buffered locally and attached as a property
+    on the next error captured via :func:`capture_error`. Segment has no
+    native breadcrumb concept, so breadcrumbs are not sent as their own
+    events.
+    """
     if not _initialized:
         return
     try:
-        import sentry_sdk
-
-        sentry_sdk.add_breadcrumb(message=message, data=data, level="info")
+        _breadcrumbs.append({"message": message, "data": data})
+        # Keep the buffer bounded.
+        if len(_breadcrumbs) > 50:
+            del _breadcrumbs[:-50]
     except Exception:
         pass
 
 
 def capture_error(exc: Exception) -> None:
-    """Capture an exception in Sentry."""
+    """Track an error event with recent breadcrumbs attached."""
     if not _initialized:
         return
     try:
-        import sentry_sdk
+        from segment import analytics
 
-        sentry_sdk.capture_exception(exc)
+        properties = {
+            **_context,
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "breadcrumbs": list(_breadcrumbs),
+        }
+        analytics.track(
+            anonymous_id=_anonymous_id,
+            event="installer.exception",
+            properties=properties,
+        )
     except Exception:
         pass
 
@@ -93,8 +146,8 @@ def flush() -> None:
     if not _initialized:
         return
     try:
-        import sentry_sdk
+        from segment import analytics
 
-        sentry_sdk.flush(timeout=2)
+        analytics.flush()
     except Exception:
         pass

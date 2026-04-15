@@ -2,7 +2,7 @@ import contextlib
 import json
 from PIL import Image as PILImage
 from datasets import load_dataset, load_dataset_builder
-from fastapi import APIRouter, HTTPException, UploadFile, Query
+from fastapi import APIRouter, HTTPException, UploadFile, Query, Depends
 import csv
 import os
 from pydantic import BaseModel
@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 from jinja2 import Environment
 from jinja2.sandbox import SandboxedEnvironment
 from transformerlab.services import dataset_service as dataset_service_module
+from transformerlab.services.permission_service import require_permission
 
 
 jinja_environment = Environment()
@@ -864,7 +865,10 @@ async def dataset_new(dataset_id: str, generated: bool = False):
 
 
 @router.get("/delete", summary="Delete a dataset.")
-async def dataset_delete(dataset_id: str):
+async def dataset_delete(
+    dataset_id: str,
+    _: None = Depends(require_permission("dataset", "delete", id_param="dataset_id")),
+):
     dataset_id = secure_filename(dataset_id)
     # delete directory and contents. ignore_errors because we don't care if the directory doesn't exist
     dataset_dir = await dirs.dataset_dir_by_id(dataset_id)
