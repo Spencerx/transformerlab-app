@@ -85,19 +85,27 @@ Default command (writes to local `stable/latest`):
 
 `python api/scripts/combine_subset_galleries.py --channel stable --min-supported-app-version 0.0.0`
 
+Another equivalent stable example:
+
+`python api/scripts/combine_subset_galleries.py --min-supported-app-version 0.0.0`
+
+For beta, just set channel and output will go to `channels/beta/latest`:
+
+`python api/scripts/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0`
+
 ### 3. Regenerate a specific channel explicitly
 
 Stable:
 
-`python api/scripts/combine_subset_galleries.py --emit-bundle-dir api/transformerlab/galleries/channels/stable/latest --channel stable --min-supported-app-version 0.0.0`
+`python api/scripts/combine_subset_galleries.py --channel stable --min-supported-app-version 0.0.0`
 
 Beta:
 
-`python api/scripts/combine_subset_galleries.py --emit-bundle-dir api/transformerlab/galleries/channels/beta/latest --channel beta --min-supported-app-version 0.28.0`
+`python api/scripts/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0`
 
 With max version bound:
 
-`python api/scripts/combine_subset_galleries.py --emit-bundle-dir api/transformerlab/galleries/channels/beta/latest --channel beta --min-supported-app-version 0.28.0 --max-supported-app-version 0.29.99`
+`python api/scripts/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0 --max-supported-app-version 0.29.99`
 
 ## CI enforcement
 
@@ -147,11 +155,3 @@ Use local beta bundle:
 Use remote beta channel (non-local mode, pulled from main of the repo):
 
 `TLAB_GALLERY_CHANNEL=beta`
-
-To regenerate/update the default local stable bundle:
-
-`python api/scripts/combine_subset_galleries.py`
-
-To generate a channel bundle (for stable/beta distribution metadata):
-
-`python api/scripts/combine_subset_galleries.py --emit-bundle-dir api/transformerlab/galleries/channels/stable/latest --channel stable --min-supported-app-version 0.0.0`

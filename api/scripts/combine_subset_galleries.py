@@ -25,6 +25,11 @@ GALLERY_SPECS = {
 }
 
 
+def default_bundle_dir_for_channel(channel: str) -> Path:
+    normalized = (channel or "stable").strip() or "stable"
+    return API_DIR / "transformerlab" / "galleries" / "channels" / normalized / "latest"
+
+
 def _load_json_file(path: Path) -> list[dict[str, Any]] | dict[str, Any]:
     with path.open("r", encoding="utf-8") as f:
         return json.load(f)
@@ -105,12 +110,6 @@ def emit_bundle(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Combine subset gallery sources for API.")
-    parser.add_argument(
-        "--emit-bundle-dir",
-        type=Path,
-        default=API_DIR / "transformerlab" / "galleries" / "channels" / "stable" / "latest",
-        help="Bundle output directory. Defaults to stable/latest local bundle.",
-    )
     parser.add_argument("--channel", default="stable", help="Bundle channel metadata value.")
     parser.add_argument("--bundle-version", default=datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"))
     parser.add_argument("--min-supported-app-version", default=None)
@@ -125,15 +124,16 @@ def main() -> int:
     for filename, payload in combined.items():
         print(f" - {filename}: {len(payload)} entries")
 
+    bundle_dir = default_bundle_dir_for_channel(args.channel)
     emit_bundle(
         combined=combined,
-        bundle_dir=args.emit_bundle_dir,
+        bundle_dir=bundle_dir,
         channel=args.channel,
         bundle_version=args.bundle_version,
         min_supported_app_version=args.min_supported_app_version,
         max_supported_app_version=args.max_supported_app_version,
     )
-    print(f"Bundle emitted to: {args.emit_bundle_dir}")
+    print(f"Bundle emitted to: {bundle_dir}")
 
     return 0
 
