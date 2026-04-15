@@ -63,14 +63,11 @@ def test_resolve_remote_uses_base_command_and_ngrok_from_ports():
     assert setup is None
 
 
-def test_resolve_local_appends_local_echo_with_base_command():
-    """Local path appends local URL echo for known interactive types; run from base_command."""
+def test_resolve_local_returns_base_command_without_echo_injection():
+    """Local path keeps task run command untouched; URL parsing happens from real logs."""
     entry = {"id": "ollama", "interactive_type": "ollama"}
     cmd, setup = resolve_interactive_command(entry, "local", base_command="python run.py")
-    assert "python run.py" in cmd
-    assert "Local Ollama API: http://localhost:11434" in cmd
-    assert "Local Open WebUI: http://localhost:8080" in cmd
-    assert "tee -a /tmp/ngrok.log" in cmd
+    assert cmd == "python run.py"
     assert setup is None
 
 

@@ -3,7 +3,7 @@ Utilities for resolving interactive gallery commands by environment (local/remot
 See galleries.py for the interactive gallery schema documentation.
 
 Run/setup text comes from the task (e.g. task.yaml from the GitHub example repo).
-Gallery entries supply metadata (ports, interactive_type) for ngrok and local URL hints only.
+Gallery entries supply metadata (ports, interactive_type) for ngrok tunnel setup.
 """
 
 import re
@@ -31,24 +31,6 @@ def _sanitize_tunnel_name(label: Optional[str], port: int) -> str:
         if safe:
             return safe
     return f"port_{port}"
-
-
-def _build_local_url_echo_command(interactive_type: str) -> Optional[str]:
-    """Return shell command that prints local URLs and appends them to /tmp/ngrok.log."""
-    # These echoed lines are parsed by tunnel_parser for local provider UX.
-    if interactive_type == "jupyter":
-        return "echo 'Local URL: http://localhost:8888' | tee -a /tmp/ngrok.log"
-    if interactive_type == "vllm":
-        return (
-            "echo 'Local vLLM API: http://localhost:8000' | tee -a /tmp/ngrok.log; "
-            "echo 'Local Open WebUI: http://localhost:8080' | tee -a /tmp/ngrok.log"
-        )
-    if interactive_type == "ollama":
-        return (
-            "echo 'Local Ollama API: http://localhost:11434' | tee -a /tmp/ngrok.log; "
-            "echo 'Local Open WebUI: http://localhost:8080' | tee -a /tmp/ngrok.log"
-        )
-    return None
 
 
 def build_ngrok_tunnel_command(entry_id: str, ports: list[dict[str, Any]]) -> str:
@@ -126,8 +108,6 @@ def resolve_interactive_command(
         gallery entries.
     """
     env = "local" if environment == "local" else "remote"
-    interactive_type = str(template_entry.get("interactive_type") or template_entry.get("id") or "").strip()
-
     resolved_base = (base_command or "").strip()
 
     if env == "remote":
@@ -139,13 +119,6 @@ def resolve_interactive_command(
                 if resolved_base:
                     return (f"{ngrok_cmd}; {resolved_base}", None)
                 return (ngrok_cmd, None)
-    elif env == "local":
-        echo_cmd = _build_local_url_echo_command(interactive_type)
-        if echo_cmd:
-            if resolved_base:
-                return (f"{echo_cmd}; {resolved_base}", None)
-            return (echo_cmd, None)
-
     return (resolved_base, None)
 
 
