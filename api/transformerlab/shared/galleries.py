@@ -55,26 +55,6 @@ async def update_gallery_cache():
         await update_gallery_cache_file(filename)
 
 
-async def get_models_gallery():
-    # Deprecated: models gallery is no longer managed in API.
-    return []
-
-
-async def get_model_groups_gallery():
-    # Deprecated: model groups gallery is no longer managed in API.
-    return []
-
-
-async def get_data_gallery():
-    # Deprecated: datasets gallery is no longer managed in API.
-    return []
-
-
-async def get_exp_recipe_gallery():
-    # Deprecated: experiment recipes gallery is no longer managed in API.
-    return []
-
-
 async def get_tasks_gallery():
     # Refresh the tasks gallery from remote at most once every 5 minutes
     await maybe_update_gallery_cache_file(TASKS_GALLERY_FILE, max_age_seconds=300)
