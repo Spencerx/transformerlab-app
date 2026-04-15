@@ -17,6 +17,7 @@ from transformerlab.services.compute_provider.launch_credentials import (
     RUNPOD_AWS_CREDENTIALS_DIR,
     generate_aws_credentials_setup,
     generate_azure_credentials_setup,
+    generate_gcp_credentials_setup,
     get_aws_credentials_from_file,
 )
 from transformerlab.services.compute_provider.launch_secrets import find_missing_secrets_for_template_launch
@@ -227,6 +228,11 @@ async def launch_template_on_provider(
                 setup_commands.append(aws_setup)
                 if aws_credentials_dir:
                     env_vars["AWS_SHARED_CREDENTIALS_FILE"] = f"{aws_credentials_dir}/credentials"
+        elif STORAGE_PROVIDER == "gcp":
+            gcp_sa_json = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON")
+            if gcp_sa_json:
+                gcp_setup = generate_gcp_credentials_setup(gcp_sa_json)
+                setup_commands.append(gcp_setup)
         elif STORAGE_PROVIDER == "azure":
             azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
             azure_account = os.getenv("AZURE_STORAGE_ACCOUNT")
