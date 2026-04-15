@@ -15,12 +15,7 @@ from packaging.version import Version, InvalidVersion
 
 from transformerlab.shared import dirs
 
-# This is the list of galleries that are updated remotely
-MODEL_GALLERY_FILE = "model-gallery.json"
-DATA_GALLERY_FILE = "dataset-gallery.json"
-MODEL_GROUP_GALLERY_FILE = "model-group-gallery.json"
-EXP_RECIPES_GALLERY_FILE = "exp-recipe-gallery.json"
-# Tasks gallery main file
+# API-managed gallery files
 TASKS_GALLERY_FILE = "task-gallery.json"
 # Interactive tasks gallery (for interactive task templates)
 INTERACTIVE_GALLERY_FILE = "interactive-gallery.json"
@@ -35,7 +30,6 @@ GALLERY_FILES = [
     ANNOUNCEMENTS_GALLERY_FILE,
 ]
 
-TLAB_REMOTE_GALLERIES_URL = "https://raw.githubusercontent.com/transformerlab/galleries/main/"
 TLAB_CHANNEL_GALLERIES_BASE_URL = os.environ.get(
     "TLAB_CHANNEL_GALLERIES_BASE_URL",
     "https://raw.githubusercontent.com/transformerlab/transformerlab-app/main/api/transformerlab/galleries/channels",
@@ -62,19 +56,23 @@ async def update_gallery_cache():
 
 
 async def get_models_gallery():
-    return await get_gallery_file(MODEL_GALLERY_FILE)
+    # Deprecated: models gallery is no longer managed in API.
+    return []
 
 
 async def get_model_groups_gallery():
-    return await get_gallery_file(MODEL_GROUP_GALLERY_FILE)
+    # Deprecated: model groups gallery is no longer managed in API.
+    return []
 
 
 async def get_data_gallery():
-    return await get_gallery_file(DATA_GALLERY_FILE)
+    # Deprecated: datasets gallery is no longer managed in API.
+    return []
 
 
 async def get_exp_recipe_gallery():
-    return await get_gallery_file(EXP_RECIPES_GALLERY_FILE)
+    # Deprecated: experiment recipes gallery is no longer managed in API.
+    return []
 
 
 async def get_tasks_gallery():
@@ -250,6 +248,13 @@ async def update_gallery_cache_file(filename: str):
 
         sourcefile = get_local_gallery_path(filename)
         if os.path.isfile(sourcefile):
+            local_galleries_flag = os.environ.get("TLAB_USE_LOCAL_GALLERIES", "").strip()
+            if local_galleries_flag in ("1", "true", "yes"):
+                if filename in CHANNEL_MANAGED_GALLERY_FILES:
+                    channel = os.environ.get("TLAB_GALLERY_CHANNEL", TLAB_GALLERY_CHANNEL).strip() or "stable"
+                    print(f"📦 Startup local channel gallery ({channel}): {sourcefile}")
+                else:
+                    print(f"📦 Startup local gallery fallback: {sourcefile}")
             # Use fsspec-aware copy
             parent_dir = posixpath.dirname(cached_gallery_file)
             if parent_dir:
@@ -264,22 +269,18 @@ async def update_gallery_cache_file(filename: str):
 
 async def update_cache_from_remote(gallery_filename: str):
     """
-    Fetches a gallery file from source and updates the cache.
-    Set TLAB_USE_LOCAL_GALLERIES=1 to skip remote fetching and use the local fallback only.
+    Fetches a gallery file from channel source and updates the cache.
+    Set TLAB_USE_LOCAL_GALLERIES=1 to skip remote fetching and use the local bundle only.
     """
     if os.environ.get("TLAB_USE_LOCAL_GALLERIES", "").strip() in ("1", "true", "yes"):
         return
+    if not should_use_channel_bundle(gallery_filename):
+        # Non-channel galleries are no longer remotely refreshed by this module.
+        return
     try:
-        remote_gallery = TLAB_REMOTE_GALLERIES_URL + gallery_filename
-        data = None
-
-        if should_use_channel_bundle(gallery_filename):
-            data, remote_gallery = try_fetch_channel_gallery(gallery_filename)
-
+        data, remote_gallery = try_fetch_channel_gallery(gallery_filename)
         if data is None:
-            remote_gallery = TLAB_REMOTE_GALLERIES_URL + gallery_filename
-            with urllib.request.urlopen(remote_gallery) as resp:
-                data = resp.read()
+            return
 
         local_cache_filename = await gallery_cache_file_path(gallery_filename)
         parent_dir = posixpath.dirname(local_cache_filename)
@@ -301,6 +302,11 @@ async def get_gallery_file(filename: str):
     if local_galleries_flag in ("1", "true", "yes"):
         local_path = get_local_gallery_path(filename)
         if os.path.isfile(local_path):
+            if filename in CHANNEL_MANAGED_GALLERY_FILES:
+                channel = os.environ.get("TLAB_GALLERY_CHANNEL", TLAB_GALLERY_CHANNEL).strip() or "stable"
+                print(f"📦 Using local channel gallery ({channel}): {local_path}")
+            else:
+                print(f"📦 Using local gallery fallback: {local_path}")
             with open(local_path, "r") as f:
                 gallery = json.load(f)
             return gallery
@@ -389,19 +395,19 @@ def try_fetch_channel_gallery(gallery_filename: str):
         with urllib.request.urlopen(manifest_url) as resp:
             manifest = json.loads(resp.read().decode("utf-8"))
     except Exception as e:
-        print(f"⚠️  Channel manifest unavailable, falling back to legacy source: {manifest_url} ({e})")
+        print(f"⚠️  Channel manifest unavailable: {manifest_url} ({e})")
         return None, manifest_url
 
     if not is_manifest_version_compatible(manifest):
         print(
             "⚠️  Channel manifest incompatible with app version "
-            f"{current_app_version()}; keeping existing fallback behavior."
+            f"{current_app_version()}; keeping current cache/local bundle."
         )
         return None, manifest_url
 
     files = manifest.get("files", {})
     if files and gallery_filename not in files:
-        print(f"⚠️  {gallery_filename} missing in channel manifest; falling back to legacy source.")
+        print(f"⚠️  {gallery_filename} missing in channel manifest; keeping current cache/local bundle.")
         return None, manifest_url
 
     gallery_url = f"{TLAB_CHANNEL_GALLERIES_BASE_URL}/{channel}/latest/{gallery_filename}"
