@@ -15,7 +15,7 @@ import useSWR from 'swr';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
 import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
-import { isTerminalJobStatus } from 'renderer/lib/utils';
+import { isJobStopPending, isTerminalJobStatus } from 'renderer/lib/utils';
 import JobProgress from '../Tasks/JobProgress';
 import InteractiveModal from '../Tasks/InteractiveModal';
 import InteractIframeModal from './InteractIframeModal';
@@ -32,6 +32,7 @@ interface InteractiveJobCardProps {
   /** Live launch progress from check-status polling; falls back to job.job_data.launch_progress in JobProgress */
   launchProgress?: LaunchProgressInfo | null;
   onDeleteJob: (jobId: string) => void;
+  onStopPendingChange?: (jobId: string, stopPending: boolean) => void;
 }
 
 function VscodeIcon() {
@@ -123,6 +124,7 @@ export default function InteractiveJobCard({
   job,
   launchProgress,
   onDeleteJob,
+  onStopPendingChange,
 }: InteractiveJobCardProps) {
   type InteractiveGalleryEntry = {
     id?: string;
@@ -135,6 +137,7 @@ export default function InteractiveJobCard({
   const [interactOpen, setInteractOpen] = useState(false);
   const jobData = job.job_data || {};
   const isPlaceholder = !!job.placeholder;
+  const stopPending = isJobStopPending(job?.status, jobData?.stop_requested);
   const interactiveGalleryId = jobData.interactive_gallery_id;
   const interactiveType =
     jobData.interactive_type ||
@@ -247,6 +250,8 @@ export default function InteractiveJobCard({
       sx={{
         height: '100%',
         transition: 'box-shadow 0.2s',
+        opacity: stopPending ? 0.6 : 1,
+        pointerEvents: stopPending ? 'none' : 'auto',
         '&:hover': {
           boxShadow: 'sm',
         },
@@ -309,6 +314,7 @@ export default function InteractiveJobCard({
               variant="plain"
               color="danger"
               size="sm"
+              disabled={stopPending}
               onClick={() => onDeleteJob(String(job.id))}
               sx={{ mt: -0.5, mr: -0.5 }}
             >
@@ -324,6 +330,7 @@ export default function InteractiveJobCard({
             hideCircularLaunchProgressAtOrAbove={
               job.status === 'INTERACTIVE' ? 99 : undefined
             }
+            onStopPendingChange={onStopPendingChange}
           />
           {tunnelTimedOut && !tunnelReady && (
             <Typography level="body-xs" color="warning" sx={{ mt: 0.5 }}>
@@ -340,6 +347,7 @@ export default function InteractiveJobCard({
                 variant="soft"
                 color="neutral"
                 size="sm"
+                disabled={stopPending}
                 onClick={() => setConnectOpen(true)}
               >
                 Logs
@@ -348,7 +356,7 @@ export default function InteractiveJobCard({
                 variant="soft"
                 color={tunnelReady ? 'success' : 'neutral'}
                 size="sm"
-                disabled={!tunnelReady}
+                disabled={stopPending || !tunnelReady}
                 onClick={() => setInteractOpen(true)}
               >
                 {tunnelReady

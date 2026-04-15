@@ -44,6 +44,7 @@ import ProviderDetailsModal from './ProviderDetailsModal';
 import QuotaSettingsSection from './QuotaSettingsSection';
 import TeamSecretsSection from './TeamSecretsSection';
 import SshKeySection from './SshKeySection';
+import PermissionsSection from './PermissionsSection';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
 
 /*
@@ -1284,6 +1285,7 @@ export default function UserLoginTest(): JSX.Element {
                 <Tab>Team Secrets</Tab>
                 <Tab>Quota Settings</Tab>
                 <Tab>Organization SSH Key</Tab>
+                <Tab>Permissions</Tab>
               </TabList>
 
               {/* Team Secrets Tab */}
@@ -1317,6 +1319,20 @@ export default function UserLoginTest(): JSX.Element {
                 }}
               >
                 <SshKeySection teamId={authContext.team?.id || ''} />
+              </TabPanel>
+
+              {/* Permissions Tab */}
+              <TabPanel
+                value={3}
+                sx={{
+                  p: 2,
+                  overflowY: 'auto',
+                }}
+              >
+                <PermissionsSection
+                  teamId={authContext.team?.id || ''}
+                  members={members?.members || []}
+                />
               </TabPanel>
             </Tabs>
           </Box>
