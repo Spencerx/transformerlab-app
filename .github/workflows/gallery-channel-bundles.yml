@@ -4,13 +4,13 @@ on:
   pull_request:
     branches: ["main"]
     paths:
-      - "api/transformerlab/galleries-src/**"
-      - "api/scripts/combine_subset_galleries.py"
+      - "api/transformerlab/galleries/src/**"
+      - "api/transformerlab/galleries/combine_subset_galleries.py"
   push:
     branches: ["main"]
     paths:
-      - "api/transformerlab/galleries-src/**"
-      - "api/scripts/combine_subset_galleries.py"
+      - "api/transformerlab/galleries/src/**"
+      - "api/transformerlab/galleries/combine_subset_galleries.py"
 
 jobs:
   verify-bundle-updated:
@@ -46,7 +46,7 @@ jobs:
             exit 0
           fi
 
-          echo "ERROR: galleries-src changed, but no stable/beta bundle update was committed."
+          echo "ERROR: galleries/src changed, but no stable/beta bundle update was committed."
           echo "Update either:"
           echo " - api/transformerlab/galleries/channels/stable/latest/*"
           echo " - api/transformerlab/galleries/channels/beta/latest/*"

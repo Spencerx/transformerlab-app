@@ -60,7 +60,7 @@ The loader behavior in `transformerlab/shared/galleries.py` is:
 2. If `TLAB_USE_LOCAL_GALLERIES` is not enabled:
    - Attempt remote channel bundle first (`stable` by default or `TLAB_GALLERY_CHANNEL`)
    - Check app-version compatibility from manifest
-   - Fallback to legacy remote source if channel/manifest is unavailable or incompatible
+   - Keep current cache/local bundle if channel/manifest is unavailable or incompatible
 
 Environment variables:
 
@@ -75,43 +75,43 @@ Environment variables:
 
 Change files under:
 
-- `api/transformerlab/galleries-src/tasks/`
-- `api/transformerlab/galleries-src/interactive/`
-- `api/transformerlab/galleries-src/announcements/`
+- `api/transformerlab/galleries/src/tasks/`
+- `api/transformerlab/galleries/src/interactive/`
+- `api/transformerlab/galleries/src/announcements/`
 
 ### 2. Regenerate a local channel bundle
 
 Default command (writes to local `stable/latest`):
 
-`python api/scripts/combine_subset_galleries.py --channel stable --min-supported-app-version 0.0.0`
+`python api/transformerlab/galleries/combine_subset_galleries.py --channel stable --min-supported-app-version 0.0.0`
 
 Another equivalent stable example:
 
-`python api/scripts/combine_subset_galleries.py --min-supported-app-version 0.0.0`
+`python api/transformerlab/galleries/combine_subset_galleries.py --min-supported-app-version 0.0.0`
 
 For beta, just set channel and output will go to `channels/beta/latest`:
 
-`python api/scripts/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0`
+`python api/transformerlab/galleries/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0`
 
 ### 3. Regenerate a specific channel explicitly
 
 Stable:
 
-`python api/scripts/combine_subset_galleries.py --channel stable --min-supported-app-version 0.0.0`
+`python api/transformerlab/galleries/combine_subset_galleries.py --channel stable --min-supported-app-version 0.0.0`
 
 Beta:
 
-`python api/scripts/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0`
+`python api/transformerlab/galleries/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0`
 
 With max version bound:
 
-`python api/scripts/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0 --max-supported-app-version 0.29.99`
+`python api/transformerlab/galleries/combine_subset_galleries.py --channel beta --min-supported-app-version 0.28.0 --max-supported-app-version 0.29.99`
 
 ## CI enforcement
 
 The workflow `gallery-channel-bundles.yml` enforces this rule:
 
-- If `galleries-src` changed, the same PR/push must include bundle updates in
+- If `galleries/src` changed, the same PR/push must include bundle updates in
   either:
   - `api/transformerlab/galleries/channels/stable/latest/*`
   - `api/transformerlab/galleries/channels/beta/latest/*`

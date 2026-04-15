@@ -15,8 +15,8 @@ from typing import Any
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-API_DIR = SCRIPT_DIR.parent
-SOURCE_ROOT = API_DIR / "transformerlab" / "galleries-src"
+API_DIR = SCRIPT_DIR.parents[2]
+SOURCE_ROOT = SCRIPT_DIR / "src"
 
 GALLERY_SPECS = {
     "tasks": "task-gallery.json",
@@ -27,7 +27,7 @@ GALLERY_SPECS = {
 
 def default_bundle_dir_for_channel(channel: str) -> Path:
     normalized = (channel or "stable").strip() or "stable"
-    return API_DIR / "transformerlab" / "galleries" / "channels" / normalized / "latest"
+    return SCRIPT_DIR / "channels" / normalized / "latest"
 
 
 def _load_json_file(path: Path) -> list[dict[str, Any]] | dict[str, Any]:
