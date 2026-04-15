@@ -243,6 +243,14 @@ export function isDeletableJobRecordStatus(
   return isTerminalJobStatus(status) || status === 'NOT_STARTED';
 }
 
+/** UI-only helper: treat explicit STOPPING and optimistic stop requests the same. */
+export function isJobStopPending(
+  status: string | undefined | null,
+  stopRequested?: boolean,
+): boolean {
+  return status === 'STOPPING' || Boolean(stopRequested);
+}
+
 export const colorArray = [
   '#e8c1a0',
   '#C7DFF7',
