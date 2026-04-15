@@ -8,6 +8,7 @@ import React, {
 import Sheet from '@mui/joy/Sheet';
 import {
   Button,
+  Chip,
   Input,
   Stack,
   Typography,
@@ -486,6 +487,16 @@ export default function Interactive() {
       );
     });
   }, [jobs, historySearchQuery]);
+
+  const totalHistoryCount = useMemo(() => {
+    const baseJobs = Array.isArray(jobs) ? jobs : [];
+    return baseJobs.filter(
+      (job: any) =>
+        job.status === 'COMPLETE' ||
+        job.status === 'FAILED' ||
+        job.status === 'STOPPED',
+    ).length;
+  }, [jobs]);
 
   const handleDeleteTask = (taskId: string, taskName?: string) => {
     setTaskToDelete({ id: taskId, name: taskName });
@@ -1355,6 +1366,11 @@ export default function Interactive() {
           onChange={(e) => setHistorySearchQuery(e.target.value)}
           sx={{ width: 240 }}
         />
+        <Chip size="sm" variant="soft" color="neutral">
+          {historySearchQuery.trim()
+            ? `${historyJobs.length} / ${totalHistoryCount}`
+            : totalHistoryCount}
+        </Chip>
       </Stack>
       <Sheet
         variant="soft"
