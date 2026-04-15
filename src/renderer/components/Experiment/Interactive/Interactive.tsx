@@ -6,7 +6,16 @@ import React, {
   useRef,
 } from 'react';
 import Sheet from '@mui/joy/Sheet';
-import { Button, Stack, Typography, Box, Skeleton, Alert } from '@mui/joy';
+import {
+  Button,
+  Chip,
+  Input,
+  Stack,
+  Typography,
+  Box,
+  Skeleton,
+  Alert,
+} from '@mui/joy';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { PlusIcon } from 'lucide-react';
@@ -103,6 +112,7 @@ export default function Interactive() {
 
   // Trigger to force re-render when localStorage changes
   const [pendingIdsTrigger, setPendingIdsTrigger] = useState(0);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   const {
     data: providerListData,
@@ -468,14 +478,50 @@ export default function Interactive() {
   // Completed / failed / stopped interactive jobs for the History section
   const historyJobs = useMemo(() => {
     const baseJobs = Array.isArray(jobs) ? jobs : [];
-    return baseJobs.filter((job: any) => {
+    const completed = baseJobs.filter((job: any) => {
       return (
         job.status === 'COMPLETE' ||
         job.status === 'FAILED' ||
         job.status === 'STOPPED'
       );
     });
-  }, [jobs]);
+    if (!historySearchQuery.trim()) return completed;
+    const q = historySearchQuery.trim().toLowerCase();
+    return completed.filter((j: any) => {
+      const rawJd = j?.job_data ?? {};
+      const jd =
+        typeof rawJd === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(rawJd);
+              } catch {
+                return {};
+              }
+            })()
+          : rawJd;
+      const interactiveType =
+        jd?.interactive_type ||
+        j?.interactive_type ||
+        jd?.template_config?.interactive_type;
+      const searchableFields = [
+        j?.id,
+        j?.short_id,
+        j?.status,
+        jd?.template_name,
+        jd?.cluster_name,
+        jd?.provider_name,
+        jd?.user_info?.name,
+        jd?.user_info?.email,
+        interactiveType,
+        jd?.error_msg,
+      ];
+      return searchableFields.some((f) =>
+        String(f ?? '')
+          .toLowerCase()
+          .includes(q),
+      );
+    });
+  }, [jobs, historySearchQuery]);
 
   const handleDeleteTask = (taskId: string, taskName?: string) => {
     setTaskToDelete({ id: taskId, name: taskName });
@@ -1337,7 +1383,19 @@ export default function Interactive() {
           </Box>
         )}
       </Sheet>
-      <Typography level="title-md">History</Typography>
+      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 1 }}>
+        <Typography level="title-md">History</Typography>
+        <Input
+          size="sm"
+          placeholder="Search history…"
+          value={historySearchQuery}
+          onChange={(e) => setHistorySearchQuery(e.target.value)}
+          sx={{ width: 240 }}
+        />
+        <Chip size="sm" variant="soft" color="neutral">
+          {historyJobs.length}
+        </Chip>
+      </Stack>
       <Sheet
         variant="soft"
         sx={{
