@@ -16,6 +16,7 @@ The API currently manages only these gallery domains:
 These folders contain source JSON files (one file per contribution or grouped
 entries). The combine script merges these files into channel bundles.
 
+
 ## What does not live here
 
 The API no longer keeps legacy root gallery JSON files under:
