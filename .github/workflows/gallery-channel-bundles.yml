@@ -41,7 +41,7 @@ jobs:
           echo "Changed files between ${BASE_SHA} and ${HEAD_SHA}:"
           printf '%s\n' "${CHANGED}"
 
-          if printf '%s\n' "${CHANGED}" | rg '^api/transformerlab/galleries/channels/(stable|beta)/latest/' > /dev/null; then
+          if printf '%s\n' "${CHANGED}" | grep -E '^api/transformerlab/galleries/channels/(stable|beta)/latest/' > /dev/null; then
             echo "Bundle update detected under stable/beta latest."
             exit 0
           fi

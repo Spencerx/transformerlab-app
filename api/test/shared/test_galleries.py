@@ -24,7 +24,7 @@ def test_only_selected_galleries_use_channel_fetch():
     assert galleries.should_use_channel_bundle(galleries.TASKS_GALLERY_FILE) is True
     assert galleries.should_use_channel_bundle(galleries.INTERACTIVE_GALLERY_FILE) is True
     assert galleries.should_use_channel_bundle(galleries.ANNOUNCEMENTS_GALLERY_FILE) is True
-    assert galleries.should_use_channel_bundle(galleries.MODEL_GALLERY_FILE) is False
+    assert galleries.should_use_channel_bundle(galleries.TEAM_TASKS_GALLERY_FILE) is False
 
 
 def test_local_channel_path_uses_selected_channel(monkeypatch, tmp_path):
