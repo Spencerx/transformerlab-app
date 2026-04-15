@@ -30,12 +30,9 @@ TEAM_TASKS_GALLERY_FILE = "team_specific_tasks.json"
 ANNOUNCEMENTS_GALLERY_FILE = "announcement-gallery.json"
 
 GALLERY_FILES = [
-    MODEL_GALLERY_FILE,
-    DATA_GALLERY_FILE,
-    MODEL_GROUP_GALLERY_FILE,
-    EXP_RECIPES_GALLERY_FILE,
     TASKS_GALLERY_FILE,
     INTERACTIVE_GALLERY_FILE,
+    ANNOUNCEMENTS_GALLERY_FILE,
 ]
 
 TLAB_REMOTE_GALLERIES_URL = "https://raw.githubusercontent.com/transformerlab/galleries/main/"
@@ -246,12 +243,12 @@ async def update_gallery_cache_file(filename: str):
     then try to update from remote.
     """
 
-    # First, if nothing is cached yet, then initialize with the local copy.
+    # First, if nothing is cached yet, then initialize with a local copy when available.
     cached_gallery_file = await gallery_cache_file_path(filename)
     if not os.path.isfile(cached_gallery_file):
         print(f"✅ Initializing {filename} from local source.")
 
-        sourcefile = os.path.join(dirs.GALLERIES_LOCAL_FALLBACK_DIR, filename)
+        sourcefile = get_local_gallery_path(filename)
         if os.path.isfile(sourcefile):
             # Use fsspec-aware copy
             parent_dir = posixpath.dirname(cached_gallery_file)
@@ -302,13 +299,12 @@ async def get_gallery_file(filename: str):
     # When developing locally, prefer the in-repo gallery file over the cached copy.
     local_galleries_flag = os.environ.get("TLAB_USE_LOCAL_GALLERIES", "").strip()
     if local_galleries_flag in ("1", "true", "yes"):
-        local_path = os.path.join(dirs.GALLERIES_LOCAL_FALLBACK_DIR, filename)
-        # print(f"[galleries] TLAB_USE_LOCAL_GALLERIES={local_galleries_flag}, local_path={local_path}, exists={os.path.isfile(local_path)}")
+        local_path = get_local_gallery_path(filename)
         if os.path.isfile(local_path):
             with open(local_path, "r") as f:
                 gallery = json.load(f)
-            # print(f"[galleries] Loaded {filename} from local: {len(gallery)} entries")
             return gallery
+        print(f"⚠️  Local gallery file not found: {local_path}. Falling back to cache.")
 
     gallery_path = await gallery_cache_file_path(filename)
 
@@ -325,6 +321,19 @@ async def get_gallery_file(filename: str):
 
 def should_use_channel_bundle(filename: str) -> bool:
     return filename in CHANNEL_MANAGED_GALLERY_FILES and bool(TLAB_CHANNEL_GALLERIES_BASE_URL)
+
+
+def get_local_gallery_path(filename: str) -> str:
+    """
+    Resolve the preferred in-repo local path for a gallery file.
+    If a channel-managed gallery is requested, prefer channels/<channel>/latest/<file>.
+    """
+    if filename in CHANNEL_MANAGED_GALLERY_FILES:
+        channel = os.environ.get("TLAB_GALLERY_CHANNEL", TLAB_GALLERY_CHANNEL).strip() or "stable"
+        candidate = os.path.join(dirs.GALLERIES_LOCAL_FALLBACK_DIR, "channels", channel, "latest", filename)
+        if os.path.isfile(candidate):
+            return candidate
+    return os.path.join(dirs.GALLERIES_LOCAL_FALLBACK_DIR, filename)
 
 
 def current_app_version() -> str:

@@ -17,7 +17,6 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 API_DIR = SCRIPT_DIR.parent
 SOURCE_ROOT = API_DIR / "transformerlab" / "galleries-src"
-OUTPUT_ROOT = API_DIR / "transformerlab" / "galleries"
 
 GALLERY_SPECS = {
     "tasks": "task-gallery.json",
@@ -68,12 +67,6 @@ def build_galleries() -> dict[str, list[dict[str, Any]]]:
         source_folder = SOURCE_ROOT / source_dir
         entries = _combine_folder(source_folder)
         combined[output_filename] = entries
-
-    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    for filename, entries in combined.items():
-        with (OUTPUT_ROOT / filename).open("w", encoding="utf-8") as f:
-            json.dump(entries, f, indent=2)
-            f.write("\n")
     return combined
 
 
@@ -112,7 +105,12 @@ def emit_bundle(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Combine subset gallery sources for API.")
-    parser.add_argument("--emit-bundle-dir", type=Path, default=None, help="Optional bundle output directory.")
+    parser.add_argument(
+        "--emit-bundle-dir",
+        type=Path,
+        default=API_DIR / "transformerlab" / "galleries" / "channels" / "stable" / "latest",
+        help="Bundle output directory. Defaults to stable/latest local bundle.",
+    )
     parser.add_argument("--channel", default="stable", help="Bundle channel metadata value.")
     parser.add_argument("--bundle-version", default=datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S"))
     parser.add_argument("--min-supported-app-version", default=None)
@@ -127,16 +125,15 @@ def main() -> int:
     for filename, payload in combined.items():
         print(f" - {filename}: {len(payload)} entries")
 
-    if args.emit_bundle_dir is not None:
-        emit_bundle(
-            combined=combined,
-            bundle_dir=args.emit_bundle_dir,
-            channel=args.channel,
-            bundle_version=args.bundle_version,
-            min_supported_app_version=args.min_supported_app_version,
-            max_supported_app_version=args.max_supported_app_version,
-        )
-        print(f"Bundle emitted to: {args.emit_bundle_dir}")
+    emit_bundle(
+        combined=combined,
+        bundle_dir=args.emit_bundle_dir,
+        channel=args.channel,
+        bundle_version=args.bundle_version,
+        min_supported_app_version=args.min_supported_app_version,
+        max_supported_app_version=args.max_supported_app_version,
+    )
+    print(f"Bundle emitted to: {args.emit_bundle_dir}")
 
     return 0
 
