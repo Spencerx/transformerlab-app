@@ -49,7 +49,7 @@ from transformerlab.routers import (  # noqa: E402
     ssh_keys,
     asset_versions,
     trackio,
-    permissions,  # noqa: E402
+    permissions,
 )
 from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 
