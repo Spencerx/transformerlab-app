@@ -9,6 +9,9 @@ import posixpath
 import urllib.request
 import shutil
 import time
+import tomllib
+from pathlib import Path
+from packaging.version import Version, InvalidVersion
 
 from transformerlab.shared import dirs
 
@@ -36,6 +39,19 @@ GALLERY_FILES = [
 ]
 
 TLAB_REMOTE_GALLERIES_URL = "https://raw.githubusercontent.com/transformerlab/galleries/main/"
+TLAB_CHANNEL_GALLERIES_BASE_URL = os.environ.get(
+    "TLAB_CHANNEL_GALLERIES_BASE_URL",
+    "https://raw.githubusercontent.com/transformerlab/transformerlab-app/main/api/transformerlab/galleries/channels",
+).rstrip("/")
+TLAB_GALLERY_CHANNEL = os.environ.get("TLAB_GALLERY_CHANNEL", "stable").strip() or "stable"
+
+CHANNEL_MANAGED_GALLERY_FILES = {
+    TASKS_GALLERY_FILE,
+    INTERACTIVE_GALLERY_FILE,
+    ANNOUNCEMENTS_GALLERY_FILE,
+}
+
+_APP_VERSION_CACHE = None
 
 
 async def update_gallery_cache():
@@ -258,10 +274,17 @@ async def update_cache_from_remote(gallery_filename: str):
         return
     try:
         remote_gallery = TLAB_REMOTE_GALLERIES_URL + gallery_filename
+        data = None
+
+        if should_use_channel_bundle(gallery_filename):
+            data, remote_gallery = try_fetch_channel_gallery(gallery_filename)
+
+        if data is None:
+            remote_gallery = TLAB_REMOTE_GALLERIES_URL + gallery_filename
+            with urllib.request.urlopen(remote_gallery) as resp:
+                data = resp.read()
+
         local_cache_filename = await gallery_cache_file_path(gallery_filename)
-        # Stream download and write via fsspec
-        with urllib.request.urlopen(remote_gallery) as resp:
-            data = resp.read()
         parent_dir = posixpath.dirname(local_cache_filename)
         if parent_dir:
             os.makedirs(parent_dir, exist_ok=True)
@@ -298,3 +321,80 @@ async def get_gallery_file(filename: str):
         gallery = json.load(f)
 
     return gallery
+
+
+def should_use_channel_bundle(filename: str) -> bool:
+    return filename in CHANNEL_MANAGED_GALLERY_FILES and bool(TLAB_CHANNEL_GALLERIES_BASE_URL)
+
+
+def current_app_version() -> str:
+    global _APP_VERSION_CACHE
+    if _APP_VERSION_CACHE:
+        return _APP_VERSION_CACHE
+
+    env_version = os.environ.get("TLAB_APP_VERSION", "").strip()
+    if env_version:
+        _APP_VERSION_CACHE = env_version
+        return _APP_VERSION_CACHE
+
+    pyproject_path = Path(__file__).resolve().parents[2] / "pyproject.toml"
+    try:
+        with pyproject_path.open("rb") as f:
+            pyproject_data = tomllib.load(f)
+        _APP_VERSION_CACHE = str(pyproject_data.get("project", {}).get("version", "0.0.0"))
+    except Exception:
+        _APP_VERSION_CACHE = "0.0.0"
+    return _APP_VERSION_CACHE
+
+
+def is_manifest_version_compatible(manifest: dict, app_version: str | None = None) -> bool:
+    app_version = app_version or current_app_version()
+    try:
+        app_ver = Version(str(app_version))
+    except InvalidVersion:
+        return False
+
+    min_version = manifest.get("min_supported_app_version")
+    if min_version:
+        try:
+            if app_ver < Version(str(min_version)):
+                return False
+        except InvalidVersion:
+            return False
+
+    max_version = manifest.get("max_supported_app_version")
+    if max_version:
+        try:
+            if app_ver > Version(str(max_version)):
+                return False
+        except InvalidVersion:
+            return False
+
+    return True
+
+
+def try_fetch_channel_gallery(gallery_filename: str):
+    channel = os.environ.get("TLAB_GALLERY_CHANNEL", TLAB_GALLERY_CHANNEL).strip() or "stable"
+    manifest_url = f"{TLAB_CHANNEL_GALLERIES_BASE_URL}/{channel}/latest/manifest.json"
+    try:
+        with urllib.request.urlopen(manifest_url) as resp:
+            manifest = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        print(f"⚠️  Channel manifest unavailable, falling back to legacy source: {manifest_url} ({e})")
+        return None, manifest_url
+
+    if not is_manifest_version_compatible(manifest):
+        print(
+            "⚠️  Channel manifest incompatible with app version "
+            f"{current_app_version()}; keeping existing fallback behavior."
+        )
+        return None, manifest_url
+
+    files = manifest.get("files", {})
+    if files and gallery_filename not in files:
+        print(f"⚠️  {gallery_filename} missing in channel manifest; falling back to legacy source.")
+        return None, manifest_url
+
+    gallery_url = f"{TLAB_CHANNEL_GALLERIES_BASE_URL}/{channel}/latest/{gallery_filename}"
+    with urllib.request.urlopen(gallery_url) as resp:
+        return resp.read(), gallery_url
