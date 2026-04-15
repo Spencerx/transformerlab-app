@@ -957,10 +957,33 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const handleQueue = async (task: any) => {
     if (!experimentInfo?.id) return;
 
+    let latestTask = task;
+    try {
+      // Always resolve the latest task snapshot before queueing to avoid
+      // launching with stale config immediately after task.yaml edits.
+      const response = await fetchWithAuth(
+        chatAPI.Endpoints.Task.GetByID(experimentInfo.id, task.id),
+        {
+          method: 'GET',
+        },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data && !data.message) {
+          latestTask = data;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh task before queueing:', error);
+      // Fall back to the in-memory task object if refresh fails.
+    }
+
     // For templates, all fields are stored directly (not nested in config)
     // For backward compatibility, check if it's an old task format with nested config
     const cfg =
-      task.config !== undefined ? SafeJSONParse(task.config, task) : task; // If no config field, assume it's a template with flat structure
+      latestTask.config !== undefined
+        ? SafeJSONParse(latestTask.config, latestTask)
+        : latestTask;
 
     if (!providers.length) {
       addNotification({
@@ -973,9 +996,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
 
     if (
       !cfg.run &&
-      !task.run &&
+      !latestTask.run &&
       !cfg.github_repo_url &&
-      !task.github_repo_url
+      !latestTask.github_repo_url
     ) {
       addNotification({
         type: 'warning',
@@ -985,7 +1008,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     }
 
     // Open the queue modal so user can pick provider (and customize params)
-    setTaskBeingQueued(task);
+    setTaskBeingQueued(latestTask);
     setQueueModalOpen(true);
   };
 
