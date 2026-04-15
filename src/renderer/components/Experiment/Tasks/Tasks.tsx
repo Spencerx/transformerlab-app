@@ -87,9 +87,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const [compareEvalModalOpen, setCompareEvalModalOpen] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
-  const [viewFileBrowserFromJob, setViewFileBrowserFromJob] = useState<
-    string | null
-  >(null);
   const [viewTaskFilesFromTask, setViewTaskFilesFromTask] = useState<{
     id: string | null;
     name?: string | null;
@@ -1384,10 +1381,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewGeneratedDataset={(jobId, datasetId) => {
             setPreviewDatasetModal({ open: true, datasetId });
           }}
-          onViewFileBrowser={(jobId) => {
-            if (jobId == null || jobId === '') return;
-            setViewFileBrowserFromJob(String(jobId));
-          }}
           onViewSweepOutput={(jobId) => {
             setViewOutputFromSweepJob(true);
             const jobIdStr =
@@ -1422,6 +1415,8 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           }}
           onToggleFavorite={handleToggleFavorite}
           onToggleHidden={handleToggleHidden}
+          showFilesButton={false}
+          forceArtifactsButtonVisible
         />
       </Sheet>
       <ViewSweepResultsModal
@@ -1479,12 +1474,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         }
         dataset_id={previewDatasetModal.datasetId}
         viewType="preview"
-      />
-      <FileBrowserModal
-        mode="job"
-        open={viewFileBrowserFromJob !== null}
-        onClose={() => setViewFileBrowserFromJob(null)}
-        jobId={viewFileBrowserFromJob ?? ''}
       />
       <FileBrowserModal
         mode="task"
