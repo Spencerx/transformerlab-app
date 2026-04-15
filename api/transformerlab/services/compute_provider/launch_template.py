@@ -14,7 +14,6 @@ from transformerlab.schemas.secrets import SPECIAL_SECRET_TYPES
 from transformerlab.services import job_service, quota_service
 from transformerlab.services.compute_provider.launch_credentials import (
     COPY_FILE_MOUNTS_SETUP,
-    GCP_CREDENTIALS_PATH,
     RUNPOD_AWS_CREDENTIALS_DIR,
     generate_aws_credentials_setup,
     generate_azure_credentials_setup,
@@ -234,10 +233,6 @@ async def launch_template_on_provider(
             if gcp_sa_json:
                 gcp_setup = generate_gcp_credentials_setup(gcp_sa_json)
                 setup_commands.append(gcp_setup)
-                env_vars["GOOGLE_APPLICATION_CREDENTIALS"] = GCP_CREDENTIALS_PATH
-            gcp_project = os.getenv("GCP_PROJECT")
-            if gcp_project:
-                env_vars["GCP_PROJECT"] = gcp_project
         elif STORAGE_PROVIDER == "azure":
             azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
             azure_account = os.getenv("AZURE_STORAGE_ACCOUNT")

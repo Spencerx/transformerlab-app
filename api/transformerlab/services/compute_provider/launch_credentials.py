@@ -66,15 +66,15 @@ def generate_aws_credentials_setup(
     return setup_script
 
 
-GCP_CREDENTIALS_PATH = "/tmp/tfl-gcp-service-account.json"
-
-
-def generate_gcp_credentials_setup(service_account_json: str) -> str:
+def generate_gcp_credentials_setup(service_account_json: str, credentials_path: Optional[str] = None) -> str:
+    target_path = credentials_path or "~/.config/gcloud/application_default_credentials.json"
     encoded = base64.b64encode(service_account_json.encode()).decode()
     setup_script = (
         "echo 'Setting up GCP service account credentials...'; "
-        f"echo '{encoded}' | base64 -d > {GCP_CREDENTIALS_PATH}; "
-        f"chmod 600 {GCP_CREDENTIALS_PATH}; "
+        f"mkdir -p $(dirname {target_path}); "
+        f"echo '{encoded}' | base64 -d > {target_path}; "
+        f"chmod 600 {target_path}; "
+        f"export GOOGLE_APPLICATION_CREDENTIALS={target_path}; "
         "echo 'GCP credentials configured successfully'"
     )
     return setup_script
