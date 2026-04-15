@@ -2,7 +2,8 @@ import os
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 import transformerlab.services.experiment_service as experiment_service
 from lab import Experiment, storage
@@ -12,20 +13,60 @@ from transformerlab.routers.experiment import (
     jobs,
     task as task_router,
 )
+from transformerlab.routers.auth import get_user_and_team
+from transformerlab.services.permission_service import check_permission, require_permission
+from transformerlab.shared.models.user_model import get_async_session
 
 from werkzeug.utils import secure_filename
 
 router = APIRouter(prefix="/experiment")
 
-router.include_router(router=documents.router, prefix="/{experimentId}", tags=["documents"])
-router.include_router(router=jobs.router, prefix="/{experimentId}", tags=["jobs"])
-router.include_router(router=task_router.router, prefix="/{experimentId}", tags=["task"])
+router.include_router(
+    router=documents.router,
+    prefix="/{experimentId}",
+    tags=["documents"],
+    dependencies=[Depends(require_permission("experiment", "read", id_param="experimentId"))],
+)
+router.include_router(
+    router=jobs.router,
+    prefix="/{experimentId}",
+    tags=["jobs"],
+    dependencies=[Depends(require_permission("experiment", "read", id_param="experimentId"))],
+)
+router.include_router(
+    router=task_router.router,
+    prefix="/{experimentId}",
+    tags=["task"],
+    dependencies=[Depends(require_permission("experiment", "read", id_param="experimentId"))],
+)
 
 
 @router.get("/", summary="Get all Experiments", tags=["experiment"])
-async def experiments_get_all():
+async def experiments_get_all(
+    session: AsyncSession = Depends(get_async_session),
+    user_and_team: dict = Depends(get_user_and_team),
+):
     """Get a list of all experiments"""
-    return await experiment_service.experiment_get_all()
+    experiments = await experiment_service.experiment_get_all()
+    user = user_and_team["user"]
+    team_id = user_and_team["team_id"]
+
+    filtered_experiments = []
+    for experiment in experiments:
+        experiment_id = str(experiment.get("id"))
+        if not experiment_id:
+            continue
+        allowed = await check_permission(
+            session=session,
+            user_id=str(user.id),
+            team_id=team_id,
+            resource_type="experiment",
+            resource_id=experiment_id,
+            action="read",
+        )
+        if allowed:
+            filtered_experiments.append(experiment)
+    return filtered_experiments
 
 
 @router.get("/create", summary="Create Experiment", tags=["experiment"])
@@ -38,7 +79,10 @@ async def experiments_create(name: str):
 
 
 @router.get("/{id}", summary="Get Experiment by ID", tags=["experiment"])
-async def experiment_get(id: str):
+async def experiment_get(
+    id: str,
+    _: None = Depends(require_permission("experiment", "read")),
+):
     data = await experiment_service.experiment_get(id)
 
     if data is None:
@@ -49,37 +93,62 @@ async def experiment_get(id: str):
 
 
 @router.get("/{id}/delete", tags=["experiment"])
-async def experiments_delete(id: str):
+async def experiments_delete(
+    id: str,
+    _: None = Depends(require_permission("experiment", "delete")),
+):
     await experiment_service.experiment_delete(id)
     return {"message": f"Experiment {id} deleted"}
 
 
 @router.get("/{id}/update", tags=["experiment"])
-async def experiments_update(id: str, name: str):
+async def experiments_update(
+    id: str,
+    name: str,
+    _: None = Depends(require_permission("experiment", "write")),
+):
     await experiment_service.experiment_update(id, name)
     return {"message": f"Experiment {id} updated to {name}"}
 
 
 @router.get("/{id}/update_config", tags=["experiment"])
-async def experiments_update_config(id: str, key: str, value: str):
+async def experiments_update_config(
+    id: str,
+    key: str,
+    value: str,
+    _: None = Depends(require_permission("experiment", "write")),
+):
     await experiment_service.experiment_update_config(id, key, value)
     return {"message": f"Experiment {id} updated"}
 
 
 @router.post("/{id}/update_configs", tags=["experiment"])
-async def experiments_update_configs(id: str, updates: Annotated[dict, Body()]):
+async def experiments_update_configs(
+    id: str,
+    updates: Annotated[dict, Body()],
+    _: None = Depends(require_permission("experiment", "write")),
+):
     await experiment_service.experiment_update_configs(id, updates)
     return {"message": f"Experiment {id} configs updated"}
 
 
 @router.post("/{id}/prompt", tags=["experiment"])
-async def experiments_save_prompt_template(id: str, template: Annotated[str, Body()]):
+async def experiments_save_prompt_template(
+    id: str,
+    template: Annotated[str, Body()],
+    _: None = Depends(require_permission("experiment", "write")),
+):
     await experiment_service.experiment_save_prompt_template(id, template)
     return {"message": f"Experiment {id} prompt template saved"}
 
 
 @router.post("/{id}/save_file_contents", tags=["experiment"])
-async def experiment_save_file_contents(id: str, filename: str, file_contents: Annotated[str, Body()]):
+async def experiment_save_file_contents(
+    id: str,
+    filename: str,
+    file_contents: Annotated[str, Body()],
+    _: None = Depends(require_permission("experiment", "write")),
+):
     filename = secure_filename(filename)
 
     # remove file extension from file:
@@ -108,7 +177,11 @@ async def experiment_save_file_contents(id: str, filename: str, file_contents: A
 
 
 @router.get("/{id}/file_contents", tags=["experiment"])
-async def experiment_get_file_contents(id: str, filename: str):
+async def experiment_get_file_contents(
+    id: str,
+    filename: str,
+    _: None = Depends(require_permission("experiment", "read")),
+):
     filename = secure_filename(filename)
 
     exp_obj = await Experiment.get(id)
