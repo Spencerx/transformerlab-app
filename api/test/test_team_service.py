@@ -1,5 +1,7 @@
 import io
 import pytest
+import sys
+import types
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
@@ -81,6 +83,34 @@ def test_validate_logo_accepts_valid_rgb_png():
 
     result = _validate_and_process_logo(_make_png_bytes("RGB"), content_type="image/png", filename="logo.png")
     assert result.mode == "RGB"
+
+
+async def test_set_team_logo_writes_png_bytes_to_async_storage(monkeypatch):
+    from transformerlab.services.team_service import set_team_logo
+
+    write_mock = AsyncMock()
+
+    class _AsyncWriter:
+        async def __aenter__(self):
+            return types.SimpleNamespace(write=write_mock)
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    storage_mock = types.SimpleNamespace(
+        join=lambda base, name: f"{base}/{name}",
+        open=AsyncMock(return_value=_AsyncWriter()),
+    )
+
+    monkeypatch.setitem(sys.modules, "lab", types.SimpleNamespace(storage=storage_mock))
+
+    result = await set_team_logo("/tmp/workspace", _make_png_bytes("RGBA"), "image/png", "logo.png")
+
+    assert result["status"] == "success"
+    write_mock.assert_awaited_once()
+    written_bytes = write_mock.await_args.args[0]
+    assert isinstance(written_bytes, bytes)
+    assert written_bytes.startswith(b"\x89PNG\r\n\x1a\n")
 
 
 # ==================== Personal team detection ====================

@@ -33,9 +33,7 @@ _MAX_LOGO_SIZE = 1 * 1024 * 1024  # 1 MB
 # ==================== Logo Helper ====================
 
 
-def _validate_and_process_logo(
-    contents: bytes, content_type: Optional[str], filename: Optional[str]
-) -> Image.Image:
+def _validate_and_process_logo(contents: bytes, content_type: Optional[str], filename: Optional[str]) -> Image.Image:
     """Validate upload bytes and return a processed RGB PIL Image. Raises HTTPException on failure."""
     if content_type and not content_type.startswith("image/"):
         raise HTTPException(
@@ -78,6 +76,13 @@ def _validate_and_process_logo(
         image = image.convert("RGB")
 
     return image
+
+
+def _encode_logo_png(image: Image.Image) -> bytes:
+    """Encode a PIL image to PNG bytes for async storage backends."""
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
 
 
 # ==================== Team CRUD ====================
@@ -138,7 +143,7 @@ async def create_team(
                 logo_path = storage.join(workspace_dir, "logo.png")
                 image = _validate_and_process_logo(logo_contents, logo_content_type, logo_filename)
                 async with await storage.open(logo_path, "wb") as f:
-                    image.save(f, format="PNG")
+                    await f.write(_encode_logo_png(image))
             except HTTPException:
                 raise
             except Exception as e:
@@ -220,9 +225,7 @@ async def leave_team(session: AsyncSession, team_id: str, user: User, team: Team
         return {"message": "Left team"}
 
     result = await session.execute(
-        select(UserTeam)
-        .where(UserTeam.team_id == team_id, UserTeam.user_id != str(user.id))
-        .order_by(UserTeam.user_id)
+        select(UserTeam).where(UserTeam.team_id == team_id, UserTeam.user_id != str(user.id)).order_by(UserTeam.user_id)
     )
     next_member = result.scalars().first()
 
@@ -416,15 +419,10 @@ async def get_my_invitations(session: AsyncSession, user_email: str) -> dict:
     team_ids = list({inv.team_id for inv in valid})
     inviter_ids = list({inv.invited_by_user_id for inv in valid})
 
-    teams = {
-        t.id: t
-        for t in (await session.execute(select(Team).where(Team.id.in_(team_ids)))).scalars().all()
-    }
+    teams = {t.id: t for t in (await session.execute(select(Team).where(Team.id.in_(team_ids)))).scalars().all()}
     inviters = {
         str(u.id): u
-        for u in (
-            await session.execute(select(User).where(cast(User.id, String).in_(inviter_ids)))
-        ).scalars().all()
+        for u in (await session.execute(select(User).where(cast(User.id, String).in_(inviter_ids)))).scalars().all()
     }
 
     responses = [
@@ -448,11 +446,7 @@ async def get_my_invitations(session: AsyncSession, user_email: str) -> dict:
 
 async def get_team_invitations(session: AsyncSession, team_id: str) -> dict:
     """Fetch all invitations for a team. Uses batched queries to avoid N+1."""
-    stmt = (
-        select(TeamInvitation)
-        .where(TeamInvitation.team_id == team_id)
-        .order_by(TeamInvitation.created_at.desc())
-    )
+    stmt = select(TeamInvitation).where(TeamInvitation.team_id == team_id).order_by(TeamInvitation.created_at.desc())
     result = await session.execute(stmt)
     invitations = result.scalars().all()
 
@@ -467,9 +461,7 @@ async def get_team_invitations(session: AsyncSession, team_id: str) -> dict:
     inviter_ids = list({inv.invited_by_user_id for inv in invitations})
     inviters = {
         str(u.id): u
-        for u in (
-            await session.execute(select(User).where(cast(User.id, String).in_(inviter_ids)))
-        ).scalars().all()
+        for u in (await session.execute(select(User).where(cast(User.id, String).in_(inviter_ids)))).scalars().all()
     }
 
     responses = [
@@ -602,7 +594,7 @@ async def set_team_logo(
     try:
         image = _validate_and_process_logo(contents, content_type, filename)
         async with await storage.open(logo_path, "wb") as f:
-            image.save(f, format="PNG")
+            await f.write(_encode_logo_png(image))
         return {"status": "success", "message": "Team logo saved successfully"}
     except HTTPException:
         raise
