@@ -128,7 +128,9 @@ class DstackProvider(ComputeProvider):
             **config.env_vars,
         }
 
-        run_command = f"tfl-remote-trap {config.run}" if config.run else ""
+        # config.run is already wrapped by launch_template with tfl-remote-trap.
+        # Re-wrapping here nests traps and can wedge status progression.
+        run_command = config.run or ""
 
         configuration: Dict[str, Any] = {
             "type": run_type,

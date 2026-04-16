@@ -660,10 +660,9 @@ async def launch_template_on_provider(
     #   - sets job_data.live_status="started" when execution begins
     #   - sets job_data.live_status="finished" on success
     #   - sets job_data.live_status="crashed" on failure
-    # Wrap with an explicit shell invocation so the entire command string is
-    # executed under tfl-remote-trap as a single payload, even when it contains
-    # separators like ';' (common in interactive launch commands).
-    wrapped_run = f"tfl-remote-trap -- /bin/bash -lc {shlex.quote(command_with_hooks)}"
+    # Pass the complete command as one quoted payload so shell operators remain
+    # intact without forcing an extra /bin/bash -lc layer.
+    wrapped_run = f"tfl-remote-trap -- {shlex.quote(command_with_hooks)}"
 
     # For dstack fleet-based runs, do not pass explicit resource requirements.
     # The provider will schedule by fleet and build resources accordingly.
