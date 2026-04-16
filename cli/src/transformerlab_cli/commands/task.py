@@ -234,6 +234,94 @@ def command_task_list():
     list_tasks(output_format=cli_state.output_format, experiment_id=current_experiment)
 
 
+@app.command("init")
+def command_task_init():
+    """Initialize a task.yaml in the current directory."""
+    task_yaml_path = os.path.join(os.getcwd(), "task.yaml")
+
+    if os.path.exists(task_yaml_path):
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": "task.yaml already exists"}))
+            raise typer.Exit(1)
+        should_overwrite = typer.confirm("task.yaml already exists. Overwrite?", default=False)
+        if not should_overwrite:
+            console.print("[warning]Cancelled.[/warning]")
+            raise typer.Exit(0)
+
+    folder_name = os.path.basename(os.getcwd()).strip()
+    default_name = folder_name if folder_name else "my-task"
+    task_name = typer.prompt("Task name", default=default_name).strip() or default_name
+
+    cpus = typer.prompt("CPUs", default="2").strip()
+    memory = typer.prompt("Memory (GB)", default="4").strip()
+    accelerators = typer.prompt("Accelerators (optional)", default="", show_default=False).strip()
+
+    setup = ""
+    run = ""
+
+    if cli_state.output_format != "json" and os.isatty(0) and os.isatty(1):
+        edited = typer.edit(
+            "\n".join(
+                [
+                    "# Define the commands for your task below.",
+                    "# This YAML snippet will be parsed and merged into task.yaml.",
+                    "",
+                    "setup: |",
+                    "  # Optional: install deps, download data, etc.",
+                    "  ",
+                    "run: |",
+                    "  # Required: the main command to execute",
+                    "  ",
+                    "",
+                ]
+            )
+        )
+        if edited:
+            try:
+                edited_obj = yaml.safe_load(edited)
+                if isinstance(edited_obj, dict):
+                    setup_val = edited_obj.get("setup")
+                    run_val = edited_obj.get("run")
+                    if isinstance(setup_val, str):
+                        setup = setup_val.rstrip()
+                    if isinstance(run_val, str):
+                        run = run_val.rstrip()
+            except yaml.YAMLError:
+                # Fall back to prompts below
+                pass
+
+    if not setup.strip():
+        setup = typer.prompt("Setup command (optional)", default="", show_default=False).rstrip()
+
+    while not run.strip():
+        run = typer.prompt("Run command", default="", show_default=False).rstrip()
+
+    task_yaml: dict = {
+        "name": task_name,
+        "resources": {"cpus": cpus, "memory": memory},
+        "run": run,
+    }
+    if accelerators:
+        task_yaml["resources"]["accelerators"] = accelerators
+    if setup.strip():
+        task_yaml["setup"] = setup
+
+    yaml_text = yaml.safe_dump(task_yaml, sort_keys=False, default_flow_style=False)
+    with open(task_yaml_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(yaml_text)
+
+    if cli_state.output_format == "json":
+        print(json.dumps({"path": task_yaml_path}))
+        return
+
+    console.print(f"[success]✓[/success] Wrote [bold]{task_yaml_path}[/bold]")
+    console.print("\nNext steps:")
+    console.print("- Upload the entire folder in the GUI, or use the CLI:")
+    console.print("  [bold]lab task add .[/bold]")
+    console.print("- You can add additional fields any time. See:")
+    console.print("  https://lab.cloud/for-teams/running-a-task/task-yaml-structure")
+
+
 @app.command("add")
 def command_task_add(
     task_directory: str = typer.Argument(None, help="Path to the task directory containing task.yaml"),
