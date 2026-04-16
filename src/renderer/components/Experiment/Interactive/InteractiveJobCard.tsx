@@ -186,6 +186,7 @@ export default function InteractiveJobCard({
     job.status === 'INTERACTIVE' ||
     job.status === 'RUNNING' ||
     job.status === 'STOPPING';
+  const isStopping = job.status === 'STOPPING';
   const isLaunching = job.status === 'LAUNCHING' || job.status === 'WAITING';
   const showDeleteAction =
     isTerminalJobStatus(job.status) || job.status === 'STOPPING';
@@ -294,20 +295,28 @@ export default function InteractiveJobCard({
             >
               {title}
             </Typography>
-            <Chip variant="soft" color={chipColor} size="sm">
-              {galleryEntry?.name ||
-                jobData.template_name ||
-                typeConfig?.label ||
-                '\u00A0'}
-            </Chip>
-            <Typography
-              level="body-xs"
-              color="neutral"
-              noWrap
-              title={providerName ?? 'Not specified'}
-            >
-              Provider: {providerName ?? 'Not specified'}
-            </Typography>
+            <Stack direction="row" spacing={0.75} sx={{ minWidth: 0 }}>
+              <Chip
+                variant="soft"
+                color={chipColor}
+                size="sm"
+                sx={{ minWidth: 0, maxWidth: '100%' }}
+              >
+                {galleryEntry?.name ||
+                  jobData.template_name ||
+                  typeConfig?.label ||
+                  '\u00A0'}
+              </Chip>
+              <Chip
+                variant="soft"
+                color="neutral"
+                size="sm"
+                sx={{ minWidth: 0, maxWidth: '100%' }}
+                title={providerName ?? 'Not specified'}
+              >
+                {providerName ?? 'Not specified'}
+              </Chip>
+            </Stack>
           </Stack>
           {showDeleteAction && (
             <IconButton
@@ -347,7 +356,7 @@ export default function InteractiveJobCard({
                 variant="soft"
                 color="neutral"
                 size="sm"
-                disabled={stopPending}
+                disabled={stopPending || isStopping}
                 onClick={() => setConnectOpen(true)}
               >
                 Logs
@@ -356,7 +365,7 @@ export default function InteractiveJobCard({
                 variant="soft"
                 color={tunnelReady ? 'success' : 'neutral'}
                 size="sm"
-                disabled={stopPending || !tunnelReady}
+                disabled={stopPending || isStopping || !tunnelReady}
                 onClick={() => setInteractOpen(true)}
               >
                 {tunnelReady

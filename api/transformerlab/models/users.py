@@ -9,6 +9,8 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.clients.github import GitHubOAuth2
 from httpx_oauth.clients.openid import OpenID
 from httpx_oauth.clients.openid import OpenIDConfigurationError
+from lab import Experiment
+from lab.dirs import set_organization_id
 from transformerlab.shared.models.user_model import get_async_session, create_personal_team, get_user_db
 from transformerlab.shared.models.models import User, UserTeam, TeamRole
 from transformerlab.utils.email import send_password_reset_email, send_email_verification_link
@@ -84,6 +86,13 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
                 session.add(user_team)
                 await session.commit()
                 print(f"Created personal team '{team.name}' for user {user.email}")
+
+                # Seed a default experiment for brand-new personal teams.
+                set_organization_id(team.id)
+                try:
+                    await Experiment.create_or_get("alpha", create_new=True)
+                finally:
+                    set_organization_id(None)
             except Exception as e:
                 print(f"⚠️  Failed to create team for {user.email}: {e}")
                 await session.rollback()
