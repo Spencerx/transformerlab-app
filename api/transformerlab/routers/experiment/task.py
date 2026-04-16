@@ -49,22 +49,6 @@ from fastapi.responses import PlainTextResponse, JSONResponse
 router = APIRouter(prefix="/task", tags=["task"])
 
 
-async def _invalidate_task_caches(experiment_id: str, task_id: Optional[str] = None, task_type: Optional[str] = None):
-    """
-    Invalidate task-related caches without clearing the broad "tasks" tag.
-
-    This keeps task gallery caches warm while ensuring task detail/list routes
-    reflect updates immediately.
-    """
-    tags: list[str] = [f"tasks:list:{experiment_id}"]
-    if task_id:
-        tags.append(f"task:{experiment_id}:{task_id}")
-    if task_type:
-        tags.append(f"tasks:list_by_type:{task_type}")
-        tags.append(f"tasks:list_by_type:{experiment_id}:{task_type}")
-    await cache.invalidate(*tags)
-
-
 def process_env_parameters_to_env_vars(config: dict) -> dict:
     """
     Process env_parameters from config/task.json and convert them to env_vars.
@@ -119,7 +103,7 @@ def process_env_parameters_to_env_vars(config: dict) -> dict:
 @cached(
     key="tasks:list:{experimentId}",
     ttl="300s",
-    tags=["tasks", "tasks:list:{experimentId}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_all(experimentId: str):
     tasks = await task_service.task_get_by_experiment(experimentId)
@@ -130,7 +114,7 @@ async def task_get_all(experimentId: str):
 @cached(
     key="tasks:get:{experimentId}:{task_id}",
     ttl="300s",
-    tags=["tasks", "task:{experimentId}:{task_id}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_by_id(experimentId: str, task_id: str):
     task = await task_service.task_get_by_id(task_id)
@@ -143,7 +127,7 @@ async def task_get_by_id(experimentId: str, task_id: str):
 @cached(
     key="tasks:list_by_type:{type}",
     ttl="300s",
-    tags=["tasks", "tasks:list_by_type:{type}"],
+    tags=["tasks:list_by_type:{type}"],
 )
 async def task_get_by_type(type: str):
     tasks = await task_service.task_get_by_type(type)
@@ -157,7 +141,7 @@ async def task_get_by_type(type: str):
 @cached(
     key="tasks:list_by_type_in_experiment:{experimentId}:{type}",
     ttl="300s",
-    tags=["tasks", "tasks:list:{experimentId}", "tasks:list_by_type:{experimentId}:{type}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_by_type_in_experiment(experimentId: str, type: str):
     tasks = await task_service.task_get_by_type_in_experiment(type, experimentId)
@@ -394,11 +378,7 @@ async def task_update_file(experimentId: str, task_id: str, file_path: str, requ
     if not task.get("file_mounts"):
         await task_service.update_task(task_id, {"file_mounts": True})
 
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task.get("type") if isinstance(task, dict) else None,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"message": "OK"}
 
 
@@ -428,11 +408,7 @@ async def task_delete_file(experimentId: str, task_id: str, file_path: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     await storage.rm(target)
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task.get("type") if isinstance(task, dict) else None,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"message": "OK"}
 
 
@@ -476,11 +452,7 @@ async def task_upload_file(
     if not task.get("file_mounts"):
         await task_service.update_task(task_id, {"file_mounts": True})
 
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task.get("type") if isinstance(task, dict) else None,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"status": "success", "files": saved_files}
 
 
@@ -594,7 +566,7 @@ async def task_get_github_file(task_id: str, file_path: str):
 @cached(
     key="tasks:list:{experimentId}:{subtype}:{type}",
     ttl="300s",
-    tags=["tasks", "tasks:list:{experimentId}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_by_subtype_in_experiment(
     experimentId: str,
@@ -614,11 +586,7 @@ async def update_task(experimentId: str, task_id: str, new_task: dict = Body()):
     success = await task_service.update_task(task_id, new_task)
     if success:
         # Best-effort invalidation: task detail + this experiment's task lists.
-        await _invalidate_task_caches(
-            experiment_id=experimentId,
-            task_id=task_id,
-            task_type=(new_task.get("type") if isinstance(new_task, dict) else None),
-        )
+        await cache.invalidate(f"tasks:{experimentId}")
         return {"message": "OK"}
     else:
         return {"message": "NOT FOUND"}
@@ -629,10 +597,7 @@ async def delete_task(experimentId: str, task_id: str):
     success = await task_service.delete_task(task_id)
     if success:
         # Best-effort invalidation: task detail + this experiment's task lists.
-        await _invalidate_task_caches(
-            experiment_id=experimentId,
-            task_id=task_id,
-        )
+        await cache.invalidate(f"tasks:{experimentId}")
         return {"message": "OK"}
     else:
         return {"message": "NOT FOUND"}
@@ -865,7 +830,6 @@ async def create_task(
     """
     content_type = (request.headers.get("content-type") or "").lower()
     task_id: Optional[str] = None
-    task_type_for_invalidation: Optional[str] = "REMOTE"
 
     if "application/json" in content_type:
         body = await request.json()
@@ -876,11 +840,7 @@ async def create_task(
                 session,
                 _resolve_provider,
             )
-            await _invalidate_task_caches(
-                experiment_id=experimentId,
-                task_id=task_id,
-                task_type="REMOTE",
-            )
+            await cache.invalidate(f"tasks:{experimentId}")
             return {"id": task_id}
 
         github_repo_url = (body.get("github_repo_url") or "").strip()
@@ -910,7 +870,6 @@ async def create_task(
                 if gid:
                     body["interactive_gallery_id"] = gid
             task_id = await task_service.add_task(body)
-            task_type_for_invalidation = body.get("type") or "REMOTE"
 
     elif "multipart/form-data" in content_type:
         form = await request.form()
@@ -934,11 +893,7 @@ async def create_task(
 
     if task_id is None:
         raise HTTPException(status_code=400, detail="Unable to create task from request payload")
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task_type_for_invalidation,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"id": task_id}
 
 
@@ -963,11 +918,7 @@ async def update_task_yaml(experimentId: str, task_id: str, request: Request):
     success = await task_service.update_task_from_yaml(task_id, task_data)
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task.get("type") if isinstance(task, dict) else None,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"message": "OK"}
 
 
@@ -995,7 +946,7 @@ async def task_delete_all():
 @cached(
     key="tasks:gallery",
     ttl="120s",
-    tags=["tasks", "tasks:gallery"],
+    tags=["tasks:gallery"],
 )
 async def task_gallery():
     """Get the tasks gallery from the JSON file (same as tasks gallery)"""
@@ -1007,7 +958,7 @@ async def task_gallery():
 @cached(
     key="tasks:gallery:interactive",
     ttl="120s",
-    tags=["tasks", "tasks:gallery", "tasks:gallery:interactive"],
+    tags=["tasks:gallery", "tasks:gallery:interactive"],
 )
 async def interactive_gallery():
     """Get the interactive tasks gallery (vscode, jupyter, vllm, ssh templates)"""
@@ -1149,11 +1100,7 @@ async def import_task_from_gallery(
         task_id = await task_service.add_task(task_data)
 
         # Invalidate cached task lists for this experiment (best-effort).
-        await _invalidate_task_caches(
-            experiment_id=experimentId,
-            task_id=task_id,
-            task_type=task_data.get("type") if isinstance(task_data, dict) else None,
-        )
+        await cache.invalidate(f"tasks:{experimentId}")
 
         # Store task.yaml in the task directory for GitHub-sourced interactive tasks
         if github_repo_url and source_yaml_data:
@@ -1280,11 +1227,7 @@ async def import_task_from_gallery(
         await f.write(task_yaml_content)
 
     # Invalidate cached task lists for this experiment (best-effort).
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task_data.get("type") if isinstance(task_data, dict) else None,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
 
     return {
         "status": "success",
@@ -1297,7 +1240,7 @@ async def import_task_from_gallery(
 @cached(
     key="tasks:gallery:team",
     ttl="60s",
-    tags=["tasks", "tasks:gallery", "tasks:gallery:team"],
+    tags=["tasks:gallery", "tasks:gallery:team"],
 )
 async def team_task_gallery():
     """Get the team-specific tasks gallery stored in workspace_dir (same as tasks gallery)"""
@@ -1595,11 +1538,7 @@ async def import_task_from_team_gallery(
                 status_code=500, detail=f"Failed to overwrite id in index.json for imported team task: {e}"
             )
 
-        await _invalidate_task_caches(
-            experiment_id=experimentId,
-            task_id=task_id,
-            task_type=task_data.get("type") if isinstance(task_data, dict) else None,
-        )
+        await cache.invalidate(f"tasks:{experimentId}")
         return {
             "status": "success",
             "message": f"Task '{task_data.get('name') or title}' imported successfully",
@@ -1667,11 +1606,7 @@ async def import_task_from_team_gallery(
         async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
             await f.write(yaml.safe_dump(yaml_obj, sort_keys=False))
 
-        await _invalidate_task_caches(
-            experiment_id=experimentId,
-            task_id=task_id,
-            task_type=task_data.get("type") if isinstance(task_data, dict) else None,
-        )
+        await cache.invalidate(f"tasks:{experimentId}")
         return {
             "status": "success",
             "message": f"Task '{task_data['name']}' imported successfully",
@@ -1755,11 +1690,7 @@ async def import_task_from_team_gallery(
         await f.write(task_yaml_content)
 
     # Invalidate cached task lists for this experiment (best-effort).
-    await _invalidate_task_caches(
-        experiment_id=experimentId,
-        task_id=task_id,
-        task_type=task_data.get("type") if isinstance(task_data, dict) else None,
-    )
+    await cache.invalidate(f"tasks:{experimentId}")
 
     return {
         "status": "success",
