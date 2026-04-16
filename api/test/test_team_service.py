@@ -94,7 +94,7 @@ async def test_set_team_logo_writes_png_bytes_to_async_storage(monkeypatch):
         async def __aenter__(self):
             return types.SimpleNamespace(write=write_mock)
 
-        async def __aexit__(self, exc_type, exc, tb):
+        async def __aexit__(self, _exc_type, _exc, _tb):
             return False
 
     storage_mock = types.SimpleNamespace(
