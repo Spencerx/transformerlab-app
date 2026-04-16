@@ -55,4 +55,3 @@ def test_task_init_uses_editor_for_commands(tmp_path, monkeypatch):
     text = (tmp_path / "task.yaml").read_text()
     assert "pip install -r requirements.txt" in text
     assert "python train.py" in text
-
