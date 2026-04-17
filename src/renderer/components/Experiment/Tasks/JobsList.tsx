@@ -26,6 +26,7 @@ import {
 import { Typography } from '@mui/joy';
 import {
   isDeletableJobRecordStatus,
+  isJobStopPending,
   isTerminalJobStatus,
 } from 'renderer/lib/utils';
 import JobProgress from './JobProgress';
@@ -60,6 +61,7 @@ interface JobsListProps {
   onToggleHidden?: (jobId: string, currentValue: boolean) => void;
   hideJobId?: boolean;
   showInteractiveType?: boolean;
+  onStopPendingChange?: (jobId: string, stopPending: boolean) => void;
 }
 
 const JobsList: React.FC<JobsListProps> = ({
@@ -86,6 +88,7 @@ const JobsList: React.FC<JobsListProps> = ({
   onToggleHidden,
   hideJobId = false,
   showInteractiveType = false,
+  onStopPendingChange,
 }) => {
   const showTrackioForStatus = (status?: string): boolean => {
     return String(status || '') === 'RUNNING' || isTerminalJobStatus(status);
@@ -236,10 +239,19 @@ const JobsList: React.FC<JobsListProps> = ({
             const fullJobId = String(job?.id ?? '');
             const displayJobId =
               String(job?.short_id ?? '').trim() || fullJobId.slice(0, 8);
+            const stopPending = isJobStopPending(
+              job?.status,
+              job?.job_data?.stop_requested,
+            );
             return (
               <tr
                 key={job.id}
-                style={job?.job_data?.hidden ? { opacity: 0.45 } : undefined}
+                style={{
+                  ...(job?.job_data?.hidden ? { opacity: 0.45 } : {}),
+                  ...(stopPending
+                    ? { opacity: 0.6, pointerEvents: 'none' }
+                    : {}),
+                }}
               >
                 <td style={{ verticalAlign: 'top', border: 'none' }}>
                   {selectMode &&
@@ -250,6 +262,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         checked={selectedJobIds.includes(String(job.id))}
                         onChange={() => onToggleJobSelected?.(String(job.id))}
+                        disabled={stopPending}
                         sx={{ mr: 1 }}
                       />
                     )}
@@ -265,6 +278,7 @@ const JobsList: React.FC<JobsListProps> = ({
                       launchProgressByJobId?.[String(job.id)] ??
                       job?.job_data?.launch_progress
                     }
+                    onStopPendingChange={onStopPendingChange}
                   />
                 </td>
                 <td
@@ -287,6 +301,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         onClick={() => {
                           window.open(job.job_data.wandb_run_url, '_blank');
                         }}
+                        disabled={stopPending}
                         startDecorator={<LineChartIcon />}
                       >
                         <Box
@@ -310,6 +325,7 @@ const JobsList: React.FC<JobsListProps> = ({
                           size="sm"
                           variant="plain"
                           onClick={() => onViewTrackio?.(String(job?.id))}
+                          disabled={stopPending}
                           startDecorator={<LineChartIcon />}
                         >
                           <Box
@@ -331,6 +347,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         variant="plain"
                         onClick={() => onViewOutput?.(job?.id)}
+                        disabled={stopPending}
                         startDecorator={<LogsIcon />}
                       >
                         <Box
@@ -351,6 +368,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         variant="plain"
                         onClick={() => onViewEvalImages?.(job?.id)}
+                        disabled={stopPending}
                       >
                         View Eval Images
                       </Button>
@@ -362,6 +380,7 @@ const JobsList: React.FC<JobsListProps> = ({
                           size="sm"
                           variant="plain"
                           onClick={() => onViewEvalResults?.(job?.id)}
+                          disabled={stopPending}
                           startDecorator={<FileTextIcon />}
                         >
                           <Box
@@ -386,6 +405,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         variant="plain"
                         onClick={() => onViewAllArtifacts?.(String(job?.id))}
+                        disabled={stopPending}
                         startDecorator={<ArchiveIcon />}
                       >
                         <Box
@@ -407,6 +427,7 @@ const JobsList: React.FC<JobsListProps> = ({
                           size="sm"
                           variant="plain"
                           onClick={() => onViewSweepResults?.(job?.id)}
+                          disabled={stopPending}
                           startDecorator={<LineChartIcon />}
                         >
                           <Box
@@ -427,6 +448,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         variant="plain"
                         onClick={() => onViewSweepOutput?.(job?.id)}
+                        disabled={stopPending}
                       >
                         Sweep Output
                       </Button>
@@ -438,6 +460,7 @@ const JobsList: React.FC<JobsListProps> = ({
                             size="sm"
                             variant="plain"
                             onClick={() => onViewInteractive?.(job?.id)}
+                            disabled={stopPending}
                           >
                             Interactive Setup
                           </Button>
@@ -446,6 +469,7 @@ const JobsList: React.FC<JobsListProps> = ({
                               size="sm"
                               variant="plain"
                               onClick={() => onViewOutput?.(job?.id)}
+                              disabled={stopPending}
                               startDecorator={<LogsIcon />}
                             >
                               <Box
@@ -468,6 +492,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         variant="plain"
                         onClick={() => onViewCheckpoints?.(job?.id)}
+                        disabled={stopPending}
                         startDecorator={<WaypointsIcon />}
                         sx={{
                           justifyContent: 'center',
@@ -491,6 +516,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         size="sm"
                         variant="plain"
                         onClick={() => onViewFileBrowser?.(job?.id)}
+                        disabled={stopPending}
                         startDecorator={<FolderOpenIcon />}
                       >
                         <Box
@@ -509,7 +535,10 @@ const JobsList: React.FC<JobsListProps> = ({
                     {!job?.placeholder && (
                       <IconButton
                         variant="plain"
-                        disabled={!isDeletableJobRecordStatus(job?.status)}
+                        disabled={
+                          stopPending ||
+                          !isDeletableJobRecordStatus(job?.status)
+                        }
                         onClick={() => {
                           if (!isDeletableJobRecordStatus(job?.status)) {
                             return;
@@ -528,6 +557,7 @@ const JobsList: React.FC<JobsListProps> = ({
                             root: { variant: 'plain', color: 'neutral' },
                           }}
                           sx={{ minWidth: 0 }}
+                          disabled={stopPending}
                         >
                           <MoreVerticalIcon size={16} />
                         </MenuButton>

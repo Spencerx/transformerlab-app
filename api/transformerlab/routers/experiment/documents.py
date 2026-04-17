@@ -45,7 +45,7 @@ def is_valid_url(url: str) -> bool:
         parsed_url = urlparse(url)
         if parsed_url.scheme not in {"http", "https"}:
             return False
-        domain = parsed_url.netloc.split(":")[0]  # Extract domain without port
+        domain = parsed_url.hostname  # Extract domain (handles userinfo@host:port correctly)
         return domain in ALLOWED_DOMAINS
     except Exception:
         return False

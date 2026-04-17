@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import shlex
 import time
 from typing import Any, Optional
 
@@ -659,7 +660,8 @@ async def launch_template_on_provider(
     #   - sets job_data.live_status="started" when execution begins
     #   - sets job_data.live_status="finished" on success
     #   - sets job_data.live_status="crashed" on failure
-    wrapped_run = f"tfl-remote-trap -- {command_with_hooks}"
+    # Pass the complete command as one quoted payload so shell operators remain intact.
+    wrapped_run = f"tfl-remote-trap -- {shlex.quote(command_with_hooks)}"
 
     # For dstack fleet-based runs, do not pass explicit resource requirements.
     # The provider will schedule by fleet and build resources accordingly.
