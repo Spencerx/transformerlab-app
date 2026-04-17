@@ -351,8 +351,9 @@ async def _check_job_via_provider(
 
         terminal_job_states = {JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED}
         jobs_finished = False
+        enable_never_seen_empty_failure = provider_type == ProviderType.SKYPILOT.value
         provider_jobs_seen_once = False
-        if isinstance(job_data, dict):
+        if enable_never_seen_empty_failure and isinstance(job_data, dict):
             provider_jobs_seen_once_raw = job_data.get("provider_jobs_seen_once", False)
             if isinstance(provider_jobs_seen_once_raw, str):
                 provider_jobs_seen_once = provider_jobs_seen_once_raw.strip().lower() in ("1", "true", "yes")
@@ -390,7 +391,7 @@ async def _check_job_via_provider(
             if not jobs_finished:
                 return False
         else:
-            if not provider_jobs_seen_once and isinstance(job_data, dict):
+            if enable_never_seen_empty_failure and not provider_jobs_seen_once and isinstance(job_data, dict):
                 try:
                     await job_service.job_update_job_data_insert_key_value(
                         job_id,
@@ -431,7 +432,7 @@ async def _check_job_via_provider(
                 final_status = JobStatus.STOPPED.value
             elif any(state == JobState.FAILED for state in provider_states):
                 final_status = JobStatus.FAILED.value
-            elif not provider_states and not provider_jobs_seen_once:
+            elif enable_never_seen_empty_failure and not provider_states and not provider_jobs_seen_once:
                 # If provider job queue never surfaced any job records, treat terminal
                 # empty-queue as launch failure instead of successful completion.
                 final_status = JobStatus.FAILED.value
