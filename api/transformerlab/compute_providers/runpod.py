@@ -389,21 +389,26 @@ class RunpodProvider(ComputeProvider):
                 except (TypeError, ValueError):
                     vcpu_count = 2
             pod_data["vcpuCount"] = vcpu_count
-        # Pod volume (persisted /workspace) when no network volume replaces it.
-        if self.extra_config.get("default_volume_gb"):
-            pod_data["volumeInGb"] = self.extra_config["default_volume_gb"]
 
-        # Queue modal / job disk_space maps to container (root) disk so it applies even when a
-        # network volume is attached (network volumes replace the pod volume, not container disk).
+        uses_network_volume = bool(self.default_network_volume_id or config.provider_config.get("network_volume_id"))
+
+        # Job disk_space: apply to both container disk and pod volume so root (~ often /workspace) and
+        # RunPod's pod volume stay aligned. With a network volume, /workspace is the NV; RunPod may
+        # still honor volumeInGb for the pod-volume tier—sizing both avoids tiny container disk when
+        # the user asked for more space overall.
         if config.disk_size:
             pod_data["containerDiskInGb"] = config.disk_size
-        elif config.provider_config.get("container_disk_gb"):
-            pod_data["containerDiskInGb"] = config.provider_config["container_disk_gb"]
+            pod_data["volumeInGb"] = config.disk_size
+        else:
+            if self.extra_config.get("default_volume_gb"):
+                pod_data["volumeInGb"] = self.extra_config["default_volume_gb"]
+            if config.provider_config.get("container_disk_gb"):
+                pod_data["containerDiskInGb"] = config.provider_config["container_disk_gb"]
 
         if config.env_vars:
             pod_data["env"] = config.env_vars
 
-        if self.default_network_volume_id or config.provider_config.get("network_volume_id"):
+        if uses_network_volume:
             pod_data["networkVolumeId"] = (
                 config.provider_config.get("network_volume_id") or self.default_network_volume_id
             )
