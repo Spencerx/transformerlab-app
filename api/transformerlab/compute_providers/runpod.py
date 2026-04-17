@@ -389,12 +389,15 @@ class RunpodProvider(ComputeProvider):
                 except (TypeError, ValueError):
                     vcpu_count = 2
             pod_data["vcpuCount"] = vcpu_count
-        if config.disk_size:
-            pod_data["volumeInGb"] = config.disk_size
-        elif self.extra_config.get("default_volume_gb"):
+        # Pod volume (persisted /workspace) when no network volume replaces it.
+        if self.extra_config.get("default_volume_gb"):
             pod_data["volumeInGb"] = self.extra_config["default_volume_gb"]
 
-        if config.provider_config.get("container_disk_gb"):
+        # Queue modal / job disk_space maps to container (root) disk so it applies even when a
+        # network volume is attached (network volumes replace the pod volume, not container disk).
+        if config.disk_size:
+            pod_data["containerDiskInGb"] = config.disk_size
+        elif config.provider_config.get("container_disk_gb"):
             pod_data["containerDiskInGb"] = config.provider_config["container_disk_gb"]
 
         if config.env_vars:
@@ -625,8 +628,10 @@ class RunpodProvider(ComputeProvider):
         elif isinstance(gpu_type, str):
             gpus.append({"gpu": gpu_type, "count": 1})
 
-        # Extract disk info
-        disk_gb = pod.get("volumeInGb") or pod.get("volumeInGB")
+        # Extract disk info (container disk is what we size from job disk_space)
+        disk_gb = pod.get("containerDiskInGb") or pod.get("containerDiskInGB")
+        if disk_gb is None:
+            disk_gb = pod.get("volumeInGb") or pod.get("volumeInGB")
 
         # CPU and memory might not be directly available in pod data
         # They're typically determined by the GPU type
