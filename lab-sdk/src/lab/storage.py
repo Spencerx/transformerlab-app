@@ -245,9 +245,11 @@ def _get_fs_for_uri(uri: str):
     elif uri.startswith("abfs://"):
         protocol = "abfs"
     else:
-        # Local filesystem or unknown protocol - use fsspec's default handling
+        # Local filesystem or unknown protocol - use fsspec's default handling.
+        # Expand ~ so users can set TFL_STORAGE_URI="~/data/transformerlab" in .env
+        # without the literal "~" leaking into every file path.
         fs = fsspec.filesystem("file", asynchronous=False)
-        return fs, uri
+        return fs, os.path.expanduser(uri)
 
     # Build storage options as kwargs (not as nested dict)
     # This ensures they're passed correctly to the filesystem, not to AioSession
