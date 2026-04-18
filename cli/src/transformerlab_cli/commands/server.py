@@ -185,7 +185,7 @@ def _prompt_storage(existing: dict[str, str]) -> dict[str, str]:
                 if not os.path.isfile(sa_path):
                     console.print(
                         f"[error]File not found: {sa_path} — skipping service account key setup.[/error]"
-                        "\n[bold error]WARNING: Remote GCP job launches will fail without a valid service account key.[/bold error]"
+                        "\n[bold error]WARNING: Remote Job (using GCP for storage) launches will fail without a valid service account key.[/bold error]"
                     )
                 else:
                     try:
@@ -195,11 +195,16 @@ def _prompt_storage(existing: dict[str, str]) -> dict[str, str]:
                     except json.JSONDecodeError:
                         console.print(
                             "[error]File is not valid JSON — skipping service account key setup.[/error]"
-                            "\n[bold error]WARNING: Remote GCP job launches will fail without a valid service account key.[/bold error]"
+                            "\n[bold error]WARNING: Remote Job (using GCP for storage) launches will fail without a valid service account key.[/bold error]"
+                        )
+                    except OSError as e:
+                        console.print(
+                            f"[error]Could not read file: {e} — skipping service account key setup.[/error]"
+                            "\n[bold error]WARNING: Remote Job (using GCP for storage) launches will fail without a valid service account key.[/bold error]"
                         )
             else:
                 console.print(
-                    "[bold error]WARNING: No service account key provided. Remote GCP job launches will fail.[/bold error]"
+                    "[bold error]WARNING: No service account key provided. Remote Job (using GCP for storage) launches will fail.[/bold error]"
                     "\n[dim]You can re-run 'lab server init' to configure this later.[/dim]"
                 )
         elif provider == "azure":
