@@ -655,15 +655,13 @@ export default function UserLoginTest(): JSX.Element {
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'passed' }));
           setProbeMessageMap((prev) => ({
             ...prev,
-            [id]: `Sentinel found at: ${checkData.path}`,
+            [id]: `Sentinel found in shared storage`,
           }));
         } else if (polls >= MAX_POLLS) {
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
           setProbeMessageMap((prev) => ({
             ...prev,
-            [id]: checkData.path
-              ? `Timed out — file not found at: ${checkData.path}`
-              : 'Timed out waiting for sentinel file.',
+            [id]: `Timed out — file not found in shared storage`,
           }));
         } else {
           setProbeMessageMap((prev) => ({
