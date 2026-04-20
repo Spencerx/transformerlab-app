@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import lab.storage  # noqa: F401
+
 
 @pytest.mark.asyncio
 async def test_probe_writes_sentinel_file():
