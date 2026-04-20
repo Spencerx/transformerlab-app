@@ -644,6 +644,7 @@ export default function UserLoginTest(): JSX.Element {
             message: completionMessage,
           });
           providersMutate();
+          setLocalSetupModalOpen(false);
           return;
         }
 
@@ -667,6 +668,9 @@ export default function UserLoginTest(): JSX.Element {
             message,
           });
           providersMutate();
+          if (!data.error) {
+            setLocalSetupModalOpen(false);
+          }
         }
       } catch {
         setLocalSetupStatus('Failed to read setup status. Please try again.');
