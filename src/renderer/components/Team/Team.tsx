@@ -692,6 +692,14 @@ export default function UserLoginTest(): JSX.Element {
     providerId: string,
     providerName: string,
   ) {
+    // eslint-disable-next-line no-alert
+    const confirmed = window.confirm(
+      `Are you sure you want to refresh "${providerName || 'Local Provider'}"? This will reinstall the base environment.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
     setLocalSetupProviderName(providerName);
     setLocalSetupModalOpen(true);
     setLocalSetupStatus('Starting local provider refresh...');
