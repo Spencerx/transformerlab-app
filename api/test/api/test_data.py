@@ -3,7 +3,6 @@ import os
 import json
 import asyncio
 from io import BytesIO
-from PIL import Image
 from lab import dirs
 from transformerlab.shared.shared import slugify
 
@@ -101,42 +100,3 @@ def test_save_metadata(client):
 
     cleanup_dataset(source_dataset_id, client)
     cleanup_dataset(new_dataset_id, client)
-
-
-@pytest.mark.skip(reason="Skipping as it contains application-specific logic")
-def test_edit_with_template(client):
-    dataset_id = "test_dataset"
-    dataset_dir = asyncio.run(dirs.dataset_dir_by_id(slugify(dataset_id)))
-    os.makedirs(dataset_dir, exist_ok=True)
-
-    image_path = os.path.join(dataset_dir, "image.jpg")
-    image = Image.new("RGB", (100, 100), color="red")
-    image.save(image_path, "JPEG")
-
-    metadata_content = (
-        json.dumps({"file_name": "image.jpg", "text": "sample caption", "label": "cat", "split": "train"}) + "\n"
-    )
-    metadata_filename = "metadata.jsonl"
-
-    files = {"files": (metadata_filename, BytesIO(metadata_content.encode()), "application/jsonl")}
-    response = client.post(f"/data/fileupload?dataset_id={dataset_id}", files=files)
-    assert response.status_code == 200
-
-    register_response = client.get(f"/data/new?dataset_id={dataset_id}")
-    assert register_response.status_code in (200, 400)
-
-    response = client.get(f"/data/edit_with_template?dataset_id={dataset_id}&template=")
-    assert response.status_code == 200
-    data = response.json()
-    print("Response JSON:", data)
-    assert data["status"] == "success"
-    rows = data["data"]["rows"]
-    assert len(rows) > 0
-    row = rows[0]
-    assert "file_name" in row
-    assert "image" in row
-    assert "text" in row
-    assert "label" in row
-    assert "split" in row
-
-    cleanup_dataset(dataset_id, client)
