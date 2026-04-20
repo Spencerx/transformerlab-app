@@ -11,7 +11,6 @@ Env vars (injected by launch_template.py):
 import asyncio
 import json
 import os
-import sys
 import time
 
 from lab import storage
