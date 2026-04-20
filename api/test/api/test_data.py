@@ -3,7 +3,6 @@ import os
 import json
 import asyncio
 from io import BytesIO
-from PIL import Image
 from lab import dirs
 from transformerlab.shared.shared import slugify
 
@@ -101,5 +100,3 @@ def test_save_metadata(client):
 
     cleanup_dataset(source_dataset_id, client)
     cleanup_dataset(new_dataset_id, client)
-
-
