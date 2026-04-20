@@ -741,7 +741,6 @@ export default function ProviderDetailsModal({
   };
 
   return (
-<<<<<<< add/refresh-button-local
     <>
       <Modal open={open} onClose={onClose}>
         <ModalDialog sx={{ gap: 0, width: 600, height: 700, overflow: 'auto' }}>
@@ -774,85 +773,6 @@ export default function ProviderDetailsModal({
                     placeholder="Enter friendly name for compute provider"
                     fullWidth
                     color={nameError ? 'danger' : undefined}
-=======
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog sx={{ gap: 0, width: 600, height: 700, overflow: 'auto' }}>
-        <DialogTitle>
-          {providerId ? 'Edit Compute Provider' : 'Add Compute Provider'}
-        </DialogTitle>
-        <DialogContent>
-          {providerId && providerDataLoading ? (
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                minHeight: 200,
-                width: '100%',
-              }}
-            >
-              <CircularProgress />
-            </Box>
-          ) : (
-            <>
-              <FormControl required error={!!nameError} sx={{ mt: 2 }}>
-                <FormLabel>Compute Provider Name</FormLabel>
-                <Input
-                  value={name}
-                  onChange={(event) => {
-                    setName(event.currentTarget.value);
-                    setNameError(null);
-                  }}
-                  placeholder="Enter friendly name for compute provider"
-                  fullWidth
-                  color={nameError ? 'danger' : undefined}
-                />
-                {nameError ? (
-                  <FormHelperText>{nameError}</FormHelperText>
-                ) : null}
-              </FormControl>
-              <FormControl sx={{ mt: 1 }}>
-                <FormLabel>Compute Provider Type</FormLabel>
-                <Select
-                  value={type}
-                  onChange={(event, value) => setType(value ?? 'skypilot')}
-                  disabled={!!providerId}
-                  sx={{ width: '100%' }}
-                >
-                  <Option value="skypilot">Skypilot</Option>
-                  <Option value="slurm">SLURM</Option>
-                  <Option value="runpod">Runpod</Option>
-                  <Option value="dstack">dstack (beta) </Option>
-                  {!hasLocalProvider && !providerId && (
-                    <Option value="local">Local</Option>
-                  )}
-                </Select>
-                {providerId && (
-                  <Typography
-                    level="body-sm"
-                    sx={{ mt: 0.5, color: 'text.tertiary' }}
-                  >
-                    Provider type cannot be changed after creation
-                  </Typography>
-                )}
-              </FormControl>
-
-              {type === 'local' && !providerId && (
-                <FormControl
-                  orientation="horizontal"
-                  sx={{ mt: 1, alignItems: 'center', gap: 1 }}
-                >
-                  <Box>
-                    <FormLabel>Force fresh install</FormLabel>
-                    <Typography level="body-sm" sx={{ color: 'text.tertiary' }}>
-                      Delete the existing conda environment, install log, and
-                      config and run a clean install from scratch.
-                    </Typography>
-                  </Box>
-                  <Switch
-                    checked={forceRefresh}
-                    onChange={(e) => setForceRefresh(e.target.checked)}
->>>>>>> main
                   />
                   {nameError ? (
                     <FormHelperText>{nameError}</FormHelperText>
