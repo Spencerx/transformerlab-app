@@ -6,12 +6,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 async def test_check_storage_probe_found():
     """check_storage_probe returns found=True when sentinel file exists."""
     with patch("transformerlab.services.compute_provider.storage_probe_service.set_organization_id") as mock_set_org:
-        with patch("transformerlab.services.compute_provider.storage_probe_service.get_workspace_dir", new=AsyncMock(return_value="/mnt/nfs/orgs/team1/workspace")):
+        with patch(
+            "transformerlab.services.compute_provider.storage_probe_service.get_workspace_dir",
+            new=AsyncMock(return_value="/mnt/nfs/orgs/team1/workspace"),
+        ):
             with patch("transformerlab.services.compute_provider.storage_probe_service.storage") as mock_storage:
                 mock_storage.join = lambda *parts: "/".join(parts)
                 mock_storage.exists = AsyncMock(return_value=True)
 
                 from transformerlab.services.compute_provider.storage_probe_service import check_storage_probe
+
                 result = await check_storage_probe(job_id="job-123", team_id="team1")
 
     assert result["found"] is True
@@ -24,12 +28,16 @@ async def test_check_storage_probe_found():
 async def test_check_storage_probe_not_found():
     """check_storage_probe returns found=False when sentinel file is missing."""
     with patch("transformerlab.services.compute_provider.storage_probe_service.set_organization_id"):
-        with patch("transformerlab.services.compute_provider.storage_probe_service.get_workspace_dir", new=AsyncMock(return_value="/mnt/nfs/orgs/team1/workspace")):
+        with patch(
+            "transformerlab.services.compute_provider.storage_probe_service.get_workspace_dir",
+            new=AsyncMock(return_value="/mnt/nfs/orgs/team1/workspace"),
+        ):
             with patch("transformerlab.services.compute_provider.storage_probe_service.storage") as mock_storage:
                 mock_storage.join = lambda *parts: "/".join(parts)
                 mock_storage.exists = AsyncMock(return_value=False)
 
                 from transformerlab.services.compute_provider.storage_probe_service import check_storage_probe
+
                 result = await check_storage_probe(job_id="job-999", team_id="team1")
 
     assert result["found"] is False

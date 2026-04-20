@@ -29,6 +29,7 @@ async def _run() -> None:
         workspace = storage_uri
     else:
         from lab.dirs import get_workspace_dir
+
         workspace = await get_workspace_dir()
 
     probe_dir = storage.join(workspace, _PROBE_SUBDIR)

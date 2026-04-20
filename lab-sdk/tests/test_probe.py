@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -32,6 +31,7 @@ async def test_probe_writes_sentinel_file():
             with patch("lab.storage.open", return_value=mock_file):
                 import importlib
                 import lab.probe as probe_mod
+
                 importlib.reload(probe_mod)
                 await probe_mod._run()
 
@@ -65,6 +65,7 @@ async def test_probe_falls_back_when_no_storage_uri(tmp_path):
                 with patch("lab.dirs.get_workspace_dir", new=AsyncMock(return_value=str(tmp_path))):
                     import importlib
                     import lab.probe as probe_mod
+
                     importlib.reload(probe_mod)
                     await probe_mod._run()
 
