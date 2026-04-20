@@ -7,6 +7,23 @@ import { expect, Page } from '@playwright/test';
  * instead of duplicating the logic.
  */
 
+export async function dismissStartupWizard(page: Page) {
+  const dialog = page.getByRole('dialog', {
+    name: 'Welcome to Transformer Lab',
+  });
+  try {
+    await dialog.waitFor({ state: 'visible', timeout: 3000 });
+  } catch {
+    return;
+  }
+  await dialog.getByRole('button', { name: 'Skip' }).click();
+  await expect(dialog.getByRole('button', { name: 'Done' })).toBeVisible({
+    timeout: 5000,
+  });
+  await dialog.getByRole('button', { name: 'Done' }).click();
+  await expect(dialog).toBeHidden({ timeout: 5000 });
+}
+
 export async function login(page: Page) {
   await page.goto('/');
   await page.getByPlaceholder('Email Address').fill('admin@example.com');
@@ -15,6 +32,7 @@ export async function login(page: Page) {
   await expect(page.locator('.Sidebar')).toBeVisible({
     timeout: 15000,
   });
+  await dismissStartupWizard(page);
 }
 
 export async function selectFirstExperiment(page: Page) {
