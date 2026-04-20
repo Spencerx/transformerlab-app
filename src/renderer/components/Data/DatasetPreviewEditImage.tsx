@@ -25,7 +25,7 @@ import {
   ChevronRightIcon,
   Info,
 } from 'lucide-react';
-import { getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
+import { Endpoints, getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { fetchWithAuth } from 'renderer/lib/authContext';
 
 const DatasetPreviewEditImage = ({ datasetId, template, onClose }) => {
@@ -55,12 +55,7 @@ const DatasetPreviewEditImage = ({ datasetId, template, onClose }) => {
   const loadPage = useCallback(async () => {
     setLoading(true);
     try {
-      const url = getAPIFullPath('datasets', ['editWithTemplate'], {
-        datasetId,
-        template: encodeURIComponent(template),
-        offset,
-        limit: pageSize,
-      });
+      const url = Endpoints.Dataset.Preview(datasetId, '', offset, pageSize);
 
       const response = await fetchWithAuth(url);
       const result = await response.json();
@@ -108,7 +103,7 @@ const DatasetPreviewEditImage = ({ datasetId, template, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [datasetId, template, offset]);
+  }, [datasetId, offset]);
 
   useEffect(() => {
     setRows([]);
