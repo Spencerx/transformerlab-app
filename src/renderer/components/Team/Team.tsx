@@ -41,6 +41,7 @@ import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import RenameTeamModal from './RenameTeamModal';
 import InviteUserModal from './InviteUserModal';
 import ProviderDetailsModal from './ProviderDetailsModal';
+import ProviderResourceGroupsModal from './ProviderResourceGroupsModal';
 import QuotaSettingsSection from './QuotaSettingsSection';
 import TeamSecretsSection from './TeamSecretsSection';
 import SshKeySection from './SshKeySection';
@@ -71,6 +72,11 @@ export default function UserLoginTest(): JSX.Element {
   const [openProviderDetailsModal, setOpenProviderDetailsModal] =
     useState<boolean>(false);
   const [providerId, setProviderId] = useState<string>('');
+  const [openProviderResourceGroupsModal, setOpenProviderResourceGroupsModal] =
+    useState<boolean>(false);
+  const [providerForResourceGroups, setProviderForResourceGroups] = useState<
+    any | null
+  >(null);
   const [checkingProviderId, setCheckingProviderId] = useState<string | null>(
     null,
   );
@@ -1238,6 +1244,22 @@ export default function UserLoginTest(): JSX.Element {
                           </Button>
                           <Button
                             size="sm"
+                            variant="outlined"
+                            onClick={() => {
+                              setProviderForResourceGroups(provider);
+                              setOpenProviderResourceGroupsModal(true);
+                            }}
+                            disabled={
+                              !iAmOwner ||
+                              providersLoading ||
+                              providers === undefined
+                            }
+                            sx={{ minWidth: '70px', fontSize: '0.75rem' }}
+                          >
+                            Groups
+                          </Button>
+                          <Button
+                            size="sm"
                             color="danger"
                             variant="outlined"
                             onClick={() =>
@@ -1366,6 +1388,19 @@ export default function UserLoginTest(): JSX.Element {
           providers.some((provider: any) => provider?.type === 'local')
         }
       />
+      {providerForResourceGroups && (
+        <ProviderResourceGroupsModal
+          open={openProviderResourceGroupsModal}
+          onClose={() => {
+            setOpenProviderResourceGroupsModal(false);
+            setProviderForResourceGroups(null);
+          }}
+          provider={providerForResourceGroups}
+          onSaved={() => {
+            providersMutate();
+          }}
+        />
+      )}
       <Modal
         open={openSetLogoModal}
         onClose={() => {
