@@ -1,6 +1,8 @@
 import re
 from typing import Optional, Tuple
 
+PUBLIC_TUNNEL_URL_PATTERN = r"https://[a-zA-Z0-9-]+\.(?:trycloudflare\.com|ngrok-free\.app|ngrok-free\.dev|ngrok\.io)"
+
 
 def parse_vscode_tunnel_logs(logs: str) -> Tuple[Optional[str], Optional[str]]:
     """
@@ -70,37 +72,24 @@ def parse_jupyter_tunnel_logs(logs: str) -> Tuple[Optional[str], Optional[str]]:
             # Jupyter prints: "http://localhost:8888/?token=abc123..." or "?token=abc123..."
             if "token=" in line and not token:
                 # Look for token in URLs
-                match = re.search(r"[?&]token=([a-f0-9]{32,})", line)
+                match = re.search(r"[?&]token=([A-Za-z0-9._-]{8,})", line)
                 if match:
                     token = match.group(1)
                 else:
                     # Also try to find standalone token mentions
-                    match = re.search(r"token[=:]\s*([a-f0-9]{32,})", line, re.IGNORECASE)
+                    match = re.search(r"token[=:]\s*([A-Za-z0-9._-]{8,})", line, re.IGNORECASE)
                     if match:
                         token = match.group(1)
 
-            # Parse cloudflared tunnel URL: "https://random-name.trycloudflare.com"
+            # Parse public tunnel URL
             if not tunnel_url:
-                # Look for the full URL
-                match = re.search(r"(https://[a-zA-Z0-9-]+\.trycloudflare\.com)", line)
-                if match:
-                    tunnel_url = match.group(1)
-                else:
-                    # If no full URL, look for just the domain
-                    match = re.search(r"([a-zA-Z0-9-]+\.trycloudflare\.com)", line)
-                    if match:
-                        tunnel_url = f"https://{match.group(1)}"
-
-            # Also check for other tunnel services (ngrok, localtunnel, etc.)
-            if not tunnel_url:
-                # Check for ngrok: "https://abc123.ngrok-free.app" or "https://abc123.ngrok-free.dev"
-                match = re.search(r"(https://[a-zA-Z0-9-]+\.(?:ngrok-free\.app|ngrok-free\.dev|ngrok\.io))", line)
+                match = re.search(f"({PUBLIC_TUNNEL_URL_PATTERN})", line)
                 if match:
                     tunnel_url = match.group(1)
 
-            # Check for local URL: "Local URL: http://localhost:8888"
+            # Parse local Jupyter URL from server startup output if no public URL was found
             if not tunnel_url:
-                match = re.search(r"Local URL:\s*(http://localhost:\d+)", line)
+                match = re.search(r"(https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0):8888[^\s]*)", line)
                 if match:
                     tunnel_url = match.group(1)
 
@@ -132,30 +121,31 @@ def parse_vllm_tunnel_logs(logs: str) -> Tuple[Optional[str], Optional[str], Opt
 
         for line in lines:
             # Look for any HTTPS tunnel URL from supported providers
-            match = re.search(
-                r"(https://[a-zA-Z0-9-]+\.(?:trycloudflare\.com|ngrok-free\.app|ngrok-free\.dev|ngrok\.io))",
-                line,
-            )
+            match = re.search(f"({PUBLIC_TUNNEL_URL_PATTERN})", line)
             if match:
                 url = match.group(1)
                 if url not in found_urls:
                     found_urls.append(url)
 
-            # Check for local URL patterns: "Local vLLM API: http://localhost:8000" or "Local Open WebUI: http://localhost:8080"
-            match = re.search(r"Local (?:vLLM API|Open WebUI):\s*(http://localhost:\d+)", line)
+            # Parse local URLs emitted by startup scripts/servers.
+            match = re.search(r"(https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(8000|8080)[^\s]*)", line)
             if match:
-                url = match.group(1)
-                if url not in found_urls:
-                    found_urls.append(url)
+                full_url = match.group(1)
+                port = match.group(2)
+                if port == "8000":
+                    vllm_url = full_url
+                elif port == "8080":
+                    openwebui_url = full_url
 
-        # Assign URLs by discovery order:
-        #  - first URL: vLLM API tunnel
-        #  - second URL (if present): Open WebUI tunnel
-        if found_urls:
+        # Prefer explicit local port-derived URLs when available.
+        if vllm_url or openwebui_url:
+            tunnel_url = vllm_url or openwebui_url
+        # Otherwise, assign public URLs by discovery order.
+        elif found_urls:
             tunnel_url = found_urls[0]
-            vllm_url = tunnel_url
-        if len(found_urls) > 1:
-            openwebui_url = found_urls[1]
+            vllm_url = found_urls[0]
+            if len(found_urls) > 1:
+                openwebui_url = found_urls[1]
 
         return tunnel_url, vllm_url, openwebui_url
 
@@ -270,8 +260,8 @@ def get_jupyter_tunnel_info(logs: str) -> dict:
     # Since Jupyter is started without token requirement, use tunnel URL directly
     jupyter_url = tunnel_url
 
-    # If token exists, append it to the URL (though we don't require it)
-    if jupyter_url and token:
+    # If token exists, append it to the URL unless it is already present.
+    if jupyter_url and token and "token=" not in jupyter_url:
         separator = "&" if "?" in jupyter_url else "?"
         jupyter_url = f"{jupyter_url}{separator}token={token}"
 
@@ -332,30 +322,31 @@ def parse_ollama_tunnel_logs(logs: str) -> Tuple[Optional[str], Optional[str], O
 
         for line in lines:
             # Look for any HTTPS tunnel URL from supported providers
-            match = re.search(
-                r"(https://[a-zA-Z0-9-]+\.(?:trycloudflare\.com|ngrok-free\.app|ngrok-free\.dev|ngrok\.io))",
-                line,
-            )
+            match = re.search(f"({PUBLIC_TUNNEL_URL_PATTERN})", line)
             if match:
                 url = match.group(1)
                 if url not in found_urls:
                     found_urls.append(url)
 
-            # Check for local URL patterns: "Local Ollama API: http://localhost:11434" or "Local Open WebUI: http://localhost:8080"
-            match = re.search(r"Local (?:Ollama API|Open WebUI):\s*(http://localhost:\d+)", line)
+            # Parse local URLs emitted by startup scripts/servers.
+            match = re.search(r"(https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0):(11434|8080)[^\s]*)", line)
             if match:
-                url = match.group(1)
-                if url not in found_urls:
-                    found_urls.append(url)
+                full_url = match.group(1)
+                port = match.group(2)
+                if port == "11434":
+                    ollama_url = full_url
+                elif port == "8080":
+                    openwebui_url = full_url
 
-        # Assign URLs by discovery order:
-        #  - first URL: Ollama API tunnel
-        #  - second URL (if present): Open WebUI tunnel
-        if found_urls:
+        # Prefer explicit local port-derived URLs when available.
+        if ollama_url or openwebui_url:
+            tunnel_url = ollama_url or openwebui_url
+        # Otherwise, assign public URLs by discovery order.
+        elif found_urls:
             tunnel_url = found_urls[0]
-            ollama_url = tunnel_url
-        if len(found_urls) > 1:
-            openwebui_url = found_urls[1]
+            ollama_url = found_urls[0]
+            if len(found_urls) > 1:
+                openwebui_url = found_urls[1]
 
         return tunnel_url, ollama_url, openwebui_url
 
@@ -492,6 +483,14 @@ def get_tunnel_info(logs: str, interactive_type: str | None, url_patterns: list[
     """
     if not interactive_type or interactive_type == "custom":
         return get_custom_tunnel_info(logs, url_patterns)
+
+    # If gallery-supplied custom patterns exist for a known interactive type,
+    # prefer them first. This lets templates parse exact emitted log lines
+    # without changing built-in parser behavior for older entries.
+    if url_patterns:
+        custom_info = get_custom_tunnel_info(logs, url_patterns)
+        if custom_info.get("is_ready"):
+            return custom_info
 
     if interactive_type == "vscode":
         return get_vscode_tunnel_info(logs)

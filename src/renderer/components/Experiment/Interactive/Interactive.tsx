@@ -6,7 +6,16 @@ import React, {
   useRef,
 } from 'react';
 import Sheet from '@mui/joy/Sheet';
-import { Button, Stack, Typography, Box, Skeleton, Alert } from '@mui/joy';
+import {
+  Button,
+  Chip,
+  Input,
+  Stack,
+  Typography,
+  Box,
+  Skeleton,
+  Alert,
+} from '@mui/joy';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { PlusIcon } from 'lucide-react';
@@ -27,6 +36,7 @@ import InteractiveJobCard from './InteractiveJobCard';
 import JobsList from '../Tasks/JobsList';
 import FileBrowserModal from '../Tasks/FileBrowserModal';
 import { API_URL } from 'renderer/lib/api-client/urls';
+import { isJobStopPending } from 'renderer/lib/utils';
 
 const duration = require('dayjs/plugin/duration');
 
@@ -92,6 +102,9 @@ export default function Interactive() {
   );
   const [isCheckingSpecialSecrets, setIsCheckingSpecialSecrets] =
     useState(false);
+  const [stopPendingByJobId, setStopPendingByJobId] = useState<
+    Record<string, boolean>
+  >({});
 
   const { experimentInfo } = useExperimentInfo();
   const { addNotification } = useNotification();
@@ -99,6 +112,7 @@ export default function Interactive() {
 
   // Trigger to force re-render when localStorage changes
   const [pendingIdsTrigger, setPendingIdsTrigger] = useState(0);
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   const {
     data: providerListData,
@@ -263,6 +277,38 @@ export default function Interactive() {
     return Array.isArray(jobsRemote) ? jobsRemote : [];
   }, [jobsRemote]);
 
+  const handleStopPendingChange = useCallback(
+    (jobId: string, stopPending: boolean) => {
+      setStopPendingByJobId((prev) => {
+        if (stopPending) {
+          return { ...prev, [jobId]: true };
+        }
+        if (!prev[jobId]) return prev;
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(jobs) || jobs.length === 0) return;
+    setStopPendingByJobId((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const job of jobs as any[]) {
+        const id = String(job?.id ?? '');
+        if (!id || !next[id]) continue;
+        if (isJobStopPending(job?.status, job?.job_data?.stop_requested)) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [jobs]);
+
   // Derive a stable string of job IDs that need launch-progress polling.
   // This avoids resetting the 3s interval on every SWR revalidation.
   const launchPollingJobIds = useMemo(() => {
@@ -415,17 +461,67 @@ export default function Interactive() {
     return [...placeholders, ...filteredJobs];
   }, [jobs, getPendingJobIds, pendingIdsTrigger]);
 
+  const jobsWithUiState = useMemo(() => {
+    return jobsWithPlaceholders.map((job: any) => {
+      const id = String(job?.id ?? '');
+      if (!id || !stopPendingByJobId[id]) return job;
+      return {
+        ...job,
+        job_data: {
+          ...(job?.job_data || {}),
+          stop_requested: true,
+        },
+      };
+    });
+  }, [jobsWithPlaceholders, stopPendingByJobId]);
+
   // Completed / failed / stopped interactive jobs for the History section
   const historyJobs = useMemo(() => {
     const baseJobs = Array.isArray(jobs) ? jobs : [];
-    return baseJobs.filter((job: any) => {
+    const completed = baseJobs.filter((job: any) => {
       return (
         job.status === 'COMPLETE' ||
         job.status === 'FAILED' ||
         job.status === 'STOPPED'
       );
     });
-  }, [jobs]);
+    if (!historySearchQuery.trim()) return completed;
+    const q = historySearchQuery.trim().toLowerCase();
+    return completed.filter((j: any) => {
+      const rawJd = j?.job_data ?? {};
+      const jd =
+        typeof rawJd === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(rawJd);
+              } catch {
+                return {};
+              }
+            })()
+          : rawJd;
+      const interactiveType =
+        jd?.interactive_type ||
+        j?.interactive_type ||
+        jd?.template_config?.interactive_type;
+      const searchableFields = [
+        j?.id,
+        j?.short_id,
+        j?.status,
+        jd?.template_name,
+        jd?.cluster_name,
+        jd?.provider_name,
+        jd?.user_info?.name,
+        jd?.user_info?.email,
+        interactiveType,
+        jd?.error_msg,
+      ];
+      return searchableFields.some((f) =>
+        String(f ?? '')
+          .toLowerCase()
+          .includes(q),
+      );
+    });
+  }, [jobs, historySearchQuery]);
 
   const handleDeleteTask = (taskId: string, taskName?: string) => {
     setTaskToDelete({ id: taskId, name: taskName });
@@ -648,6 +744,7 @@ export default function Interactive() {
             body: JSON.stringify({
               gallery_id: templateId,
               experiment_id: experimentInfo.id,
+              name: data.title,
               is_interactive: true,
               env_vars:
                 Object.keys(envVarsForImportClean).length > 0
@@ -699,7 +796,7 @@ export default function Interactive() {
           env_vars:
             Object.keys(envVarsClean).length > 0 ? envVarsClean : undefined,
           github_repo_url: galleryTemplate?.github_repo_url || undefined,
-          github_directory: galleryTemplate?.github_repo_dir || undefined,
+          github_repo_dir: galleryTemplate?.github_repo_dir || undefined,
         };
 
         response = await chatAPI.authenticatedFetch(
@@ -822,7 +919,7 @@ export default function Interactive() {
       }
 
       if (!cfg.run && !cfg.github_repo_url && !task.github_repo_url) {
-        return { ok: false, error: 'Task is missing a command to run.' };
+        return { ok: false, error: 'Something went wrong. Please try again.' };
       }
 
       const payload = {
@@ -851,16 +948,8 @@ export default function Interactive() {
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: providerMeta.name,
         github_repo_url: cfg.github_repo_url || task.github_repo_url,
-        github_repo_dir:
-          cfg.github_repo_dir ||
-          cfg.github_directory ||
-          task.github_repo_dir ||
-          task.github_directory,
-        github_repo_branch:
-          cfg.github_repo_branch ||
-          cfg.github_branch ||
-          task.github_repo_branch ||
-          task.github_branch,
+        github_repo_dir: cfg.github_repo_dir || task.github_repo_dir,
+        github_repo_branch: cfg.github_repo_branch || task.github_repo_branch,
         run_sweeps: cfg.run_sweeps || task.run_sweeps || undefined,
         sweep_config: cfg.sweep_config || task.sweep_config || undefined,
         sweep_metric:
@@ -1003,16 +1092,8 @@ export default function Interactive() {
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: providerMeta.name,
         github_repo_url: cfg.github_repo_url || task.github_repo_url,
-        github_repo_dir:
-          cfg.github_repo_dir ||
-          cfg.github_directory ||
-          task.github_repo_dir ||
-          task.github_directory,
-        github_repo_branch:
-          cfg.github_repo_branch ||
-          cfg.github_branch ||
-          task.github_repo_branch ||
-          task.github_branch,
+        github_repo_dir: cfg.github_repo_dir || task.github_repo_dir,
+        github_repo_branch: cfg.github_repo_branch || task.github_repo_branch,
         run_sweeps: cfg.run_sweeps || task.run_sweeps || undefined,
         sweep_config: cfg.sweep_config || task.sweep_config || undefined,
         sweep_metric:
@@ -1277,7 +1358,7 @@ export default function Interactive() {
               </Typography>
             </Box>
           )}
-        {!jobsIsLoading && jobsWithPlaceholders.length > 0 && (
+        {!jobsIsLoading && jobsWithUiState.length > 0 && (
           <Box
             sx={{
               display: 'grid',
@@ -1290,18 +1371,31 @@ export default function Interactive() {
               gap: 2,
             }}
           >
-            {jobsWithPlaceholders.map((job: any) => (
+            {jobsWithUiState.map((job: any) => (
               <InteractiveJobCard
                 key={job.id}
                 job={job}
                 onDeleteJob={handleDeleteJob}
                 launchProgress={launchProgressByJobId[String(job.id)]}
+                onStopPendingChange={handleStopPendingChange}
               />
             ))}
           </Box>
         )}
       </Sheet>
-      <Typography level="title-md">History</Typography>
+      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 1 }}>
+        <Typography level="title-md">History</Typography>
+        <Input
+          size="sm"
+          placeholder="Search history…"
+          value={historySearchQuery}
+          onChange={(e) => setHistorySearchQuery(e.target.value)}
+          sx={{ width: 240 }}
+        />
+        <Chip size="sm" variant="soft" color="neutral">
+          {historyJobs.length}
+        </Chip>
+      </Stack>
       <Sheet
         variant="soft"
         sx={{
@@ -1318,6 +1412,8 @@ export default function Interactive() {
           loading={jobsIsLoading || !experimentInfo?.id}
           onDeleteJob={handleDeleteJob}
           hideOutputButton
+          hideJobId
+          showInteractiveType
           onViewFileBrowser={(jobId) => {
             if (jobId == null || jobId === '') return;
             setViewFileBrowserFromJob(String(jobId));

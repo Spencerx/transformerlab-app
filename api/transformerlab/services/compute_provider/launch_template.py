@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import shlex
 import time
 from typing import Any, Optional
 
@@ -17,6 +18,7 @@ from transformerlab.services.compute_provider.launch_credentials import (
     RUNPOD_AWS_CREDENTIALS_DIR,
     generate_aws_credentials_setup,
     generate_azure_credentials_setup,
+    generate_gcp_credentials_setup,
     get_aws_credentials_from_file,
 )
 from transformerlab.services.compute_provider.launch_secrets import find_missing_secrets_for_template_launch
@@ -227,6 +229,11 @@ async def launch_template_on_provider(
                 setup_commands.append(aws_setup)
                 if aws_credentials_dir:
                     env_vars["AWS_SHARED_CREDENTIALS_FILE"] = f"{aws_credentials_dir}/credentials"
+        elif STORAGE_PROVIDER == "gcp":
+            gcp_sa_json = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON")
+            if gcp_sa_json:
+                gcp_setup = generate_gcp_credentials_setup(gcp_sa_json)
+                setup_commands.append(gcp_setup)
         elif STORAGE_PROVIDER == "azure":
             azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
             azure_account = os.getenv("AZURE_STORAGE_ACCOUNT")
@@ -269,18 +276,15 @@ async def launch_template_on_provider(
         task_data = await task_service.task_get_by_id(request.task_id)
         if task_data:
             request.github_repo_url = task_data.get("github_repo_url", "") or ""
-            # Task data may store the directory as either github_repo_dir or github_directory
-            request.github_repo_dir = (
-                task_data.get("github_repo_dir", "") or task_data.get("github_directory", "") or ""
-            )
-            request.github_repo_branch = task_data.get("github_branch", "") or ""
+            request.github_repo_dir = task_data.get("github_repo_dir", "") or ""
+            request.github_repo_branch = task_data.get("github_repo_branch", "") or ""
 
     # Add GitHub clone setup if enabled
     if request.github_repo_url:
         workspace_dir = await get_workspace_dir()
         github_pat = await read_github_pat_from_workspace(workspace_dir, user_id=user_id)
-        directory = request.github_repo_dir or request.github_directory
-        branch = request.github_repo_branch or request.github_branch
+        directory = request.github_repo_dir
+        branch = request.github_repo_branch
         github_setup = generate_github_clone_setup(
             repo_url=request.github_repo_url,
             directory=directory,
@@ -340,6 +344,7 @@ async def launch_template_on_provider(
     env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
     env_vars["_TFL_JOB_ID"] = str(job_id)
     env_vars["_TFL_EXPERIMENT_ID"] = request.experiment_id
+    env_vars["TFL_EXPERIMENT_ID"] = request.experiment_id
     env_vars["_TFL_USER_ID"] = user_id
 
     # Enable Trackio auto-init for this job if requested. When set, the lab SDK
@@ -397,7 +402,8 @@ async def launch_template_on_provider(
         if workspace_dir and not storage.is_remote_path(workspace_dir):
             env_vars["TFL_WORKSPACE_DIR"] = workspace_dir
 
-    # Resolve run command (and optional setup override) for interactive sessions from gallery
+    # Resolve run command for interactive sessions: run/setup from task or request only;
+    # gallery supplies ports / interactive_type for ngrok and local URL hints.
     base_command = request.run
     setup_override_from_gallery = None
     interactive_setup_added = False
@@ -409,11 +415,10 @@ async def launch_template_on_provider(
         )
         if gallery_entry:
             environment = "local" if (provider.type == ProviderType.LOCAL.value or request.local) else "remote"
-            # Run gallery/task setup for both local and remote interactive (SUDO prefix so $SUDO is defined).
-            # Ngrok is installed only when tunnel logic runs (remote); setup has no ngrok.
+            # Task/request setup for interactive (SUDO prefix so $SUDO is defined). Not from gallery JSON.
             from transformerlab.shared.interactive_gallery_utils import INTERACTIVE_SUDO_PREFIX
 
-            raw_setup = (gallery_entry.get("setup") or "").strip() or (request.setup or "").strip()
+            raw_setup = (request.setup or "").strip()
             if raw_setup:
                 setup_commands.append(INTERACTIVE_SUDO_PREFIX + " " + raw_setup)
                 interactive_setup_added = True
@@ -591,6 +596,10 @@ async def launch_template_on_provider(
     if trackio_run_name_for_job is not None:
         job_data["trackio_run_name"] = trackio_run_name_for_job
 
+    # Store quota_hold_id so the background worker can release it on failure.
+    if quota_hold:
+        job_data["quota_hold_id"] = str(quota_hold.id)
+
     await job_service.job_update_job_data_insert_key_values(
         job_id, {k: v for k, v in job_data.items() if v is not None}, request.experiment_id
     )
@@ -651,7 +660,8 @@ async def launch_template_on_provider(
     #   - sets job_data.live_status="started" when execution begins
     #   - sets job_data.live_status="finished" on success
     #   - sets job_data.live_status="crashed" on failure
-    wrapped_run = f"tfl-remote-trap -- {command_with_hooks}"
+    # Pass the complete command as one quoted payload so shell operators remain intact.
+    wrapped_run = f"tfl-remote-trap -- {shlex.quote(command_with_hooks)}"
 
     # For dstack fleet-based runs, do not pass explicit resource requirements.
     # The provider will schedule by fleet and build resources accordingly.
@@ -675,6 +685,12 @@ async def launch_template_on_provider(
         region=skypilot_region,
         zone=skypilot_zone,
         use_spot=skypilot_use_spot,
+    )
+
+    # Persist cluster_config into job_data so the DB-backed queue workers
+    # can reconstruct the work item without the in-memory object.
+    await job_service.job_update_job_data_insert_key_value(
+        job_id, "cluster_config", cluster_config.model_dump(), request.experiment_id
     )
 
     await job_service.job_update_launch_progress(
@@ -720,13 +736,7 @@ async def launch_template_on_provider(
     await enqueue_remote_launch(
         job_id=str(job_id),
         experiment_id=str(request.experiment_id),
-        provider_id=str(provider.id),
         team_id=str(team_id),
-        user_id=str(user.id),
-        cluster_name=formatted_cluster_name,
-        cluster_config=cluster_config,
-        quota_hold_id=str(quota_hold.id) if quota_hold else None,
-        subtype=request.subtype,
     )
 
     return {

@@ -18,7 +18,12 @@ import { FolderIcon, FileIcon, ChevronRightIcon } from 'lucide-react';
 import { Endpoints, getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import { fetchWithAuth } from 'renderer/lib/authContext';
-import { formatBytes } from 'renderer/lib/utils';
+import {
+  formatBytes,
+  TEXT_FILE_EXTENSIONS,
+  IMAGE_FILE_EXTENSIONS,
+  getFileExtension,
+} from 'renderer/lib/utils';
 
 type FileSource = 'job' | 'github' | 'local';
 
@@ -198,40 +203,7 @@ export default function FileBrowserModal({
       setFileLoading(true);
       setFileContent(null);
 
-      const ext = file.name.split('.').pop()?.toLowerCase() || '';
-      const textExtensions = [
-        'txt',
-        'log',
-        'csv',
-        'py',
-        'yaml',
-        'yml',
-        'md',
-        'sh',
-        'cfg',
-        'ini',
-        'toml',
-        'json',
-        'xml',
-        'html',
-        'css',
-        'js',
-        'ts',
-        'tsx',
-        'jsx',
-        'sql',
-        'r',
-        'ipynb',
-      ];
-      const imageExtensions = [
-        'png',
-        'jpg',
-        'jpeg',
-        'gif',
-        'bmp',
-        'webp',
-        'svg',
-      ];
+      const ext = getFileExtension(file.name);
 
       try {
         const url = getAPIFullPath('jobs', ['getFile'], {
@@ -240,10 +212,10 @@ export default function FileBrowserModal({
           filePath: encodeURIComponent(filePath),
         });
 
-        if (imageExtensions.includes(ext)) {
+        if (IMAGE_FILE_EXTENSIONS.has(ext)) {
           setFileMediaType('image');
           setFileContent(url);
-        } else if (textExtensions.includes(ext)) {
+        } else if (TEXT_FILE_EXTENSIONS.has(ext)) {
           setFileMediaType('text');
           const res = await fetchWithAuth(url);
           const text = await res.text();
@@ -271,32 +243,7 @@ export default function FileBrowserModal({
     setFileLoading(true);
     setFileContent(null);
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const textExtensions = [
-      'txt',
-      'log',
-      'csv',
-      'py',
-      'yaml',
-      'yml',
-      'md',
-      'sh',
-      'cfg',
-      'ini',
-      'toml',
-      'json',
-      'xml',
-      'html',
-      'css',
-      'js',
-      'ts',
-      'tsx',
-      'jsx',
-      'sql',
-      'r',
-      'ipynb',
-    ];
-    const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg'];
+    const ext = getFileExtension(file.name);
 
     try {
       const url =
@@ -328,10 +275,10 @@ export default function FileBrowserModal({
         return;
       }
 
-      if (imageExtensions.includes(ext)) {
+      if (IMAGE_FILE_EXTENSIONS.has(ext)) {
         setFileMediaType('image');
         setFileContent(url);
-      } else if (textExtensions.includes(ext)) {
+      } else if (TEXT_FILE_EXTENSIONS.has(ext)) {
         setFileMediaType('text');
         const res = await fetchWithAuth(url);
         const text = await res.text();
@@ -456,7 +403,7 @@ export default function FileBrowserModal({
                           <FileIcon size={16} />
                         )}
                       </ListItemDecorator>
-                      <ListItemContent>
+                      <ListItemContent sx={{ minWidth: 0 }}>
                         <Typography
                           level="body-sm"
                           sx={{
@@ -507,7 +454,11 @@ export default function FileBrowserModal({
                         <ChevronRightIcon size={14} />
                       )}
                       {mode === 'job' && !file.is_dir && (
-                        <Typography level="body-xs" color="neutral">
+                        <Typography
+                          level="body-xs"
+                          color="neutral"
+                          sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
                           {formatBytes(file.size)}
                         </Typography>
                       )}

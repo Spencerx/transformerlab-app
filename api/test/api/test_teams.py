@@ -205,6 +205,37 @@ def test_get_user_teams(client, owner_user, test_team):
     assert test_team_data["role"] == "owner"
 
 
+def test_new_signup_personal_team_has_default_alpha_experiment(client):
+    """New signup should get an alpha experiment in their personal team."""
+    import time
+
+    email = f"signup_alpha_{int(time.time() * 1000)}@test.com"
+    password = "password123"
+
+    register_resp = client.post("/auth/register", json={"email": email, "password": password})
+    assert register_resp.status_code in (200, 201)
+
+    verify_user_in_db(email)
+
+    login_resp = client.post("/auth/jwt/login", data={"username": email, "password": password})
+    assert login_resp.status_code == 200
+    token = login_resp.json()["access_token"]
+
+    teams_resp = client.get("/users/me/teams", headers={"Authorization": f"Bearer {token}"})
+    assert teams_resp.status_code == 200
+    teams = teams_resp.json()["teams"]
+    assert len(teams) >= 1
+    personal_team_id = teams[0]["id"]
+
+    experiments_resp = client.get(
+        "/experiment/",
+        headers={"Authorization": f"Bearer {token}", "X-Team-Id": personal_team_id},
+    )
+    assert experiments_resp.status_code == 200
+    experiment_ids = {exp.get("id") for exp in experiments_resp.json()}
+    assert "alpha" in experiment_ids
+
+
 def test_list_team_members(client, owner_user, test_team):
     """Test listing team members"""
     headers = {"Authorization": f"Bearer {owner_user['token']}", "X-Team-Id": test_team["id"]}

@@ -38,7 +38,10 @@ import SafeJSONParse from '../../Shared/SafeJSONParse';
 import NewTaskModal2 from './NewTaskModal/NewTaskModal2';
 import TaskYamlEditorModal from './TaskYamlEditorModal';
 import TrackioModal from './TrackioModal';
-import { isDeletableJobRecordStatus } from 'renderer/lib/utils';
+import {
+  isDeletableJobRecordStatus,
+  isJobStopPending,
+} from 'renderer/lib/utils';
 
 const duration = require('dayjs/plugin/duration');
 const dayjs = require('dayjs');
@@ -99,6 +102,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     id: string;
     name?: string;
   } | null>(null);
+  const [stopPendingByJobId, setStopPendingByJobId] = useState<
+    Record<string, boolean>
+  >({});
   const { experimentInfo } = useExperimentInfo();
   const { addNotification } = useNotification();
   const { fetchWithAuth, team } = useAuth();
@@ -298,6 +304,38 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     return [...sweepJobs, ...remoteJobs];
   }, [jobsRemote, jobsSweep]);
 
+  const handleStopPendingChange = useCallback(
+    (jobId: string, stopPending: boolean) => {
+      setStopPendingByJobId((prev) => {
+        if (stopPending) {
+          return { ...prev, [jobId]: true };
+        }
+        if (!prev[jobId]) return prev;
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(jobs) || jobs.length === 0) return;
+    setStopPendingByJobId((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const job of jobs as any[]) {
+        const id = String(job?.id ?? '');
+        if (!id || !next[id]) continue;
+        if (isJobStopPending(job?.status, job?.job_data?.stop_requested)) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [jobs]);
+
   // Fetch templates with useSWR (templates replace remote tasks)
   const {
     data: allTemplates,
@@ -448,7 +486,17 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   }, [getPendingJobIds, isInteractiveJob, jobs, pendingIdsTrigger, subtype]);
 
   const filteredJobsForDisplay = useMemo(() => {
-    let result = jobsWithPlaceholders;
+    let result = jobsWithPlaceholders.map((job: any) => {
+      const id = String(job?.id ?? '');
+      if (!id || !stopPendingByJobId[id]) return job;
+      return {
+        ...job,
+        job_data: {
+          ...(job?.job_data || {}),
+          stop_requested: true,
+        },
+      };
+    });
     if (showFavoritesOnly) {
       result = result.filter((j: any) => j?.job_data?.favorite);
     }
@@ -456,7 +504,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
       result = result.filter((j: any) => !j?.job_data?.hidden);
     }
     return result;
-  }, [jobsWithPlaceholders, showFavoritesOnly, showHidden]);
+  }, [jobsWithPlaceholders, showFavoritesOnly, showHidden, stopPendingByJobId]);
 
   const hiddenJobCount = useMemo(() => {
     return jobsWithPlaceholders.filter((j: any) => j?.job_data?.hidden).length;
@@ -693,10 +741,8 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         parameters: data.parameters || undefined,
         file_mounts: data.file_mounts || undefined,
         github_repo_url: data.github_repo_url || undefined,
-        github_repo_dir:
-          data.github_repo_dir || data.github_directory || undefined,
-        github_repo_branch:
-          data.github_repo_branch || data.github_branch || undefined,
+        github_repo_dir: data.github_repo_dir || undefined,
+        github_repo_branch: data.github_repo_branch || undefined,
         run_sweeps: data.run_sweeps || undefined,
         sweep_config: data.sweep_config || undefined,
         sweep_metric:
@@ -866,7 +912,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           provider_name: providerMeta.name,
           env_vars: Object.keys(envVars).length > 0 ? envVars : undefined,
           github_repo_url: template?.github_repo_url || undefined,
-          github_directory: template?.github_repo_dir || undefined,
+          github_repo_dir: template?.github_repo_dir || undefined,
         };
 
         response = await fetchWithAuth(
@@ -911,10 +957,33 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const handleQueue = async (task: any) => {
     if (!experimentInfo?.id) return;
 
+    let latestTask = task;
+    try {
+      // Always resolve the latest task snapshot before queueing to avoid
+      // launching with stale config immediately after task.yaml edits.
+      const response = await fetchWithAuth(
+        chatAPI.Endpoints.Task.GetByID(experimentInfo.id, task.id),
+        {
+          method: 'GET',
+        },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data && !data.message) {
+          latestTask = data;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh task before queueing:', error);
+      // Fall back to the in-memory task object if refresh fails.
+    }
+
     // For templates, all fields are stored directly (not nested in config)
     // For backward compatibility, check if it's an old task format with nested config
     const cfg =
-      task.config !== undefined ? SafeJSONParse(task.config, task) : task; // If no config field, assume it's a template with flat structure
+      latestTask.config !== undefined
+        ? SafeJSONParse(latestTask.config, latestTask)
+        : latestTask;
 
     if (!providers.length) {
       addNotification({
@@ -927,9 +996,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
 
     if (
       !cfg.run &&
-      !task.run &&
+      !latestTask.run &&
       !cfg.github_repo_url &&
-      !task.github_repo_url
+      !latestTask.github_repo_url
     ) {
       addNotification({
         type: 'warning',
@@ -939,7 +1008,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     }
 
     // Open the queue modal so user can pick provider (and customize params)
-    setTaskBeingQueued(task);
+    setTaskBeingQueued(latestTask);
     setQueueModalOpen(true);
   };
 
@@ -1026,16 +1095,8 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         file_mounts: cfg.file_mounts || task.file_mounts,
         provider_name: config?.provider_name ?? providerMeta.name,
         github_repo_url: cfg.github_repo_url || task.github_repo_url,
-        github_repo_dir:
-          cfg.github_repo_dir ||
-          cfg.github_directory ||
-          task.github_repo_dir ||
-          task.github_directory,
-        github_repo_branch:
-          cfg.github_repo_branch ||
-          cfg.github_branch ||
-          task.github_repo_branch ||
-          task.github_branch,
+        github_repo_dir: cfg.github_repo_dir || task.github_repo_dir,
+        github_repo_branch: cfg.github_repo_branch || task.github_repo_branch,
         run_sweeps: cfg.run_sweeps || task.run_sweeps || undefined,
         sweep_config: cfg.sweep_config || task.sweep_config || undefined,
         sweep_metric:
@@ -1295,12 +1356,14 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onQueueTask={handleQueue}
           onEditTask={handleEditTask}
           onExportTask={handleExportToTeamGallery}
-          onViewFilesTask={(taskRow) =>
-            setViewTaskFilesFromTask({
-              id: taskRow.id,
-              name: (taskRow as any).name ?? (taskRow as any).title ?? null,
-            })
-          }
+          // TODO: potentially deprecated — file browsing is now integrated into the Edit Task modal.
+          // Remove onViewFilesTask and related FileBrowserModal state once confirmed unnecessary.
+          // onViewFilesTask={(taskRow) =>
+          //   setViewTaskFilesFromTask({
+          //     id: taskRow.id,
+          //     name: (taskRow as any).name ?? (taskRow as any).title ?? null,
+          //   })
+          // }
           loading={templatesIsLoading}
         />
       </Sheet>
@@ -1430,6 +1493,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           }}
           onToggleFavorite={handleToggleFavorite}
           onToggleHidden={handleToggleHidden}
+          onStopPendingChange={handleStopPendingChange}
         />
       </Sheet>
       <ViewSweepResultsModal

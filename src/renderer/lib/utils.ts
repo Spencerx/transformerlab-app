@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react';
  */
 export function formatBytes(bytes: number, decimals = 2): string {
   // Handle invalid inputs (NaN, undefined, null, negative values)
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 Bytes';
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 Bytes';
 
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
@@ -243,6 +243,14 @@ export function isDeletableJobRecordStatus(
   return isTerminalJobStatus(status) || status === 'NOT_STARTED';
 }
 
+/** UI-only helper: treat explicit STOPPING and optimistic stop requests the same. */
+export function isJobStopPending(
+  status: string | undefined | null,
+  stopRequested?: boolean,
+): boolean {
+  return status === 'STOPPING' || Boolean(stopRequested);
+}
+
 export const colorArray = [
   '#e8c1a0',
   '#C7DFF7',
@@ -255,4 +263,69 @@ export const colorArray = [
 
 export function mixColorWithBackground(color: string, percent = '50'): string {
   return `color-mix(in srgb, ${color}, var(--joy-palette-background-surface) ${percent}%)`;
+}
+
+export const TEXT_FILE_EXTENSIONS = new Set([
+  'txt',
+  'log',
+  'csv',
+  'py',
+  'yaml',
+  'yml',
+  'md',
+  'sh',
+  'cfg',
+  'ini',
+  'toml',
+  'json',
+  'xml',
+  'html',
+  'css',
+  'js',
+  'ts',
+  'tsx',
+  'jsx',
+  'sql',
+  'r',
+  'ipynb',
+]);
+
+export const IMAGE_FILE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'bmp',
+  'webp',
+  'svg',
+]);
+
+export function getFileExtension(fileName: string): string {
+  return fileName.split('.').pop()?.toLowerCase() || '';
+}
+
+const EXTENSION_TO_MONACO_LANGUAGE: Record<string, string> = {
+  py: 'python',
+  yaml: 'yaml',
+  yml: 'yaml',
+  json: 'json',
+  js: 'javascript',
+  ts: 'typescript',
+  tsx: 'typescript',
+  jsx: 'javascript',
+  sh: 'shell',
+  md: 'markdown',
+  html: 'html',
+  css: 'css',
+  xml: 'xml',
+  sql: 'sql',
+  toml: 'ini',
+  ini: 'ini',
+  cfg: 'ini',
+  r: 'r',
+};
+
+export function getMonacoLanguage(fileName: string): string {
+  const ext = getFileExtension(fileName);
+  return EXTENSION_TO_MONACO_LANGUAGE[ext] || 'plaintext';
 }

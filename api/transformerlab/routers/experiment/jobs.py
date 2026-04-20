@@ -20,6 +20,7 @@ from transformerlab.routers.auth import get_user_and_team
 from transformerlab.routers.serverinfo import watch_file
 from transformerlab.services.job_service import get_artifacts_from_directory, job_update_status
 import transformerlab.services.job_service as job_service
+from transformerlab.services.permission_service import require_permission
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
 from transformerlab.shared import shared, zip_utils
 from transformerlab.shared.models.models import ProviderType
@@ -121,6 +122,7 @@ async def job_create(
     type: str = "UNDEFINED",
     status: str = "CREATED",
     data: str = "{}",
+    _: None = Depends(require_permission("experiment", "execute", id_param="experimentId")),
 ):
     jobid = await job_service.job_create(type=type, status=status, job_data=data, experiment_id=experimentId)
     return jobid
@@ -507,16 +509,6 @@ async def get_tunnel_info_for_job(
             job_data = json.loads(job_data)
         except JSONDecodeError:
             job_data = {}
-    # If we have previously cached tunnel info URLs and they are ready, use them immediately
-    # and skip any provider log fetching for a faster response.
-    cached_urls = job_data.get("tunnel_info_urls")
-    cached_legacy = job_data.get("cached_tunnel_info")
-    tunnel_info: dict | None = None
-    if isinstance(cached_urls, dict) and cached_urls.get("is_ready"):
-        tunnel_info = cached_urls
-    elif isinstance(cached_legacy, dict) and cached_legacy.get("is_ready"):
-        tunnel_info = cached_legacy
-
     interactive_type = job_data.get("interactive_type")
 
     # Look up the gallery entry to resolve url_patterns and interactive_type fallbacks
@@ -534,6 +526,36 @@ async def get_tunnel_info_for_job(
         # No explicit type: use "custom" (url_patterns-based parsing) rather than
         # assuming a specific legacy type like "vscode".
         interactive_type = "custom"
+
+    # Build the set of URL keys expected by this interactive template so cache is only
+    # considered "complete" when all expected values are populated.
+    expected_url_keys: set[str] = set()
+    for pattern in url_patterns or []:
+        value_key = pattern.get("value_key")
+        if isinstance(value_key, str) and value_key.endswith("_url"):
+            expected_url_keys.add(value_key)
+    for item in gallery_entry.get("instructions", []) if gallery_entry else []:
+        if item.get("kind") == "url":
+            value_key = item.get("value_key")
+            if isinstance(value_key, str):
+                expected_url_keys.add(value_key)
+
+    def _cache_has_expected_urls(cache: dict) -> bool:
+        if not cache.get("is_ready"):
+            return False
+        if not expected_url_keys:
+            return True
+        return all(cache.get(key) for key in expected_url_keys)
+
+    # If we have previously cached tunnel info URLs and they are complete, use them
+    # immediately and skip provider log fetching for a faster response.
+    cached_urls = job_data.get("tunnel_info_urls")
+    cached_legacy = job_data.get("cached_tunnel_info")
+    tunnel_info: dict | None = None
+    if isinstance(cached_urls, dict) and _cache_has_expected_urls(cached_urls):
+        tunnel_info = cached_urls
+    elif isinstance(cached_legacy, dict) and _cache_has_expected_urls(cached_legacy):
+        tunnel_info = cached_legacy
 
     provider_id = job_data.get("provider_id")
     cluster_name = job_data.get("cluster_name")
