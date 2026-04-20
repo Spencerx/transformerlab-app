@@ -41,10 +41,12 @@ import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import RenameTeamModal from './RenameTeamModal';
 import InviteUserModal from './InviteUserModal';
 import ProviderDetailsModal from './ProviderDetailsModal';
+import LocalProviderRefreshModal from './LocalProviderRefreshModal';
 import QuotaSettingsSection from './QuotaSettingsSection';
 import TeamSecretsSection from './TeamSecretsSection';
 import SshKeySection from './SshKeySection';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
+import { Endpoints } from 'renderer/lib/api-client/endpoints';
 
 /*
   Minimal in-file auth utilities and request helpers.
@@ -88,6 +90,12 @@ export default function UserLoginTest(): JSX.Element {
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [localSetupModalOpen, setLocalSetupModalOpen] = useState(false);
+  const [localSetupProviderName, setLocalSetupProviderName] = useState('');
+  const [localSetupStatus, setLocalSetupStatus] = useState<string | null>(null);
+  const [localSetupLogTail, setLocalSetupLogTail] = useState<string>('');
+  const [localSetupInProgressProviderId, setLocalSetupInProgressProviderId] =
+    useState<string | null>(null);
 
   // Get teams list (unchanged)
   const { data: teams, mutate: teamsMutate } = useAPI('teams', ['list']);
@@ -601,6 +609,97 @@ export default function UserLoginTest(): JSX.Element {
       setProviderCheckStatus((prev) => ({ ...prev, [id]: false }));
     } finally {
       setCheckingProviderId(null);
+    }
+  }
+
+  async function pollLocalSetupStatus(providerId: string) {
+    const poll = async () => {
+      try {
+        const response = await authContext.fetchWithAuth(
+          Endpoints.ComputeProvider.SetupStatus(providerId),
+          { method: 'GET' },
+        );
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          const detail =
+            (error &&
+              (error.detail?.message || error.detail || error.message)) ||
+            'Unknown error';
+          setLocalSetupStatus(`Failed to read setup status: ${detail}`);
+          setLocalSetupInProgressProviderId(null);
+          addNotification({
+            type: 'danger',
+            message: 'Local provider refresh failed to report status.',
+          });
+          return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        const message: string =
+          data.message ||
+          data.error ||
+          (data.done
+            ? 'Local provider refresh finished.'
+            : 'Refreshing local provider setup...');
+        setLocalSetupStatus(message);
+        setLocalSetupLogTail(typeof data.log_tail === 'string' ? data.log_tail : '');
+
+        if (!data.done) {
+          window.setTimeout(poll, 2000);
+        } else {
+          setLocalSetupInProgressProviderId(null);
+          addNotification({
+            type: data.error ? 'danger' : 'success',
+            message,
+          });
+          providersMutate();
+        }
+      } catch {
+        setLocalSetupStatus('Failed to read setup status. Please try again.');
+        setLocalSetupInProgressProviderId(null);
+        addNotification({
+          type: 'danger',
+          message: 'Local provider refresh failed to report status.',
+        });
+      }
+    };
+
+    setLocalSetupInProgressProviderId(providerId);
+    setLocalSetupStatus('Refreshing local provider setup...');
+    setLocalSetupLogTail('');
+    poll();
+  }
+
+  async function handleRefreshLocalProvider(providerId: string, providerName: string) {
+    setLocalSetupProviderName(providerName);
+    setLocalSetupModalOpen(true);
+    setLocalSetupStatus('Starting local provider refresh...');
+    setLocalSetupLogTail('');
+    try {
+      const response = await authContext.fetchWithAuth(
+        `${Endpoints.ComputeProvider.Setup(providerId)}?refresh=true`,
+        { method: 'POST' },
+      );
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        const detail =
+          (error && (error.detail?.message || error.detail || error.message)) ||
+          'Failed to start local provider refresh';
+        setLocalSetupStatus(detail);
+        addNotification({
+          type: 'danger',
+          message: detail,
+        });
+        return;
+      }
+      await pollLocalSetupStatus(providerId);
+    } catch (error: any) {
+      const detail = error?.message ?? 'Failed to start local provider refresh';
+      setLocalSetupStatus(detail);
+      addNotification({
+        type: 'danger',
+        message: detail,
+      });
     }
   }
 
@@ -1235,6 +1334,29 @@ export default function UserLoginTest(): JSX.Element {
                           >
                             Edit
                           </Button>
+                          {provider.type === 'local' && (
+                            <Button
+                              size="sm"
+                              variant="outlined"
+                              onClick={() =>
+                                handleRefreshLocalProvider(
+                                  provider.id,
+                                  provider.name || 'Local Provider',
+                                )
+                              }
+                              loading={
+                                localSetupInProgressProviderId === provider.id
+                              }
+                              disabled={
+                                !iAmOwner ||
+                                providersLoading ||
+                                providers === undefined
+                              }
+                              sx={{ minWidth: '70px', fontSize: '0.75rem' }}
+                            >
+                              Refresh
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             color="danger"
@@ -1349,6 +1471,16 @@ export default function UserLoginTest(): JSX.Element {
           Array.isArray(providers) &&
           providers.some((provider: any) => provider?.type === 'local')
         }
+      />
+      <LocalProviderRefreshModal
+        open={localSetupModalOpen}
+        onClose={() => setLocalSetupModalOpen(false)}
+        providerName={localSetupProviderName}
+        setupStatus={localSetupStatus}
+        setupLogTail={localSetupLogTail}
+        isInProgress={Boolean(localSetupInProgressProviderId)}
+        titlePrefix="Refreshing"
+        description="This runs a force refresh of the local provider environment and streams setup logs."
       />
       <Modal
         open={openSetLogoModal}

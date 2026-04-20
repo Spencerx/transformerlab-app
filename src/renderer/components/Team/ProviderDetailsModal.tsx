@@ -27,6 +27,7 @@ import { getPath } from 'renderer/lib/api-client/urls';
 import { Endpoints } from 'renderer/lib/api-client/endpoints';
 import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import LocalProviderRefreshModal from './LocalProviderRefreshModal';
 
 interface ProviderDetailsModalProps {
   open: boolean;
@@ -400,6 +401,9 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setIsSetupInProgress(false);
+      setSetupStatus(null);
+      setSetupLogTail('');
     }
   }, [open]);
 
@@ -737,8 +741,9 @@ export default function ProviderDetailsModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose}>
-      <ModalDialog sx={{ gap: 0, width: 600, height: 700, overflow: 'auto' }}>
+    <>
+      <Modal open={open} onClose={onClose}>
+        <ModalDialog sx={{ gap: 0, width: 600, height: 700, overflow: 'auto' }}>
         <DialogTitle>
           {providerId ? 'Edit Compute Provider' : 'Add Compute Provider'}
         </DialogTitle>
@@ -1206,35 +1211,7 @@ export default function ProviderDetailsModal({
             </>
           )}
         </DialogContent>
-        <DialogActions>
-          <Box
-            sx={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'stretch',
-              width: '100%',
-              mt: 1,
-              gap: 1,
-            }}
-          >
-            {isSetupInProgress && setupLogTail && (
-              <Box
-                sx={{
-                  maxHeight: 220,
-                  overflow: 'auto',
-                  borderRadius: 'sm',
-                  border: '1px solid',
-                  borderColor: 'neutral.outlinedBorder',
-                  bgcolor: 'neutral.softBg',
-                  p: 1,
-                  fontFamily: 'monospace',
-                  fontSize: '12px',
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                {setupLogTail}
-              </Box>
-            )}
+          <DialogActions>
             <Box
               sx={{
                 display: 'flex',
@@ -1242,16 +1219,9 @@ export default function ProviderDetailsModal({
                 justifyContent: 'flex-end',
                 width: '100%',
                 gap: 1,
+                mt: 1,
               }}
             >
-              {isSetupInProgress && setupStatus && (
-                <Typography
-                  level="body-sm"
-                  sx={{ color: 'text.tertiary', mr: 1 }}
-                >
-                  {setupStatus}
-                </Typography>
-              )}
               <Button variant="outlined" onClick={onClose}>
                 Cancel
               </Button>
@@ -1263,9 +1233,19 @@ export default function ProviderDetailsModal({
                 {providerId ? 'Save Compute Provider' : 'Add Compute Provider'}
               </Button>
             </Box>
-          </Box>
-        </DialogActions>
-      </ModalDialog>
-    </Modal>
+          </DialogActions>
+        </ModalDialog>
+      </Modal>
+      <LocalProviderRefreshModal
+        open={isSetupInProgress}
+        onClose={onClose}
+        providerName={name}
+        setupStatus={setupStatus}
+        setupLogTail={setupLogTail}
+        isInProgress={isSetupInProgress}
+        titlePrefix="Setting up"
+        description="Transformer Lab is preparing your local provider and streaming setup logs."
+      />
+    </>
   );
 }
