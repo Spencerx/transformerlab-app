@@ -77,6 +77,13 @@ export default function UserLoginTest(): JSX.Element {
   const [providerCheckStatus, setProviderCheckStatus] = useState<
     Record<string, boolean | null>
   >({});
+  type ProbeStatus = 'idle' | 'running' | 'passed' | 'failed' | 'error';
+  const [probeStatusMap, setProbeStatusMap] = useState<
+    Record<string, ProbeStatus>
+  >({});
+  const [probeMessageMap, setProbeMessageMap] = useState<
+    Record<string, string>
+  >({});
   const [githubPAT, setGithubPAT] = useState<string>('');
   const [githubPATMasked, setGithubPATMasked] = useState<string>('');
   const [githubPATExists, setGithubPATExists] = useState<boolean>(false);
@@ -602,6 +609,102 @@ export default function UserLoginTest(): JSX.Element {
       setProviderCheckStatus((prev) => ({ ...prev, [id]: false }));
     } finally {
       setCheckingProviderId(null);
+    }
+  }
+
+  async function handleStorageProbe(id: string) {
+    setProbeStatusMap((prev) => ({ ...prev, [id]: 'running' }));
+    setProbeMessageMap((prev) => ({ ...prev, [id]: 'Launching probe job…' }));
+
+    try {
+      const launchRes = await authContext.fetchWithAuth(
+        chatAPI.Endpoints.ComputeProvider.LaunchStorageProbe(id),
+        { method: 'POST' },
+      );
+      if (!launchRes.ok) {
+        setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+        setProbeMessageMap((prev) => ({
+          ...prev,
+          [id]: 'Failed to launch probe job.',
+        }));
+        return;
+      }
+      const { job_id: jobId, experiment_id: experimentId } =
+        await launchRes.json();
+
+      const pollStatus = async (): Promise<void> => {
+        const statusRes = await authContext.fetchWithAuth(
+          chatAPI.Endpoints.ComputeProvider.CheckJobStatus(
+            String(jobId),
+            experimentId,
+          ),
+          { method: 'GET' },
+        );
+        if (!statusRes.ok) {
+          setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: 'Lost contact with probe job.',
+          }));
+          return;
+        }
+        const statusData = await statusRes.json();
+        const jobStatus: string = statusData?.status ?? '';
+
+        if (jobStatus === 'COMPLETE') {
+          const checkRes = await authContext.fetchWithAuth(
+            chatAPI.Endpoints.ComputeProvider.CheckStorageProbe(
+              id,
+              String(jobId),
+            ),
+            { method: 'GET' },
+          );
+          if (!checkRes.ok) {
+            setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+            setProbeMessageMap((prev) => ({
+              ...prev,
+              [id]: 'Could not reach check endpoint.',
+            }));
+            return;
+          }
+          const checkData = await checkRes.json();
+          if (checkData.found) {
+            setProbeStatusMap((prev) => ({ ...prev, [id]: 'passed' }));
+            setProbeMessageMap((prev) => ({
+              ...prev,
+              [id]: `Sentinel found at: ${checkData.path}`,
+            }));
+          } else {
+            setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
+            setProbeMessageMap((prev) => ({
+              ...prev,
+              [id]: `File not found at: ${checkData.path}`,
+            }));
+          }
+        } else if (jobStatus === 'FAILED' || jobStatus === 'STOPPED') {
+          setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: 'Probe job failed on the worker.',
+          }));
+        } else {
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: `Job status: ${jobStatus} — waiting…`,
+          }));
+          window.setTimeout(() => {
+            pollStatus();
+          }, 3000);
+        }
+      };
+
+      await pollStatus();
+    } catch {
+      setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+      setProbeMessageMap((prev) => ({
+        ...prev,
+        [id]: 'Unexpected error running storage probe.',
+      }));
     }
   }
 
@@ -1216,42 +1319,90 @@ export default function UserLoginTest(): JSX.Element {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <Stack
-                          direction="row"
+                          direction="column"
                           gap={0.5}
-                          justifyContent="flex-end"
+                          alignItems="flex-end"
                         >
-                          <Button
-                            size="sm"
-                            variant="outlined"
-                            onClick={() => {
-                              setProviderId(provider.id);
-                              setOpenProviderDetailsModal(true);
-                            }}
-                            disabled={
-                              provider.type === 'local' ||
-                              providersLoading ||
-                              providers === undefined
-                            }
-                            sx={{ minWidth: '60px', fontSize: '0.75rem' }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            color="danger"
-                            variant="outlined"
-                            onClick={() =>
-                              handleDeleteProvider(provider.id, provider.name)
-                            }
-                            disabled={
-                              !iAmOwner ||
-                              providersLoading ||
-                              providers === undefined
-                            }
-                            sx={{ minWidth: '60px', fontSize: '0.75rem' }}
-                          >
-                            Delete
-                          </Button>
+                          <Stack direction="row" gap={0.5}>
+                            <Button
+                              size="sm"
+                              variant="outlined"
+                              loading={
+                                probeStatusMap[provider.id] === 'running'
+                              }
+                              onClick={() => {
+                                if (probeStatusMap[provider.id] !== 'running') {
+                                  handleStorageProbe(provider.id);
+                                }
+                              }}
+                              sx={{ minWidth: '90px', fontSize: '0.75rem' }}
+                            >
+                              Test Storage
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outlined"
+                              onClick={() => {
+                                setProviderId(provider.id);
+                                setOpenProviderDetailsModal(true);
+                              }}
+                              disabled={
+                                provider.type === 'local' ||
+                                providersLoading ||
+                                providers === undefined
+                              }
+                              sx={{ minWidth: '60px', fontSize: '0.75rem' }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              color="danger"
+                              variant="outlined"
+                              onClick={() =>
+                                handleDeleteProvider(provider.id, provider.name)
+                              }
+                              disabled={
+                                !iAmOwner ||
+                                providersLoading ||
+                                providers === undefined
+                              }
+                              sx={{ minWidth: '60px', fontSize: '0.75rem' }}
+                            >
+                              Delete
+                            </Button>
+                          </Stack>
+                          {probeStatusMap[provider.id] === 'passed' && (
+                            <Chip color="success" size="sm" variant="soft">
+                              Storage OK
+                            </Chip>
+                          )}
+                          {(probeStatusMap[provider.id] === 'failed' ||
+                            probeStatusMap[provider.id] === 'error') && (
+                            <Chip color="danger" size="sm" variant="soft">
+                              {probeStatusMap[provider.id] === 'failed'
+                                ? 'File not found'
+                                : 'Error'}
+                            </Chip>
+                          )}
+                          {probeMessageMap[provider.id] && (
+                            <Typography
+                              level="body-xs"
+                              sx={{
+                                color:
+                                  probeStatusMap[provider.id] === 'passed'
+                                    ? 'success.600'
+                                    : probeStatusMap[provider.id] === 'running'
+                                      ? 'text.secondary'
+                                      : 'danger.600',
+                                fontFamily: 'monospace',
+                                maxWidth: '240px',
+                                wordBreak: 'break-all',
+                              }}
+                            >
+                              {probeMessageMap[provider.id]}
+                            </Typography>
+                          )}
                         </Stack>
                       </td>
                     </tr>
