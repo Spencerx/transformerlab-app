@@ -80,6 +80,6 @@ def test_notes_append_get_error(_mock_exp, _mock_api):
 @patch("transformerlab_cli.commands.notes.subprocess.run", return_value=MagicMock(returncode=1))
 @patch("transformerlab_cli.commands.notes.api.get", return_value=_mock_resp("# notes"))
 @patch("transformerlab_cli.commands.notes.require_current_experiment", return_value="exp1")
-def test_notes_edit_nonzero_editor_exit(_mock_exp, _mock_get, mock_run):
+def test_notes_edit_nonzero_editor_exit(_mock_exp, _mock_get, _mock_run):
     result = runner.invoke(app, ["notes", "edit"])
     assert result.exit_code != 0
