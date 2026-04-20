@@ -635,6 +635,18 @@ export default function UserLoginTest(): JSX.Element {
         }
 
         const data = await response.json().catch(() => ({}));
+        if (data.status === 'idle' && data.done) {
+          const completionMessage = 'Local provider refresh finished.';
+          setLocalSetupStatus(completionMessage);
+          setLocalSetupInProgressProviderId(null);
+          addNotification({
+            type: 'success',
+            message: completionMessage,
+          });
+          providersMutate();
+          return;
+        }
+
         const message: string =
           data.message ||
           data.error ||
@@ -642,7 +654,9 @@ export default function UserLoginTest(): JSX.Element {
             ? 'Local provider refresh finished.'
             : 'Refreshing local provider setup...');
         setLocalSetupStatus(message);
-        setLocalSetupLogTail(typeof data.log_tail === 'string' ? data.log_tail : '');
+        setLocalSetupLogTail(
+          typeof data.log_tail === 'string' ? data.log_tail : '',
+        );
 
         if (!data.done) {
           window.setTimeout(poll, 2000);
@@ -670,7 +684,10 @@ export default function UserLoginTest(): JSX.Element {
     poll();
   }
 
-  async function handleRefreshLocalProvider(providerId: string, providerName: string) {
+  async function handleRefreshLocalProvider(
+    providerId: string,
+    providerName: string,
+  ) {
     setLocalSetupProviderName(providerName);
     setLocalSetupModalOpen(true);
     setLocalSetupStatus('Starting local provider refresh...');
@@ -1480,7 +1497,7 @@ export default function UserLoginTest(): JSX.Element {
         setupLogTail={localSetupLogTail}
         isInProgress={Boolean(localSetupInProgressProviderId)}
         titlePrefix="Refreshing"
-        description="This runs a force refresh of the local provider environment and streams setup logs."
+        description="This runs a force refresh of the local provider environment"
       />
       <Modal
         open={openSetLogoModal}
