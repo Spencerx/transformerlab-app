@@ -629,72 +629,48 @@ export default function UserLoginTest(): JSX.Element {
         }));
         return;
       }
-      const { job_id: jobId, experiment_id: experimentId } =
-        await launchRes.json();
+      const { job_id: jobId } = await launchRes.json();
 
+      const MAX_POLLS = 10;
+      let polls = 0;
       const pollStatus = async (): Promise<void> => {
-        const statusRes = await authContext.fetchWithAuth(
-          chatAPI.Endpoints.ComputeProvider.CheckJobStatus(
+        polls += 1;
+        const checkRes = await authContext.fetchWithAuth(
+          chatAPI.Endpoints.ComputeProvider.CheckStorageProbe(
+            id,
             String(jobId),
-            experimentId,
           ),
           { method: 'GET' },
         );
-        if (!statusRes.ok) {
+        if (!checkRes.ok) {
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
           setProbeMessageMap((prev) => ({
             ...prev,
-            [id]: 'Lost contact with probe job.',
+            [id]: 'Could not reach check endpoint.',
           }));
           return;
         }
-        const statusData = await statusRes.json();
-        const jobStatus: string = statusData?.status ?? '';
-
-        if (jobStatus === 'COMPLETE') {
-          const checkRes = await authContext.fetchWithAuth(
-            chatAPI.Endpoints.ComputeProvider.CheckStorageProbe(
-              id,
-              String(jobId),
-            ),
-            { method: 'GET' },
-          );
-          if (!checkRes.ok) {
-            setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
-            setProbeMessageMap((prev) => ({
-              ...prev,
-              [id]: 'Could not reach check endpoint.',
-            }));
-            return;
-          }
-          const checkData = await checkRes.json();
-          if (checkData.found) {
-            setProbeStatusMap((prev) => ({ ...prev, [id]: 'passed' }));
-            setProbeMessageMap((prev) => ({
-              ...prev,
-              [id]: `Sentinel found at: ${checkData.path}`,
-            }));
-          } else {
-            setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
-            setProbeMessageMap((prev) => ({
-              ...prev,
-              [id]: `File not found at: ${checkData.path}`,
-            }));
-          }
-        } else if (jobStatus === 'FAILED' || jobStatus === 'STOPPED') {
+        const checkData = await checkRes.json();
+        if (checkData.found) {
+          setProbeStatusMap((prev) => ({ ...prev, [id]: 'passed' }));
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: `Sentinel found at: ${checkData.path}`,
+          }));
+        } else if (polls >= MAX_POLLS) {
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
           setProbeMessageMap((prev) => ({
             ...prev,
-            [id]: 'Probe job failed on the worker.',
+            [id]: checkData.path
+              ? `Timed out — file not found at: ${checkData.path}`
+              : 'Timed out waiting for sentinel file.',
           }));
         } else {
           setProbeMessageMap((prev) => ({
             ...prev,
-            [id]: `Job status: ${jobStatus} — waiting…`,
+            [id]: 'Waiting for sentinel file…',
           }));
-          window.setTimeout(() => {
-            pollStatus();
-          }, 3000);
+          window.setTimeout(pollStatus, 20000);
         }
       };
 

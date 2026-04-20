@@ -54,9 +54,8 @@ async def check_storage_probe(job_id: str, team_id: str) -> dict:
     set_organization_id(team_id)
     try:
         workspace = await get_workspace_dir()
+        sentinel_path = storage.join(workspace, "debug", f"storage-probe-{job_id}.txt")
+        found = await storage.exists(sentinel_path)
     finally:
         set_organization_id(None)
-
-    sentinel_path = storage.join(workspace, "debug", f"storage-probe-{job_id}.txt")
-    found = await storage.exists(sentinel_path)
     return {"found": found, "path": sentinel_path}

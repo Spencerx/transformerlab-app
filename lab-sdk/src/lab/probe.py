@@ -13,7 +13,7 @@ import json
 import os
 import time
 
-from lab import storage
+from lab import lab as tfl, storage
 
 
 _PROBE_SUBDIR = "debug"
@@ -51,7 +51,9 @@ async def _run() -> None:
 
 
 def main() -> None:
+    tfl.init()
     asyncio.run(_run())
+    tfl.finish()
 
 
 if __name__ == "__main__":
