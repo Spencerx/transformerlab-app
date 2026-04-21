@@ -786,7 +786,7 @@ export default function ProviderDetailsModal({
                   <Option value="runpod">Runpod</Option>
                   <Option value="dstack">dstack (beta) </Option>
                   {!hasLocalProvider && !providerId && (
-                    <Option value="local">Local (beta)</Option>
+                    <Option value="local">Local</Option>
                   )}
                 </Select>
                 {providerId && (
