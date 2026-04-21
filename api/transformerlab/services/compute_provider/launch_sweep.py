@@ -26,6 +26,7 @@ from transformerlab.services.compute_provider.trackio_launch import (
     resolve_trackio_project_name,
 )
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
+from transformerlab.shared.disk_space_utils import parse_disk_space_gb
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.github_utils import read_github_pat_from_workspace, generate_github_clone_setup
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
@@ -350,12 +351,7 @@ async def launch_sweep_jobs(
                         child_job_id, child_job_updates, request.experiment_id
                     )
 
-                disk_size = None
-                if request.disk_space:
-                    try:
-                        disk_size = int(request.disk_space)
-                    except (TypeError, ValueError):
-                        disk_size = None
+                disk_size = parse_disk_space_gb(request.disk_space)
 
                 file_mounts_for_provider = request.file_mounts if isinstance(request.file_mounts, dict) else {}
 

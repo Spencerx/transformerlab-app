@@ -1864,7 +1864,7 @@ export default function QueueTaskModal({
                     <FormControl sx={{ flex: 1 }}>
                       <FormLabel>Disk space</FormLabel>
                       <Input
-                        placeholder="e.g. 100GB"
+                        placeholder="e.g. 100 or 100GB"
                         value={diskSpaceInput}
                         onChange={(e) => {
                           setDiskSpaceInput(e.target.value);
