@@ -2,6 +2,7 @@ import io
 import json
 import os
 import zipfile
+from pathlib import Path
 
 import httpx
 import typer
@@ -234,11 +235,69 @@ def command_task_list():
     list_tasks(output_format=cli_state.output_format, experiment_id=current_experiment)
 
 
-@app.command("init")
-def command_task_init():
-    """Initialize a task.yaml in the current directory."""
-    task_yaml_path = os.path.join(os.getcwd(), "task.yaml")
+TASK_INIT_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "task_init"
 
+
+def _render_task_yaml_template(task_name: str) -> str:
+    template = (TASK_INIT_TEMPLATES_DIR / "task.yaml").read_text(encoding="utf-8")
+    return template.replace("{{TASK_NAME}}", task_name)
+
+
+def _main_py_template() -> str:
+    return (TASK_INIT_TEMPLATES_DIR / "main.py").read_text(encoding="utf-8")
+
+
+def _write_task_yaml(path: str, data: dict) -> None:
+    yaml_text = yaml.safe_dump(data, sort_keys=False, default_flow_style=False)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(yaml_text)
+
+
+def _print_next_steps(include_main_py: bool) -> None:
+    console.print("\nNext steps:")
+    if include_main_py:
+        console.print("- Edit [bold]main.py[/bold] with your task code")
+    console.print("- Customize [bold]task.yaml[/bold] (resources, setup, parameters)")
+    console.print("- Run: [bold]lab task add .[/bold]")
+    console.print("- Docs: https://lab.cloud/for-teams/running-a-task/task-yaml-structure")
+
+
+def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str) -> None:
+    if os.path.exists(task_yaml_path):
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": "task.yaml already exists"}))
+        else:
+            console.print(
+                f"[error]Error:[/error] [bold]{task_yaml_path}[/bold] already exists. "
+                "Refusing to overwrite. Remove it first or run `lab task init` in an empty directory."
+            )
+        raise typer.Exit(1)
+
+    with open(task_yaml_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(_render_task_yaml_template(folder_name))
+
+    main_py_existed = os.path.exists(main_py_path)
+    if not main_py_existed:
+        with open(main_py_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(_main_py_template())
+
+    if cli_state.output_format == "json":
+        created = ["task.yaml"] if main_py_existed else ["task.yaml", "main.py"]
+        skipped = ["main.py"] if main_py_existed else []
+        print(json.dumps({"created": created, "skipped": skipped, "path": os.path.dirname(task_yaml_path)}))
+        return
+
+    console.print("[success]✓[/success] Created [bold]task.yaml[/bold]")
+    if main_py_existed:
+        console.print("[warning]•[/warning] Skipped [bold]main.py[/bold] (already exists)")
+    else:
+        console.print("[success]✓[/success] Created [bold]main.py[/bold]")
+
+    console.print(f"\nLocation: [bold]{os.path.dirname(task_yaml_path)}[/bold]")
+    _print_next_steps(include_main_py=not main_py_existed)
+
+
+def _task_init_interactive(task_yaml_path: str, folder_name: str) -> None:
     if os.path.exists(task_yaml_path):
         if cli_state.output_format == "json":
             print(json.dumps({"error": "task.yaml already exists"}))
@@ -248,9 +307,7 @@ def command_task_init():
             console.print("[warning]Cancelled.[/warning]")
             raise typer.Exit(0)
 
-    folder_name = os.path.basename(os.getcwd()).strip()
-    default_name = folder_name if folder_name else "my-task"
-    task_name = typer.prompt("Task name", default=default_name).strip() or default_name
+    task_name = typer.prompt("Task name", default=folder_name).strip() or folder_name
 
     cpus = typer.prompt("CPUs", default="2").strip()
     memory = typer.prompt("Memory (GB)", default="4").strip()
@@ -287,7 +344,6 @@ def command_task_init():
                     if isinstance(run_val, str):
                         run = run_val.rstrip()
             except yaml.YAMLError:
-                # Fall back to prompts below
                 pass
 
     if not setup.strip():
@@ -306,20 +362,30 @@ def command_task_init():
     if setup.strip():
         task_yaml["setup"] = setup
 
-    yaml_text = yaml.safe_dump(task_yaml, sort_keys=False, default_flow_style=False)
-    with open(task_yaml_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(yaml_text)
+    _write_task_yaml(task_yaml_path, task_yaml)
 
     if cli_state.output_format == "json":
         print(json.dumps({"path": task_yaml_path}))
         return
 
     console.print(f"[success]✓[/success] Wrote [bold]{task_yaml_path}[/bold]")
-    console.print("\nNext steps:")
-    console.print("- Upload the entire folder in the GUI, or use the CLI:")
-    console.print("  [bold]lab task add .[/bold]")
-    console.print("- You can add additional fields any time. See:")
-    console.print("  https://lab.cloud/for-teams/running-a-task/task-yaml-structure")
+    _print_next_steps(include_main_py=False)
+
+
+@app.command("init")
+def command_task_init(
+    interactive: bool = typer.Option(False, "--interactive", help="Prompt for task settings instead of using defaults"),
+):
+    """Initialize a task.yaml and main.py in the current directory."""
+    cwd = os.getcwd()
+    task_yaml_path = os.path.join(cwd, "task.yaml")
+    main_py_path = os.path.join(cwd, "main.py")
+    folder_name = os.path.basename(cwd).strip() or "my-task"
+
+    if interactive:
+        _task_init_interactive(task_yaml_path, folder_name)
+    else:
+        _task_init_default(task_yaml_path, main_py_path, folder_name)
 
 
 @app.command("add")
