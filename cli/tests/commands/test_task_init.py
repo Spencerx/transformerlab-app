@@ -85,6 +85,28 @@ def test_task_init_interactive_json_mode_does_not_prompt_on_overwrite(tmp_path, 
     assert "already exists" in result.stdout
 
 
+def test_task_init_default_force_overwrites_task_yaml(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "task.yaml").write_text("name: old\nrun: echo old\n")
+
+    result = runner.invoke(app, ["task", "init", "--force"])
+    assert result.exit_code == 0
+    yaml_text = (tmp_path / "task.yaml").read_text()
+    assert "name: old" not in yaml_text
+    assert "resources:" in yaml_text
+
+
+def test_task_init_interactive_force_overwrites_task_yaml(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "task.yaml").write_text("name: old\nrun: echo old\n")
+
+    result = runner.invoke(app, ["task", "init", "--interactive", "--force"], input="\n2\n4\n\n\npython train.py\n")
+    assert result.exit_code == 0
+    yaml_text = (tmp_path / "task.yaml").read_text()
+    assert "name: old" not in yaml_text
+    assert "run:" in yaml_text
+
+
 def test_task_init_interactive_uses_editor_for_commands(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("transformerlab_cli.commands.task.os.isatty", lambda _fd: True)
