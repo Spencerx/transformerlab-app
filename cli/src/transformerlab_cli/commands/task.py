@@ -262,8 +262,8 @@ def _print_next_steps(include_main_py: bool) -> None:
     console.print("- Docs: https://lab.cloud/for-teams/running-a-task/task-yaml-structure")
 
 
-def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str) -> None:
-    if os.path.exists(task_yaml_path):
+def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str, force: bool = False) -> None:
+    if os.path.exists(task_yaml_path) and not force:
         if cli_state.output_format == "json":
             print(json.dumps({"error": "task.yaml already exists"}))
         else:
@@ -297,8 +297,8 @@ def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str)
     _print_next_steps(include_main_py=not main_py_existed)
 
 
-def _task_init_interactive(task_yaml_path: str, folder_name: str) -> None:
-    if os.path.exists(task_yaml_path):
+def _task_init_interactive(task_yaml_path: str, folder_name: str, force: bool = False) -> None:
+    if os.path.exists(task_yaml_path) and not force:
         if cli_state.output_format == "json":
             print(json.dumps({"error": "task.yaml already exists"}))
             raise typer.Exit(1)
@@ -375,6 +375,7 @@ def _task_init_interactive(task_yaml_path: str, folder_name: str) -> None:
 @app.command("init")
 def command_task_init(
     interactive: bool = typer.Option(False, "--interactive", help="Prompt for task settings instead of using defaults"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing task.yaml without prompting"),
 ):
     """Initialize a task.yaml and main.py in the current directory."""
     cwd = os.getcwd()
@@ -383,9 +384,9 @@ def command_task_init(
     folder_name = os.path.basename(cwd).strip() or "my-task"
 
     if interactive:
-        _task_init_interactive(task_yaml_path, folder_name)
+        _task_init_interactive(task_yaml_path, folder_name, force=force)
     else:
-        _task_init_default(task_yaml_path, main_py_path, folder_name)
+        _task_init_default(task_yaml_path, main_py_path, folder_name, force=force)
 
 
 @app.command("add")
