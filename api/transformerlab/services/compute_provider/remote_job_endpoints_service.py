@@ -18,6 +18,7 @@ from transformerlab.services.compute_provider.trackio_launch import (
     resolve_trackio_project_name,
 )
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
+from transformerlab.shared.disk_space_utils import parse_disk_space_gb
 from transformerlab.shared.github_utils import generate_github_clone_setup, read_github_pat_from_workspace
 from transformerlab.shared.models.models import ProviderType
 from lab import storage
@@ -162,8 +163,6 @@ async def resume_remote_job_from_checkpoint(
         "github_repo_url",
         "github_repo_dir",
         "github_repo_branch",
-        "github_directory",
-        "github_branch",
         "user_info",
         "team_id",
     ]
@@ -201,6 +200,7 @@ async def resume_remote_job_from_checkpoint(
     env_vars["TFL_STORAGE_PROVIDER"] = STORAGE_PROVIDER
     env_vars["_TFL_JOB_ID"] = str(new_job_id)
     env_vars["_TFL_EXPERIMENT_ID"] = experiment_id
+    env_vars["TFL_EXPERIMENT_ID"] = experiment_id
     if user:
         env_vars["_TFL_USER_ID"] = str(user.id)
 
@@ -260,9 +260,9 @@ async def resume_remote_job_from_checkpoint(
         github_pat = await read_github_pat_from_workspace(workspace_dir, user_id=user_id_for_pat)
         github_setup = generate_github_clone_setup(
             repo_url=github_repo_url,
-            directory=job_data.get("github_directory"),
+            directory=job_data.get("github_repo_dir"),
             github_pat=github_pat,
-            branch=job_data.get("github_branch"),
+            branch=job_data.get("github_repo_branch"),
         )
         setup_commands.append(github_setup)
 
@@ -307,12 +307,7 @@ async def resume_remote_job_from_checkpoint(
         new_job_id, {k: v for k, v in launch_job_data.items() if v is not None}, experiment_id
     )
 
-    disk_size = None
-    if job_data.get("disk_space"):
-        try:
-            disk_size = int(job_data.get("disk_space"))
-        except (TypeError, ValueError):
-            disk_size = None
+    disk_size = parse_disk_space_gb(job_data.get("disk_space"))
 
     cluster_config = ClusterConfig(
         cluster_name=formatted_cluster_name,

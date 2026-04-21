@@ -22,6 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+    env:
+      DO_NOT_TRACK: "1"
 
     steps:
       - name: Checkout repository

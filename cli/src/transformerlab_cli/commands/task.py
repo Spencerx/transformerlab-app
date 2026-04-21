@@ -2,6 +2,7 @@ import io
 import json
 import os
 import zipfile
+from pathlib import Path
 
 import httpx
 import typer
@@ -67,7 +68,9 @@ def info_task(task_id: str, experiment_id: str) -> None:
         console.print(f"[error]Error:[/error] Failed to fetch task info. Status code: {response.status_code}")
 
 
-def add_task_from_directory(task_directory_path: str, experiment_id: str, dry_run: bool = False) -> None:
+def add_task_from_directory(
+    task_directory_path: str, experiment_id: str, dry_run: bool = False, interactive: bool = True
+) -> None:
     """Add a task from a local directory containing task.yaml."""
     task_dir = os.path.realpath(task_directory_path)
 
@@ -132,7 +135,7 @@ def add_task_from_directory(task_directory_path: str, experiment_id: str, dry_ru
         console.print("\n[warning]Dry run mode:[/warning] Task would be created but was not submitted.")
         return
 
-    if cli_state.output_format != "json" and not typer.confirm("\nProceed with task creation?"):
+    if interactive and cli_state.output_format != "json" and not typer.confirm("\nProceed with task creation?"):
         console.print("[warning]Cancelled.[/warning]")
         raise typer.Exit(0)
 
@@ -232,11 +235,165 @@ def command_task_list():
     list_tasks(output_format=cli_state.output_format, experiment_id=current_experiment)
 
 
+TASK_INIT_TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "task_init"
+
+
+def _render_task_yaml_template(task_name: str) -> str:
+    template = (TASK_INIT_TEMPLATES_DIR / "task.yaml").read_text(encoding="utf-8")
+    return template.replace("{{TASK_NAME}}", task_name)
+
+
+def _main_py_template() -> str:
+    return (TASK_INIT_TEMPLATES_DIR / "main.py").read_text(encoding="utf-8")
+
+
+def _write_task_yaml(path: str, data: dict) -> None:
+    yaml_text = yaml.safe_dump(data, sort_keys=False, default_flow_style=False)
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(yaml_text)
+
+
+def _print_next_steps(include_main_py: bool) -> None:
+    console.print("\nNext steps:")
+    if include_main_py:
+        console.print("- Edit [bold]main.py[/bold] with your task code")
+    console.print("- Customize [bold]task.yaml[/bold] (resources, setup, parameters)")
+    console.print("- Run: [bold]lab task add .[/bold]")
+    console.print("- Docs: https://lab.cloud/for-teams/running-a-task/task-yaml-structure")
+
+
+def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str) -> None:
+    if os.path.exists(task_yaml_path):
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": "task.yaml already exists"}))
+        else:
+            console.print(
+                f"[error]Error:[/error] [bold]{task_yaml_path}[/bold] already exists. "
+                "Refusing to overwrite. Remove it first or run `lab task init` in an empty directory."
+            )
+        raise typer.Exit(1)
+
+    with open(task_yaml_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(_render_task_yaml_template(folder_name))
+
+    main_py_existed = os.path.exists(main_py_path)
+    if not main_py_existed:
+        with open(main_py_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(_main_py_template())
+
+    if cli_state.output_format == "json":
+        created = ["task.yaml"] if main_py_existed else ["task.yaml", "main.py"]
+        skipped = ["main.py"] if main_py_existed else []
+        print(json.dumps({"created": created, "skipped": skipped, "path": os.path.dirname(task_yaml_path)}))
+        return
+
+    console.print("[success]✓[/success] Created [bold]task.yaml[/bold]")
+    if main_py_existed:
+        console.print("[warning]•[/warning] Skipped [bold]main.py[/bold] (already exists)")
+    else:
+        console.print("[success]✓[/success] Created [bold]main.py[/bold]")
+
+    console.print(f"\nLocation: [bold]{os.path.dirname(task_yaml_path)}[/bold]")
+    _print_next_steps(include_main_py=not main_py_existed)
+
+
+def _task_init_interactive(task_yaml_path: str, folder_name: str) -> None:
+    if os.path.exists(task_yaml_path):
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": "task.yaml already exists"}))
+            raise typer.Exit(1)
+        should_overwrite = typer.confirm("task.yaml already exists. Overwrite?", default=False)
+        if not should_overwrite:
+            console.print("[warning]Cancelled.[/warning]")
+            raise typer.Exit(0)
+
+    task_name = typer.prompt("Task name", default=folder_name).strip() or folder_name
+
+    cpus = typer.prompt("CPUs", default="2").strip()
+    memory = typer.prompt("Memory (GB)", default="4").strip()
+    accelerators = typer.prompt("Accelerators (optional)", default="", show_default=False).strip()
+
+    setup = ""
+    run = ""
+
+    if cli_state.output_format != "json" and os.isatty(0) and os.isatty(1):
+        edited = typer.edit(
+            "\n".join(
+                [
+                    "# Define the commands for your task below.",
+                    "# This YAML snippet will be parsed and merged into task.yaml.",
+                    "",
+                    "setup: |",
+                    "  # Optional: install deps, download data, etc.",
+                    "  ",
+                    "run: |",
+                    "  # Required: the main command to execute",
+                    "  ",
+                    "",
+                ]
+            )
+        )
+        if edited:
+            try:
+                edited_obj = yaml.safe_load(edited)
+                if isinstance(edited_obj, dict):
+                    setup_val = edited_obj.get("setup")
+                    run_val = edited_obj.get("run")
+                    if isinstance(setup_val, str):
+                        setup = setup_val.rstrip()
+                    if isinstance(run_val, str):
+                        run = run_val.rstrip()
+            except yaml.YAMLError:
+                pass
+
+    if not setup.strip():
+        setup = typer.prompt("Setup command (optional)", default="", show_default=False).rstrip()
+
+    while not run.strip():
+        run = typer.prompt("Run command", default="", show_default=False).rstrip()
+
+    task_yaml: dict = {
+        "name": task_name,
+        "resources": {"cpus": cpus, "memory": memory},
+        "run": run,
+    }
+    if accelerators:
+        task_yaml["resources"]["accelerators"] = accelerators
+    if setup.strip():
+        task_yaml["setup"] = setup
+
+    _write_task_yaml(task_yaml_path, task_yaml)
+
+    if cli_state.output_format == "json":
+        print(json.dumps({"path": task_yaml_path}))
+        return
+
+    console.print(f"[success]✓[/success] Wrote [bold]{task_yaml_path}[/bold]")
+    _print_next_steps(include_main_py=False)
+
+
+@app.command("init")
+def command_task_init(
+    interactive: bool = typer.Option(False, "--interactive", help="Prompt for task settings instead of using defaults"),
+):
+    """Initialize a task.yaml and main.py in the current directory."""
+    cwd = os.getcwd()
+    task_yaml_path = os.path.join(cwd, "task.yaml")
+    main_py_path = os.path.join(cwd, "main.py")
+    folder_name = os.path.basename(cwd).strip() or "my-task"
+
+    if interactive:
+        _task_init_interactive(task_yaml_path, folder_name)
+    else:
+        _task_init_default(task_yaml_path, main_py_path, folder_name)
+
+
 @app.command("add")
 def command_task_add(
     task_directory: str = typer.Argument(None, help="Path to the task directory containing task.yaml"),
     from_git: str = typer.Option(None, "--from-git", help="Git URL to fetch the task from"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Preview the task without creating it"),
+    no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip confirmation prompt"),
 ):
     """Add a new task. Provide a directory path directly, or use --from-git to fetch from a Git repository."""
     current_experiment = require_current_experiment()
@@ -244,7 +401,9 @@ def command_task_add(
     if from_git:
         add_task_from_github(from_git, experiment_id=current_experiment)
     elif task_directory:
-        add_task_from_directory(task_directory, experiment_id=current_experiment, dry_run=dry_run)
+        add_task_from_directory(
+            task_directory, experiment_id=current_experiment, dry_run=dry_run, interactive=not no_interactive
+        )
     else:
         console.print("[error]Error:[/error] Provide a task directory path or use --from-git <url>")
         raise typer.Exit(1)
@@ -253,9 +412,14 @@ def command_task_add(
 @app.command("delete")
 def command_task_delete(
     task_id: str = typer.Argument(..., help="Task ID to delete"),
+    no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip confirmation prompt"),
 ):
     """Delete a task."""
     current_experiment = require_current_experiment()
+
+    if not no_interactive:
+        typer.confirm(f"Delete task {task_id}?", abort=True)
+
     delete_task(task_id, experiment_id=current_experiment)
 
 
@@ -313,10 +477,11 @@ def build_launch_payload(
         "env_vars": task.get("env_vars", {}),
         "parameters": task.get("parameters", {}),
         "config": param_values if param_values else None,
+        "file_mounts": cfg.get("file_mounts") or task.get("file_mounts"),
         "provider_name": provider_name,
         "github_repo_url": task.get("github_repo_url"),
-        "github_repo_dir": task.get("github_repo_dir") or task.get("github_directory"),
-        "github_repo_branch": task.get("github_repo_branch") or task.get("github_branch"),
+        "github_repo_dir": task.get("github_repo_dir"),
+        "github_repo_branch": task.get("github_repo_branch"),
     }
 
 

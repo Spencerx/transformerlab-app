@@ -85,7 +85,8 @@ async def get_workspace_dir() -> str:
     # Only return container workspace path when value is exactly "true"
     # In localfs mode, workspace is TFL_STORAGE_URI/orgs/<org_id>/workspace; HOME_DIR stays app home
     if os.getenv("TFL_STORAGE_URI") is not None and STORAGE_PROVIDER != "localfs":
-        return await storage.root_uri()
+        root = await storage.root_uri()
+        return root
 
     # Explicit override wins
     if "TFL_WORKSPACE_DIR" in os.environ and not (
@@ -102,7 +103,8 @@ async def get_workspace_dir() -> str:
     if org_id:
         # Cloud: _current_tfl_storage_uri is the org workspace root. Localfs: TFL_STORAGE_URI/orgs/org_id/workspace
         if _current_tfl_storage_uri.get() is not None and STORAGE_PROVIDER != "localfs":
-            return _current_tfl_storage_uri.get()
+            ctx = _current_tfl_storage_uri.get()
+            return ctx
         if STORAGE_PROVIDER == "localfs" and os.getenv("TFL_STORAGE_URI"):
             path = storage.join(os.getenv("TFL_STORAGE_URI", ""), "orgs", org_id, "workspace")
         else:
@@ -111,7 +113,8 @@ async def get_workspace_dir() -> str:
         return path
 
     if os.getenv("TFL_STORAGE_URI") and STORAGE_PROVIDER != "localfs":
-        return await storage.root_uri()
+        root = await storage.root_uri()
+        return root
 
     path = storage.join(HOME_DIR, "workspace")
     await storage.makedirs(path, exist_ok=True)
@@ -126,7 +129,7 @@ WORKSPACE_DIR = HOME_DIR
 TFL_HOME_DIR is the directory that is the parent of the src and workspace directories.
 By default, it is set to ~/.transformerlab
 
-TFL_WORKSPACE_DIR is the directory where all the experiments, plugins, and models are stored.
+TFL_WORKSPACE_DIR is the directory where all the experiments, tasks, and models are stored.
 By default, it is set to TFL_HOME_DIR/workspace
 
 TFL_SOURCE_CODE_DIR is the directory where the source code is stored.
@@ -179,17 +182,6 @@ async def get_logs_dir() -> str:
 async def experiment_dir_by_name(experiment_name: str) -> str:
     experiments_dir = await get_experiments_dir()
     return storage.join(experiments_dir, experiment_name)
-
-
-async def get_plugin_dir() -> str:
-    workspace = await get_workspace_dir()
-    return storage.join(workspace, "plugins")
-
-
-async def plugin_dir_by_name(plugin_name: str) -> str:
-    plugin_name = secure_filename(plugin_name)
-    plugin_dir = await get_plugin_dir()
-    return storage.join(plugin_dir, plugin_name)
 
 
 async def get_models_dir() -> str:

@@ -49,6 +49,7 @@ from transformerlab.routers import (  # noqa: E402
     ssh_keys,
     asset_versions,
     trackio,
+    permissions,
 )
 from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 
@@ -140,6 +141,13 @@ async def lifespan(app: FastAPI):
 
         await start_remote_job_status_worker()
         await start_notification_worker()
+        # Start background remote job queue worker (dispatches PENDING remote launch jobs).
+        from transformerlab.services.remote_provider_queue import (
+            start_remote_job_queue_worker,
+            stop_remote_job_queue_worker,
+        )
+
+        await start_remote_job_queue_worker()
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
@@ -149,6 +157,7 @@ async def lifespan(app: FastAPI):
         await stop_sweep_status_worker()
         await stop_remote_job_status_worker()
         await stop_notification_worker()
+        await stop_remote_job_queue_worker()
         await stop_jobs_migration_worker()
     from transformerlab.services.process_registry import get_registry
 
@@ -307,6 +316,7 @@ app.include_router(quota.router)
 app.include_router(ssh_keys.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(asset_versions.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(trackio.router, dependencies=[Depends(get_user_and_team)])
+app.include_router(permissions.router, dependencies=[Depends(get_user_and_team)])
 
 
 # @app.get("/")

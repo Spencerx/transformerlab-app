@@ -6,6 +6,8 @@ from fastapi import (
     Depends,
     Request,
     Response,
+    File,
+    UploadFile,
 )
 from fastapi.responses import StreamingResponse
 from typing import Optional
@@ -101,7 +103,7 @@ def process_env_parameters_to_env_vars(config: dict) -> dict:
 @cached(
     key="tasks:list:{experimentId}",
     ttl="300s",
-    tags=["tasks", "tasks:list:{experimentId}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_all(experimentId: str):
     tasks = await task_service.task_get_by_experiment(experimentId)
@@ -112,7 +114,7 @@ async def task_get_all(experimentId: str):
 @cached(
     key="tasks:get:{experimentId}:{task_id}",
     ttl="300s",
-    tags=["tasks", "task:{experimentId}:{task_id}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_by_id(experimentId: str, task_id: str):
     task = await task_service.task_get_by_id(task_id)
@@ -125,7 +127,7 @@ async def task_get_by_id(experimentId: str, task_id: str):
 @cached(
     key="tasks:list_by_type:{type}",
     ttl="300s",
-    tags=["tasks", "tasks:list_by_type:{type}"],
+    tags=["tasks:list_by_type:{type}"],
 )
 async def task_get_by_type(type: str):
     tasks = await task_service.task_get_by_type(type)
@@ -139,7 +141,7 @@ async def task_get_by_type(type: str):
 @cached(
     key="tasks:list_by_type_in_experiment:{experimentId}:{type}",
     ttl="300s",
-    tags=["tasks", "tasks:list:{experimentId}", "tasks:list_by_type:{experimentId}:{type}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_by_type_in_experiment(experimentId: str, type: str):
     tasks = await task_service.task_get_by_type_in_experiment(type, experimentId)
@@ -168,11 +170,9 @@ async def task_list_files(task_id: str) -> TaskFilesResponse:
     github_files: list[str] = []
     local_files: list[str] = []
 
-    # For tasks, fields are stored directly (flat structure). Prefer canonical github_repo_* keys,
-    # but fall back to legacy github_directory/github_branch for older tasks.
     github_repo_url = task.get("github_repo_url")
-    github_repo_dir = task.get("github_repo_dir") or task.get("github_directory")
-    github_repo_branch = task.get("github_repo_branch") or task.get("github_branch")
+    github_repo_dir = task.get("github_repo_dir")
+    github_repo_branch = task.get("github_repo_branch")
 
     if github_repo_url:
         try:
@@ -204,28 +204,25 @@ async def task_list_files(task_id: str) -> TaskFilesResponse:
                 elif tgt:
                     local_files.append(str(tgt))
 
-    # Always list files from the per-task workspace directory (workspace/task/{task_id}).
-    # This directory contains at minimum the task.yaml, and for upload-from-directory
-    # tasks it also contains user-uploaded files.
+    # Always list files from the canonical per-task directory.
+    # This directory contains at minimum task.yaml and may include uploaded files.
     try:
-        workspace_dir = await get_workspace_dir()
-        if workspace_dir:
-            task_dir = storage.join(workspace_dir, "task", str(task_id))
-            if await storage.exists(task_dir):
-                entries = await storage.ls(task_dir)
-                # Build a set of basenames already in local_files for dedup.
-                existing_basenames = {os.path.basename(f.split(" -> ")[-1].strip()) for f in local_files}
-                for entry in entries:
-                    # storage.ls returns full paths; compute relative path safely
-                    try:
-                        name = os.path.relpath(entry, task_dir)
-                    except ValueError:
-                        continue  # entry is not under task_dir; skip it
-                    if not name or name == "." or name == "index.json":
-                        continue
-                    if name not in existing_basenames:
-                        local_files.append(name)
-                        existing_basenames.add(name)
+        task_dir = await task_service.get_task_dir(task_id)
+        if await storage.exists(task_dir):
+            entries = await storage.ls(task_dir)
+            # Build a set of basenames already in local_files for dedup.
+            existing_basenames = {os.path.basename(f.split(" -> ")[-1].strip()) for f in local_files}
+            for entry in entries:
+                # storage.ls returns full paths; compute relative path safely
+                try:
+                    name = os.path.relpath(entry, task_dir)
+                except ValueError:
+                    continue  # entry is not under task_dir; skip it
+                if not name or name == "." or name == "index.json":
+                    continue
+                if name not in existing_basenames:
+                    local_files.append(name)
+                    existing_basenames.add(name)
     except Exception as e:  # pragma: no cover - defensive logging
         print(f"Error listing local files for task {task_id} from task dir: {e}")
 
@@ -254,7 +251,10 @@ async def task_get_file(task_id: str, file_path: str):
 
     # Files for upload-from-directory tasks are materialized under workspace/task/{task_id}
     task_dir = storage.join(workspace_dir, "task", str(task_id))
-    target = storage.join(task_dir, file_path)
+    safe_rel = posixpath.normpath(file_path).lstrip("/")
+    if safe_rel.startswith("..") or "/.." in safe_rel:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    target = storage.join(task_dir, safe_rel)
 
     if not await storage.exists(target) or not await storage.isfile(target):
         raise HTTPException(status_code=404, detail="File not found")
@@ -341,6 +341,121 @@ async def task_get_file(task_id: str, file_path: str):
     )
 
 
+@router.put(
+    "/{task_id}/file/{file_path:path}",
+    summary="Save a text file in a task's local workspace directory",
+)
+async def task_update_file(experimentId: str, task_id: str, file_path: str, request: Request):
+    """
+    Save a UTF-8 text file to workspace/task/{task_id}/{file_path}.
+
+    This endpoint is intended for editable source/config/document files (for example:
+    .py, .md, .yaml/.yml, .json, .txt). Request bodies are decoded as UTF-8 and
+    written in text mode. Binary uploads should use the file-upload endpoint.
+    """
+    task = await task_service.task_get_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    workspace_dir = await get_workspace_dir()
+    if not workspace_dir:
+        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
+
+    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    safe_rel = posixpath.normpath(file_path).lstrip("/")
+    if safe_rel.startswith("..") or "/.." in safe_rel:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    target = storage.join(task_dir, safe_rel)
+    target_parent = os.path.dirname(target)
+    if target_parent:
+        await storage.makedirs(target_parent, exist_ok=True)
+
+    body = (await request.body()).decode("utf-8")
+    async with await storage.open(target, "w", encoding="utf-8") as f:
+        await f.write(body)
+
+    if not task.get("file_mounts"):
+        await task_service.update_task(task_id, {"file_mounts": True})
+
+    await cache.invalidate(f"tasks:{experimentId}")
+    return {"message": "OK"}
+
+
+@router.delete(
+    "/{task_id}/file/{file_path:path}",
+    summary="Delete a file from a task's local workspace directory",
+)
+async def task_delete_file(experimentId: str, task_id: str, file_path: str):
+    task = await task_service.task_get_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    workspace_dir = await get_workspace_dir()
+    if not workspace_dir:
+        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
+
+    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    safe_rel = posixpath.normpath(file_path).lstrip("/")
+    if safe_rel.startswith("..") or "/.." in safe_rel:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+    base_name = os.path.basename(safe_rel).lower()
+    if base_name in {"task.yaml", "task.yml"}:
+        raise HTTPException(status_code=400, detail="task.yaml cannot be deleted")
+
+    target = storage.join(task_dir, safe_rel)
+    if not await storage.exists(target) or not await storage.isfile(target):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    await storage.rm(target)
+    await cache.invalidate(f"tasks:{experimentId}")
+    return {"message": "OK"}
+
+
+@router.post(
+    "/{task_id}/file-upload",
+    summary="Upload one or more files into a task's local workspace directory",
+)
+async def task_upload_file(
+    experimentId: str,
+    task_id: str,
+    files: list[UploadFile] = File(...),
+):
+    task = await task_service.task_get_by_id(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    workspace_dir = await get_workspace_dir()
+    if not workspace_dir:
+        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
+
+    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    await storage.makedirs(task_dir, exist_ok=True)
+
+    saved_files: list[str] = []
+    for uploaded in files:
+        original_name = (uploaded.filename or "").strip()
+        if not original_name:
+            continue
+        safe_name = secure_filename(original_name)
+        if not safe_name:
+            continue
+        target = storage.join(task_dir, safe_name)
+        content = await uploaded.read()
+        async with await storage.open(target, "wb") as f:
+            await f.write(content)
+        saved_files.append(safe_name)
+
+    if not saved_files:
+        raise HTTPException(status_code=400, detail="No valid files uploaded")
+
+    if not task.get("file_mounts"):
+        await task_service.update_task(task_id, {"file_mounts": True})
+
+    await cache.invalidate(f"tasks:{experimentId}")
+    return {"status": "success", "files": saved_files}
+
+
 @router.get(
     "/{task_id}/github_file/{file_path:path}",
     summary="Serve a file from the task's associated GitHub repository for preview",
@@ -357,7 +472,7 @@ async def task_get_github_file(task_id: str, file_path: str):
         raise HTTPException(status_code=404, detail="Task not found")
 
     github_repo_url = task.get("github_repo_url")
-    github_branch = task.get("github_branch")
+    github_repo_branch = task.get("github_repo_branch")
     if not github_repo_url:
         raise HTTPException(status_code=400, detail="Task has no github_repo_url configured")
 
@@ -366,7 +481,7 @@ async def task_get_github_file(task_id: str, file_path: str):
     content_bytes = await fetch_github_file_bytes(
         github_repo_url,
         file_path=file_path,
-        ref=github_branch,
+        ref=github_repo_branch,
     )
 
     _, ext = os.path.splitext(file_path.lower())
@@ -451,7 +566,7 @@ async def task_get_github_file(task_id: str, file_path: str):
 @cached(
     key="tasks:list:{experimentId}:{subtype}:{type}",
     ttl="300s",
-    tags=["tasks", "tasks:list:{experimentId}"],
+    tags=["tasks:{experimentId}"],
 )
 async def task_get_by_subtype_in_experiment(
     experimentId: str,
@@ -471,7 +586,7 @@ async def update_task(experimentId: str, task_id: str, new_task: dict = Body()):
     success = await task_service.update_task(task_id, new_task)
     if success:
         # Best-effort invalidation: task detail + this experiment's task lists.
-        await cache.invalidate(f"task:{experimentId}:{task_id}", f"tasks:list:{experimentId}")
+        await cache.invalidate(f"tasks:{experimentId}")
         return {"message": "OK"}
     else:
         return {"message": "NOT FOUND"}
@@ -482,7 +597,7 @@ async def delete_task(experimentId: str, task_id: str):
     success = await task_service.delete_task(task_id)
     if success:
         # Best-effort invalidation: task detail + this experiment's task lists.
-        await cache.invalidate(f"task:{experimentId}:{task_id}", f"tasks:list:{experimentId}")
+        await cache.invalidate(f"tasks:{experimentId}")
         return {"message": "OK"}
     else:
         return {"message": "NOT FOUND"}
@@ -725,7 +840,7 @@ async def create_task(
                 session,
                 _resolve_provider,
             )
-            await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+            await cache.invalidate(f"tasks:{experimentId}")
             return {"id": task_id}
 
         github_repo_url = (body.get("github_repo_url") or "").strip()
@@ -778,7 +893,7 @@ async def create_task(
 
     if task_id is None:
         raise HTTPException(status_code=400, detail="Unable to create task from request payload")
-    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"id": task_id}
 
 
@@ -803,7 +918,7 @@ async def update_task_yaml(experimentId: str, task_id: str, request: Request):
     success = await task_service.update_task_from_yaml(task_id, task_data)
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
-    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    await cache.invalidate(f"tasks:{experimentId}")
     return {"message": "OK"}
 
 
@@ -831,7 +946,7 @@ async def task_delete_all():
 @cached(
     key="tasks:gallery",
     ttl="120s",
-    tags=["tasks", "tasks:gallery"],
+    tags=["tasks:gallery"],
 )
 async def task_gallery():
     """Get the tasks gallery from the JSON file (same as tasks gallery)"""
@@ -843,7 +958,7 @@ async def task_gallery():
 @cached(
     key="tasks:gallery:interactive",
     ttl="120s",
-    tags=["tasks", "tasks:gallery", "tasks:gallery:interactive"],
+    tags=["tasks:gallery", "tasks:gallery:interactive"],
 )
 async def interactive_gallery():
     """Get the interactive tasks gallery (vscode, jupyter, vllm, ssh templates)"""
@@ -885,7 +1000,8 @@ async def import_task_from_gallery(
                 raise HTTPException(status_code=404, detail="Gallery entry not found")
 
         # Create interactive task template (store interactive_gallery_id for launch-time run resolution)
-        task_name = gallery_entry.get("name", "Interactive Task")
+        requested_name = (request.name or "").strip()
+        task_name = requested_name or gallery_entry.get("name", "Interactive Task")
         interactive_type = gallery_entry.get("interactive_type") or "custom"
         interactive_gallery_id = gallery_entry.get("id")
 
@@ -895,14 +1011,14 @@ async def import_task_from_gallery(
         # 3. inline setup/command fields on the gallery entry
         github_repo_url = gallery_entry.get("github_repo_url")
         github_repo_dir = gallery_entry.get("github_repo_dir")
-        github_branch = gallery_entry.get("github_branch")
+        github_repo_branch = gallery_entry.get("github_repo_branch")
         local_task_dir = gallery_entry.get("local_task_dir")
         source_yaml_data = {}
 
         if github_repo_url:
             try:
                 task_yaml_content = await fetch_task_yaml_from_github(
-                    github_repo_url, directory=github_repo_dir, ref=github_branch
+                    github_repo_url, directory=github_repo_dir, ref=github_repo_branch
                 )
                 source_yaml_data = _parse_yaml_to_task_data(task_yaml_content)
             except Exception as e:
@@ -931,17 +1047,17 @@ async def import_task_from_gallery(
         if github_repo_url:
             task_data["github_repo_url"] = github_repo_url
             if github_repo_dir:
-                task_data["github_directory"] = github_repo_dir
-            if github_branch:
-                task_data["github_branch"] = github_branch
+                task_data["github_repo_dir"] = github_repo_dir
+            if github_repo_branch:
+                task_data["github_repo_branch"] = github_repo_branch
 
         # Merge additional fields from source task.yaml (parameters, env_vars, resources, etc.)
         for key in (
             "parameters",
             "env_vars",
             "github_repo_url",
-            "github_directory",
-            "github_branch",
+            "github_repo_dir",
+            "github_repo_branch",
             "cpus",
             "memory",
             "disk_space",
@@ -984,7 +1100,7 @@ async def import_task_from_gallery(
         task_id = await task_service.add_task(task_data)
 
         # Invalidate cached task lists for this experiment (best-effort).
-        await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+        await cache.invalidate(f"tasks:{experimentId}")
 
         # Store task.yaml in the task directory for GitHub-sourced interactive tasks
         if github_repo_url and source_yaml_data:
@@ -1029,15 +1145,9 @@ async def import_task_from_gallery(
 
     # Extract gallery entry fields
     title = gallery_entry.get("title", "Imported Task")
-    github_repo_url = gallery_entry.get("github_repo_url") or gallery_entry.get("github_url", "")
-    github_repo_dir = (
-        gallery_entry.get("github_repo_dir")
-        or gallery_entry.get("directory_path")
-        or gallery_entry.get("github_directory")
-    )
-    github_branch = (
-        gallery_entry.get("github_branch") or gallery_entry.get("github_repo_branch") or gallery_entry.get("git_branch")
-    )
+    github_repo_url = gallery_entry.get("github_repo_url") or ""
+    github_repo_dir = gallery_entry.get("github_repo_dir")
+    github_repo_branch = gallery_entry.get("github_repo_branch")
 
     if not github_repo_url:
         raise HTTPException(status_code=400, detail="Gallery entry missing github_repo_url")
@@ -1045,7 +1155,7 @@ async def import_task_from_gallery(
     # Fetch task.yaml from GitHub repository
     try:
         task_yaml_content = await fetch_task_yaml_from_github(
-            github_repo_url, directory=github_repo_dir, ref=github_branch
+            github_repo_url, directory=github_repo_dir, ref=github_repo_branch
         )
     except HTTPException as e:
         if e.status_code == 404:
@@ -1087,13 +1197,13 @@ async def import_task_from_gallery(
     if "plugin" not in task_data:
         task_data["plugin"] = "remote_orchestrator"
 
-    # Ensure GitHub repo info is set (may be in task.yaml as git_repo). Prefer canonical github_repo_* keys.
+    # Ensure GitHub repo info is set when gallery YAML omits it.
     if not task_data.get("github_repo_url"):
         task_data["github_repo_url"] = github_repo_url
     if github_repo_dir and not task_data.get("github_repo_dir"):
         task_data["github_repo_dir"] = github_repo_dir
-    if github_branch and not task_data.get("github_repo_branch"):
-        task_data["github_repo_branch"] = github_branch
+    if github_repo_branch and not task_data.get("github_repo_branch"):
+        task_data["github_repo_branch"] = github_repo_branch
 
     # Resolve provider
     await _resolve_provider(task_data, user_and_team, session)
@@ -1117,7 +1227,7 @@ async def import_task_from_gallery(
         await f.write(task_yaml_content)
 
     # Invalidate cached task lists for this experiment (best-effort).
-    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    await cache.invalidate(f"tasks:{experimentId}")
 
     return {
         "status": "success",
@@ -1130,7 +1240,7 @@ async def import_task_from_gallery(
 @cached(
     key="tasks:gallery:team",
     ttl="60s",
-    tags=["tasks", "tasks:gallery", "tasks:gallery:team"],
+    tags=["tasks:gallery", "tasks:gallery:team"],
 )
 async def team_task_gallery():
     """Get the team-specific tasks gallery stored in workspace_dir (same as tasks gallery)"""
@@ -1328,15 +1438,9 @@ async def import_task_from_team_gallery(
 
     # Extract gallery entry fields
     title = gallery_entry.get("title", "Imported Task")
-    github_repo_url = gallery_entry.get("github_repo_url") or gallery_entry.get("github_url", "")
-    github_repo_dir = (
-        gallery_entry.get("github_repo_dir")
-        or gallery_entry.get("directory_path")
-        or gallery_entry.get("github_directory")
-    )
-    github_branch = (
-        gallery_entry.get("github_branch") or gallery_entry.get("github_repo_branch") or gallery_entry.get("git_branch")
-    )
+    github_repo_url = gallery_entry.get("github_repo_url") or ""
+    github_repo_dir = gallery_entry.get("github_repo_dir")
+    github_repo_branch = gallery_entry.get("github_repo_branch")
 
     local_task_dir = gallery_entry.get("local_task_dir")
     inline_config = gallery_entry.get("config") if isinstance(gallery_entry.get("config"), dict) else None
@@ -1387,8 +1491,8 @@ async def import_task_from_team_gallery(
             task_data["github_repo_url"] = github_repo_url
         if github_repo_dir and not task_data.get("github_repo_dir"):
             task_data["github_repo_dir"] = github_repo_dir
-        if github_branch and not task_data.get("github_repo_branch"):
-            task_data["github_repo_branch"] = github_branch
+        if github_repo_branch and not task_data.get("github_repo_branch"):
+            task_data["github_repo_branch"] = github_repo_branch
 
         if not is_interactive_import:
             await _resolve_provider(task_data, user_and_team, session)
@@ -1434,7 +1538,7 @@ async def import_task_from_team_gallery(
                 status_code=500, detail=f"Failed to overwrite id in index.json for imported team task: {e}"
             )
 
-        await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+        await cache.invalidate(f"tasks:{experimentId}")
         return {
             "status": "success",
             "message": f"Task '{task_data.get('name') or title}' imported successfully",
@@ -1502,7 +1606,7 @@ async def import_task_from_team_gallery(
         async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
             await f.write(yaml.safe_dump(yaml_obj, sort_keys=False))
 
-        await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+        await cache.invalidate(f"tasks:{experimentId}")
         return {
             "status": "success",
             "message": f"Task '{task_data['name']}' imported successfully",
@@ -1519,7 +1623,7 @@ async def import_task_from_team_gallery(
     # Fetch task.yaml from GitHub repository
     try:
         task_yaml_content = await fetch_task_yaml_from_github(
-            github_repo_url, directory=github_repo_dir, ref=github_branch
+            github_repo_url, directory=github_repo_dir, ref=github_repo_branch
         )
     except HTTPException as e:
         if e.status_code == 404:
@@ -1554,13 +1658,12 @@ async def import_task_from_team_gallery(
         if interactive_gallery_id and not task_data.get("interactive_gallery_id"):
             task_data["interactive_gallery_id"] = interactive_gallery_id
 
-    # Ensure GitHub repo info is set (may be in task.yaml as git_repo)
     if not task_data.get("github_repo_url"):
         task_data["github_repo_url"] = github_repo_url
-    if github_repo_dir and not task_data.get("github_directory"):
-        task_data["github_directory"] = github_repo_dir
-    if github_branch and not task_data.get("github_branch"):
-        task_data["github_branch"] = github_branch
+    if github_repo_dir and not task_data.get("github_repo_dir"):
+        task_data["github_repo_dir"] = github_repo_dir
+    if github_repo_branch and not task_data.get("github_repo_branch"):
+        task_data["github_repo_branch"] = github_repo_branch
 
     # Interactive imports: provider is chosen at launch in the UI, not from YAML/defaults.
     if not is_interactive_import:
@@ -1587,7 +1690,7 @@ async def import_task_from_team_gallery(
         await f.write(task_yaml_content)
 
     # Invalidate cached task lists for this experiment (best-effort).
-    await cache.invalidate("tasks", f"tasks:list:{experimentId}")
+    await cache.invalidate(f"tasks:{experimentId}")
 
     return {
         "status": "success",
@@ -1637,10 +1740,10 @@ async def export_task_to_team_gallery(
         config["file_mounts"] = task.get("file_mounts")
     if task.get("github_repo_url"):
         config["github_repo_url"] = task.get("github_repo_url")
-    if task.get("github_directory"):
-        config["github_directory"] = task.get("github_directory")
-    if task.get("github_branch"):
-        config["github_branch"] = task.get("github_branch")
+    if task.get("github_repo_dir"):
+        config["github_repo_dir"] = task.get("github_repo_dir")
+    if task.get("github_repo_branch"):
+        config["github_repo_branch"] = task.get("github_repo_branch")
     # Preserve interactive metadata in the exported entry so the team interactive tab can round-trip.
     if task.get("subtype"):
         config["subtype"] = task.get("subtype")
@@ -1655,8 +1758,8 @@ async def export_task_to_team_gallery(
         "description": task.get("description"),
         "config": config,
         "github_repo_url": task.get("github_repo_url"),
-        "github_repo_dir": task.get("github_directory"),
-        "github_branch": task.get("github_branch"),
+        "github_repo_dir": task.get("github_repo_dir"),
+        "github_repo_branch": task.get("github_repo_branch"),
         "subtype": task.get("subtype"),
         "interactive_type": task.get("interactive_type"),
         "interactive_gallery_id": task.get("interactive_gallery_id"),
@@ -1705,8 +1808,8 @@ async def export_task_to_team_gallery(
                         "envs": task.get("env_vars") if isinstance(task.get("env_vars"), dict) else None,
                         "parameters": task.get("parameters") if isinstance(task.get("parameters"), dict) else None,
                         "github_repo_url": task.get("github_repo_url"),
-                        "github_repo_dir": task.get("github_directory"),
-                        "github_repo_branch": task.get("github_branch"),
+                        "github_repo_dir": task.get("github_repo_dir"),
+                        "github_repo_branch": task.get("github_repo_branch"),
                     }
                     yaml_obj["resources"] = {
                         k: v for k, v in (yaml_obj.get("resources") or {}).items() if v is not None
@@ -1770,7 +1873,7 @@ async def add_task_to_team_gallery(
         },
         "github_repo_url": request.github_repo_url,
         "github_repo_dir": request.github_repo_dir,
-        "github_repo_branch": request.github_branch,
+        "github_repo_branch": request.github_repo_branch,
     }
     yaml_obj["resources"] = {k: v for k, v in (yaml_obj.get("resources") or {}).items() if v not in (None, "")}
     yaml_obj = {k: v for k, v in yaml_obj.items() if v not in (None, "", {}, [])}
@@ -1802,11 +1905,11 @@ async def add_task_to_team_gallery(
             "supported_accelerators": request.supported_accelerators,
             "github_repo_url": request.github_repo_url,
             "github_repo_dir": request.github_repo_dir,
-            "github_branch": request.github_branch,
+            "github_repo_branch": request.github_repo_branch,
         },
         "github_repo_url": request.github_repo_url,
         "github_repo_dir": request.github_repo_dir,
-        "github_branch": request.github_branch,
+        "github_repo_branch": request.github_repo_branch,
         "local_task_dir": dest_dir,
     }
 

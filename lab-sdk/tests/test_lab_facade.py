@@ -474,6 +474,7 @@ def test_lab_save_dataset(tmp_path, monkeypatch):
             return len(self.data)
 
         def to_json(self, path_or_buf, orient, lines):
+            _ = orient
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -541,6 +542,7 @@ def test_lab_save_dataset_with_metadata(tmp_path, monkeypatch):
             return len(self.data)
 
         def to_json(self, path_or_buf, orient, lines):
+            _ = orient
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -587,6 +589,7 @@ def test_lab_save_dataset_image_format(tmp_path, monkeypatch):
             return len(self.data)
 
         def to_json(self, path_or_buf, orient, lines):
+            _ = orient
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -632,6 +635,7 @@ def test_lab_save_dataset_duplicate_error(tmp_path, monkeypatch):
             return len(self.data)
 
         def to_json(self, path_or_buf, orient, lines):
+            _ = orient
             # Handle both file-like objects and path strings (like real pandas)
             if hasattr(path_or_buf, "write"):
                 # It's a file-like object
@@ -1198,3 +1202,45 @@ def test_lab_save_model_does_not_call_sync_log_in_async_path(tmp_path, monkeypat
     with open(log_path, "r") as f:
         content = f.read()
     assert "Warning: Model saved but metadata creation failed: metadata failed" in content
+
+
+@pytest.mark.asyncio
+async def test_copy_file_mounts_without_lab_init(tmp_path, monkeypatch):
+    """Provider setup runs copy_file_mounts without lab.init(); env matches launch_template."""
+    _fresh(monkeypatch)
+    home = tmp_path / "home"
+    ws = tmp_path / ".tfl_ws"
+    home.mkdir()
+    ws.mkdir()
+    (home / ".tfl_home").mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("TFL_HOME_DIR", str(home / ".tfl_home"))
+    monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
+
+    from lab.experiment import Experiment
+    from lab.lab_facade import Lab
+    from lab.dirs import get_task_dir
+    from lab import storage
+
+    exp = await Experiment.create("exp_mounts")
+    job = await exp.create_job()
+    await job.update_job_data_field("task_id", "mytask")
+
+    task_root = await get_task_dir()
+    task_path = storage.join(task_root, "mytask")
+    await storage.makedirs(task_path, exist_ok=True)
+    hello = storage.join(task_path, "hello.txt")
+    async with await storage.open(hello, "w") as f:
+        await f.write("hi")
+
+    monkeypatch.setenv("_TFL_JOB_ID", str(job.id))
+    monkeypatch.setenv("_TFL_EXPERIMENT_ID", str(exp.id))
+
+    lab = Lab()
+    assert lab._experiment is None
+    await lab.async_copy_file_mounts()
+
+    dest = os.path.join(str(home), "hello.txt")
+    assert os.path.isfile(dest)
+    with open(dest) as f:
+        assert f.read() == "hi"

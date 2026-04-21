@@ -47,77 +47,28 @@ def test_build_ngrok_empty_ports_returns_empty():
     assert build_ngrok_tunnel_command("id", []) == ""
 
 
-# ---- resolve_interactive_command: legacy (no commands field) ----
-def test_resolve_legacy_entry_remote():
-    """Legacy entry without 'commands' uses top-level command and no setup override."""
-    entry = {"id": "jupyter", "command": "jupyter lab --port=8888", "setup": "pip install jupyter"}
-    cmd, setup = resolve_interactive_command(entry, "remote")
-    assert cmd == "jupyter lab --port=8888"
-    assert setup is None
-
-
-def test_resolve_legacy_entry_local():
-    """Legacy entry: local environment still gets legacy command when no commands.local."""
-    entry = {"id": "jupyter", "command": "jupyter lab --port=8888"}
-    cmd, setup = resolve_interactive_command(entry, "local")
-    assert cmd == "jupyter lab --port=8888"
-    assert setup is None
-
-
-# ---- resolve_interactive_command: logic (preferred); tunnel "ngrok" built from ports ----
-def test_resolve_logic_remote_tunnel_ngrok_uses_builder():
-    """When tunnel is 'ngrok', remote command includes API-generated ngrok (YAML + start --all)."""
+# ---- resolve_interactive_command: task run + ngrok from gallery ports ----
+def test_resolve_remote_uses_base_command_and_ngrok_from_ports():
+    """Remote: task run from base_command; ngrok built from gallery ports."""
     entry = {
         "id": "jupyter",
         "interactive_type": "jupyter",
-        "logic": {
-            "core": "start-core",
-            "tunnel": "ngrok",
-            "tail_logs": "tail-logs",
-        },
         "ports": [{"port": 8888, "label": "Jupyter Lab", "protocol": "http"}],
     }
-    cmd, setup = resolve_interactive_command(entry, "remote")
+    cmd, setup = resolve_interactive_command(entry, "remote", base_command="start-core")
     assert "start-core" in cmd
-    assert "tail-logs" in cmd
     assert 'ngrok config add-authtoken "$NGROK_AUTH_TOKEN"' in cmd
     assert "~/ngrok-jupyter.yml" in cmd
     assert "ngrok start --all" in cmd
     assert setup is None
 
 
-def test_resolve_logic_local_omits_tunnel_adds_echo():
-    """logic is used for local; tunnel (ngrok) omitted, local URL echo for known types, ngrok stripped from tail."""
-    entry = {
-        "id": "jupyter",
-        "interactive_type": "jupyter",
-        "logic": {
-            "core": "start-core",
-            "tunnel": "ngrok",
-            "tail_logs": "tail -f /tmp/jupyter.log /tmp/ngrok.log",
-        },
-        "ports": [{"port": 8888, "label": "Jupyter", "protocol": "http"}],
-    }
-    cmd, setup = resolve_interactive_command(entry, "local")
-    assert "start-core" in cmd
-    assert "ngrok start" not in cmd
-    assert "Local URL: http://localhost:8888" in cmd
-    assert "/tmp/ngrok.log" not in cmd
+def test_resolve_local_returns_base_command_without_echo_injection():
+    """Local path keeps task run command untouched; URL parsing happens from real logs."""
+    entry = {"id": "ollama", "interactive_type": "ollama"}
+    cmd, setup = resolve_interactive_command(entry, "local", base_command="python run.py")
+    assert cmd == "python run.py"
     assert setup is None
-
-
-def test_resolve_legacy_command_when_no_logic():
-    """When entry has no logic, top-level command is used (commands.local/remote ignored)."""
-    entry = {
-        "command": "legacy-cmd",
-        "setup": "legacy-setup",
-        "commands": {"local": {"default": "local-cmd"}, "remote": {"default": "remote-cmd"}},
-    }
-    cmd, setup = resolve_interactive_command(entry, "remote")
-    assert cmd == "legacy-cmd"
-    assert setup is None
-    cmd2, _ = resolve_interactive_command(entry, "local")
-    assert cmd2 == "legacy-cmd"
 
 
 # ---- find_interactive_gallery_entry ----

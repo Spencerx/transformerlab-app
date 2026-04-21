@@ -389,18 +389,26 @@ class RunpodProvider(ComputeProvider):
                 except (TypeError, ValueError):
                     vcpu_count = 2
             pod_data["vcpuCount"] = vcpu_count
-        if config.disk_size:
-            pod_data["volumeInGb"] = config.disk_size
-        elif self.extra_config.get("default_volume_gb"):
-            pod_data["volumeInGb"] = self.extra_config["default_volume_gb"]
 
-        if config.provider_config.get("container_disk_gb"):
-            pod_data["containerDiskInGb"] = config.provider_config["container_disk_gb"]
+        uses_network_volume = bool(self.default_network_volume_id or config.provider_config.get("network_volume_id"))
+
+        # Job disk_space: apply to both container disk and pod volume so root (~ often /workspace) and
+        # RunPod's pod volume stay aligned. With a network volume, /workspace is the NV; RunPod may
+        # still honor volumeInGb for the pod-volume tier—sizing both avoids tiny container disk when
+        # the user asked for more space overall.
+        if config.disk_size:
+            pod_data["containerDiskInGb"] = config.disk_size
+            pod_data["volumeInGb"] = config.disk_size
+        else:
+            if self.extra_config.get("default_volume_gb"):
+                pod_data["volumeInGb"] = self.extra_config["default_volume_gb"]
+            if config.provider_config.get("container_disk_gb"):
+                pod_data["containerDiskInGb"] = config.provider_config["container_disk_gb"]
 
         if config.env_vars:
             pod_data["env"] = config.env_vars
 
-        if self.default_network_volume_id or config.provider_config.get("network_volume_id"):
+        if uses_network_volume:
             pod_data["networkVolumeId"] = (
                 config.provider_config.get("network_volume_id") or self.default_network_volume_id
             )
@@ -484,9 +492,26 @@ class RunpodProvider(ComputeProvider):
             }
 
         try:
-            # Terminate the pod
+            # Terminate the pod. RunPod documents 204 No Content on success (no body).
+            # https://docs.runpod.io/api-reference/pods/DELETE/pods/podId
             response = self._make_request("DELETE", f"/pods/{pod_id}")
-            result = response.json()
+            status = response.status_code
+            result: Optional[Any] = None
+
+            if status == 204:
+                result = None
+            elif 200 <= status < 300:
+                if response.content:
+                    try:
+                        result = response.json()
+                    except requests.exceptions.JSONDecodeError:
+                        if response.text:
+                            result = {"raw_response": response.text}
+            else:
+                # Should not occur: _make_request uses raise_for_status() (non-2xx raise before here).
+                raise RuntimeError(
+                    f"Unexpected HTTP status from RunPod delete pod: {status} (expected 2xx, typically 204)"
+                )
 
             # Remove from cache
             if cluster_name in self._cluster_name_to_pod_id:
@@ -608,8 +633,10 @@ class RunpodProvider(ComputeProvider):
         elif isinstance(gpu_type, str):
             gpus.append({"gpu": gpu_type, "count": 1})
 
-        # Extract disk info
-        disk_gb = pod.get("volumeInGb") or pod.get("volumeInGB")
+        # Extract disk info (container disk is what we size from job disk_space)
+        disk_gb = pod.get("containerDiskInGb") or pod.get("containerDiskInGB")
+        if disk_gb is None:
+            disk_gb = pod.get("volumeInGb") or pod.get("volumeInGB")
 
         # CPU and memory might not be directly available in pod data
         # They're typically determined by the GPU type

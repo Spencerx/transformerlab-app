@@ -221,9 +221,7 @@ async def _check_job_via_provider(
     provider_type = provider_record.type
     job_status = job.get("status", "")
 
-    # Never auto-transition interactive sessions unless they are already STOPPING.
-    if _is_interactive_subtype_job(job) and job_status != JobStatus.STOPPING.value:
-        return False
+    is_interactive = _is_interactive_subtype_job(job)
 
     if provider_type in (ProviderType.LOCAL.value, ProviderType.RUNPOD.value):
         # LOCAL and RUNPOD: the pod/process itself is the job — check cluster state.
@@ -322,6 +320,10 @@ async def _check_job_via_provider(
                 elif job_status == JobStatus.INTERACTIVE.value and cluster_state == ClusterState.DOWN:
                     # Interactive session died (e.g. setup failure); treat as failed so the job is not stuck.
                     final_status = JobStatus.FAILED.value
+                elif is_interactive:
+                    # Interactive sessions should never be auto-marked COMPLETE.
+                    # If the cluster is down/stopped but not explicitly failed, treat as failed.
+                    final_status = JobStatus.FAILED.value
                 else:
                     final_status = JobStatus.COMPLETE.value
             else:
@@ -329,6 +331,9 @@ async def _check_job_via_provider(
                 if job_status == JobStatus.STOPPING.value:
                     final_status = JobStatus.STOPPED.value
                 elif cluster_state == ClusterState.FAILED:
+                    final_status = JobStatus.FAILED.value
+                elif is_interactive:
+                    # Interactive sessions should never be auto-marked COMPLETE.
                     final_status = JobStatus.FAILED.value
                 else:
                     final_status = JobStatus.COMPLETE.value
@@ -346,6 +351,14 @@ async def _check_job_via_provider(
 
         terminal_job_states = {JobState.COMPLETED, JobState.FAILED, JobState.CANCELLED}
         jobs_finished = False
+        enable_never_seen_empty_failure = provider_type == ProviderType.SKYPILOT.value
+        provider_jobs_seen_once = False
+        if enable_never_seen_empty_failure and isinstance(job_data, dict):
+            provider_jobs_seen_once_raw = job_data.get("provider_jobs_seen_once", False)
+            if isinstance(provider_jobs_seen_once_raw, str):
+                provider_jobs_seen_once = provider_jobs_seen_once_raw.strip().lower() in ("1", "true", "yes")
+            else:
+                provider_jobs_seen_once = bool(provider_jobs_seen_once_raw)
 
         if not provider_jobs:
             empty_poll_count_raw = (
@@ -378,6 +391,19 @@ async def _check_job_via_provider(
             if not jobs_finished:
                 return False
         else:
+            if enable_never_seen_empty_failure and not provider_jobs_seen_once and isinstance(job_data, dict):
+                try:
+                    await job_service.job_update_job_data_insert_key_value(
+                        job_id,
+                        "provider_jobs_seen_once",
+                        True,
+                        experiment_id,
+                    )
+                    provider_jobs_seen_once = True
+                except Exception as exc:
+                    logger.warning(
+                        f"Remote job status worker: failed to set provider_jobs_seen_once for job {job_id}: {exc}"
+                    )
             # Provider queue is non-empty. Prime empty-poll counter to threshold so that
             # the next empty queue observation can be treated as terminal immediately.
             if isinstance(job_data, dict):
@@ -405,6 +431,13 @@ async def _check_job_via_provider(
             if job_status == JobStatus.STOPPING.value or any(state == JobState.CANCELLED for state in provider_states):
                 final_status = JobStatus.STOPPED.value
             elif any(state == JobState.FAILED for state in provider_states):
+                final_status = JobStatus.FAILED.value
+            elif enable_never_seen_empty_failure and not provider_states and not provider_jobs_seen_once:
+                # If provider job queue never surfaced any job records, treat terminal
+                # empty-queue as launch failure instead of successful completion.
+                final_status = JobStatus.FAILED.value
+            elif is_interactive:
+                # Interactive sessions should never be auto-marked COMPLETE.
                 final_status = JobStatus.FAILED.value
             else:
                 final_status = JobStatus.COMPLETE.value

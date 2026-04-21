@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "transformerlab-cli"
-version = "0.0.11"
+version = "0.0.16"
 description = "Transformer Lab CLI"
 requires-python = ">=3.10"
 authors = [{ name = "Transformer Lab", email = "hello@transformerlab.ai" }]
@@ -29,6 +29,7 @@ dependencies = [
   "rich>=13.0.0",
   "textual>=0.86.0",
   "pyyaml>=6.0.3",
+  "segment-analytics-python>=2.3.3",
 ]
 
 [project.urls]
@@ -42,7 +43,7 @@ lab = "transformerlab_cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["*.tcss", "*.css"]
+"*" = ["*.tcss", "*.css", "templates/task_init/*"]
 
 [dependency-groups]
 dev = ["pytest", "textual>=6.11.0", "typer[testing]"]

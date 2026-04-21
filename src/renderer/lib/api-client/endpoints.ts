@@ -107,6 +107,16 @@ Endpoints.Task = {
     `${API_URL()}experiment/${experimentId}/task/${taskId}/file/${encodeURIComponent(
       filePath,
     )}`,
+  UpdateFile: (experimentId: string, taskId: string, filePath: string) =>
+    `${API_URL()}experiment/${experimentId}/task/${taskId}/file/${encodeURIComponent(
+      filePath,
+    )}`,
+  DeleteFile: (experimentId: string, taskId: string, filePath: string) =>
+    `${API_URL()}experiment/${experimentId}/task/${taskId}/file/${encodeURIComponent(
+      filePath,
+    )}`,
+  UploadFile: (experimentId: string, taskId: string) =>
+    `${API_URL()}experiment/${experimentId}/task/${taskId}/file-upload`,
   GetGithubFile: (experimentId: string, taskId: string, filePath: string) =>
     `${API_URL()}experiment/${experimentId}/task/${taskId}/github_file/${encodeURIComponent(
       filePath,
@@ -179,15 +189,6 @@ Endpoints.Dataset = {
     `${API_URL()}data/preview?dataset_id=${datasetId}&split=${split}&offset=${
       offset
     }&limit=${limit}`,
-  PreviewWithTemplate: (
-    datasetId: string,
-    template: string,
-    offset: number,
-    limit: number,
-  ) =>
-    `${API_URL()}data/preview_with_template?dataset_id=${datasetId}&template=${
-      template
-    }&offset=${offset}&limit=${limit}`,
   Delete: (datasetId: string) =>
     `${API_URL()}data/delete?dataset_id=${datasetId}`,
   Create: (datasetId: string) => `${API_URL()}data/new?dataset_id=${datasetId}`,
@@ -265,32 +266,6 @@ Endpoints.Experiment = {
     `${API_URL()}experiment/${id}/file_contents?filename=${filename}`,
   SaveFile: (id: string, filename: string) =>
     `${API_URL()}experiment/${id}/save_file_contents?filename=${filename}`,
-  GetPlugin: (id: string, plugin_name: string) => {
-    return `${API_URL()}experiment/${
-      id
-    }/evals/get_evaluation_plugin_file_contents?plugin_name=${plugin_name}`;
-  },
-  GetGenerationPlugin: (id: string, plugin_name: string) => {
-    return `${API_URL()}experiment/${
-      id
-    }/generations/get_evaluation_plugin_file_contents?plugin_name=${
-      plugin_name
-    }`;
-  },
-  RunEvaluation: (id: string, pluginName: string, evalName: string) => {
-    return `${API_URL()}experiment/${
-      id
-    }/evals/run_evaluation_script?eval_name=${evalName}&plugin_name=${
-      pluginName
-    }`;
-  },
-  RunGeneration: (id: string, pluginName: string, evalName: string) => {
-    return `${API_URL()}experiment/${
-      id
-    }/generations/run_generation_script?generation_name=${
-      evalName
-    }&plugin_name=${pluginName}`;
-  },
   DeleteEval: (experimentId: string, evalName: string) =>
     `${API_URL()}experiment/${experimentId}/evals/delete` +
     `?eval_name=${evalName}`,
