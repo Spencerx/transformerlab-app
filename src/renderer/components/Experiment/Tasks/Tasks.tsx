@@ -38,7 +38,10 @@ import SafeJSONParse from '../../Shared/SafeJSONParse';
 import NewTaskModal2 from './NewTaskModal/NewTaskModal2';
 import TaskYamlEditorModal from './TaskYamlEditorModal';
 import TrackioModal from './TrackioModal';
-import { isDeletableJobRecordStatus } from 'renderer/lib/utils';
+import {
+  isDeletableJobRecordStatus,
+  isJobStopPending,
+} from 'renderer/lib/utils';
 
 const duration = require('dayjs/plugin/duration');
 const dayjs = require('dayjs');
@@ -87,9 +90,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const [compareEvalModalOpen, setCompareEvalModalOpen] = useState(false);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
-  const [viewFileBrowserFromJob, setViewFileBrowserFromJob] = useState<
-    string | null
-  >(null);
   const [viewTaskFilesFromTask, setViewTaskFilesFromTask] = useState<{
     id: string | null;
     name?: string | null;
@@ -99,6 +99,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     id: string;
     name?: string;
   } | null>(null);
+  const [stopPendingByJobId, setStopPendingByJobId] = useState<
+    Record<string, boolean>
+  >({});
   const { experimentInfo } = useExperimentInfo();
   const { addNotification } = useNotification();
   const { fetchWithAuth, team } = useAuth();
@@ -298,6 +301,38 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     return [...sweepJobs, ...remoteJobs];
   }, [jobsRemote, jobsSweep]);
 
+  const handleStopPendingChange = useCallback(
+    (jobId: string, stopPending: boolean) => {
+      setStopPendingByJobId((prev) => {
+        if (stopPending) {
+          return { ...prev, [jobId]: true };
+        }
+        if (!prev[jobId]) return prev;
+        const next = { ...prev };
+        delete next[jobId];
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!Array.isArray(jobs) || jobs.length === 0) return;
+    setStopPendingByJobId((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const job of jobs as any[]) {
+        const id = String(job?.id ?? '');
+        if (!id || !next[id]) continue;
+        if (isJobStopPending(job?.status, job?.job_data?.stop_requested)) {
+          delete next[id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [jobs]);
+
   // Fetch templates with useSWR (templates replace remote tasks)
   const {
     data: allTemplates,
@@ -448,7 +483,17 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   }, [getPendingJobIds, isInteractiveJob, jobs, pendingIdsTrigger, subtype]);
 
   const filteredJobsForDisplay = useMemo(() => {
-    let result = jobsWithPlaceholders;
+    let result = jobsWithPlaceholders.map((job: any) => {
+      const id = String(job?.id ?? '');
+      if (!id || !stopPendingByJobId[id]) return job;
+      return {
+        ...job,
+        job_data: {
+          ...(job?.job_data || {}),
+          stop_requested: true,
+        },
+      };
+    });
     if (showFavoritesOnly) {
       result = result.filter((j: any) => j?.job_data?.favorite);
     }
@@ -456,7 +501,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
       result = result.filter((j: any) => !j?.job_data?.hidden);
     }
     return result;
-  }, [jobsWithPlaceholders, showFavoritesOnly, showHidden]);
+  }, [jobsWithPlaceholders, showFavoritesOnly, showHidden, stopPendingByJobId]);
 
   const hiddenJobCount = useMemo(() => {
     return jobsWithPlaceholders.filter((j: any) => j?.job_data?.hidden).length;
@@ -909,10 +954,33 @@ export default function Tasks({ subtype }: { subtype?: string }) {
   const handleQueue = async (task: any) => {
     if (!experimentInfo?.id) return;
 
+    let latestTask = task;
+    try {
+      // Always resolve the latest task snapshot before queueing to avoid
+      // launching with stale config immediately after task.yaml edits.
+      const response = await fetchWithAuth(
+        chatAPI.Endpoints.Task.GetByID(experimentInfo.id, task.id),
+        {
+          method: 'GET',
+        },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data && !data.message) {
+          latestTask = data;
+        }
+      }
+    } catch (error) {
+      console.error('Failed to refresh task before queueing:', error);
+      // Fall back to the in-memory task object if refresh fails.
+    }
+
     // For templates, all fields are stored directly (not nested in config)
     // For backward compatibility, check if it's an old task format with nested config
     const cfg =
-      task.config !== undefined ? SafeJSONParse(task.config, task) : task; // If no config field, assume it's a template with flat structure
+      latestTask.config !== undefined
+        ? SafeJSONParse(latestTask.config, latestTask)
+        : latestTask;
 
     if (!providers.length) {
       addNotification({
@@ -925,9 +993,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
 
     if (
       !cfg.run &&
-      !task.run &&
+      !latestTask.run &&
       !cfg.github_repo_url &&
-      !task.github_repo_url
+      !latestTask.github_repo_url
     ) {
       addNotification({
         type: 'warning',
@@ -937,7 +1005,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
     }
 
     // Open the queue modal so user can pick provider (and customize params)
-    setTaskBeingQueued(task);
+    setTaskBeingQueued(latestTask);
     setQueueModalOpen(true);
   };
 
@@ -1384,10 +1452,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           onViewGeneratedDataset={(jobId, datasetId) => {
             setPreviewDatasetModal({ open: true, datasetId });
           }}
-          onViewFileBrowser={(jobId) => {
-            if (jobId == null || jobId === '') return;
-            setViewFileBrowserFromJob(String(jobId));
-          }}
           onViewSweepOutput={(jobId) => {
             setViewOutputFromSweepJob(true);
             const jobIdStr =
@@ -1422,6 +1486,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           }}
           onToggleFavorite={handleToggleFavorite}
           onToggleHidden={handleToggleHidden}
+          showFilesButton={false}
+          forceArtifactsButtonVisible
+          onStopPendingChange={handleStopPendingChange}
         />
       </Sheet>
       <ViewSweepResultsModal
@@ -1479,12 +1546,6 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         }
         dataset_id={previewDatasetModal.datasetId}
         viewType="preview"
-      />
-      <FileBrowserModal
-        mode="job"
-        open={viewFileBrowserFromJob !== null}
-        onClose={() => setViewFileBrowserFromJob(null)}
-        jobId={viewFileBrowserFromJob ?? ''}
       />
       <FileBrowserModal
         mode="task"
