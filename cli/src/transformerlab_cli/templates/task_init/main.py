@@ -56,9 +56,7 @@ def main():
         # download (metrics, plots, CSVs, etc.). The second argument is
         # the name the artifact appears under in the UI / CLI.
         summary_path = Path("training_summary.json")
-        summary_path.write_text(
-            json.dumps({"steps": total_steps, "ok": True}, indent=2)
-        )
+        summary_path.write_text(json.dumps({"steps": total_steps, "ok": True}, indent=2))
         lab.save_artifact(str(summary_path), "training_summary.json")
 
         # If you trained a model, you would also call:
