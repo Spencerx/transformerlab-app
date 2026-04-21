@@ -1,0 +1,99 @@
+[
+  {
+    "title": "Batch Image Generation using FLUX2",
+    "description": "A task to generate images in batch using the FLUX2 model.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
+    "github_repo_dir": "batch-image-gen-flux",
+    "metadata": {
+      "category": "generation",
+      "modality": "vision",
+      "framework": [""]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Sample Task Example",
+    "description": "A sample PyTorch training task that clones a repository and runs training script",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
+    "github_repo_dir": "sample-task",
+    "metadata": {
+      "category": "other",
+      "modality": "other",
+      "framework": []
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AppleSilicon": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "cpu": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      }
+    }
+  },
+  {
+    "title": "Dataset Generation Task Example",
+    "description": "A sample dataset generation task that runs a dataset generation script and creates a dataset.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
+    "github_repo_dir": "demo-generate-task",
+    "metadata": {
+      "category": "dataset-generation",
+      "modality": "other",
+      "framework": []
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AppleSilicon": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "cpu": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      }
+    }
+  }
+]

@@ -43,7 +43,7 @@ lab = "transformerlab_cli.main:app"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["*.tcss", "*.css"]
+"*" = ["*.tcss", "*.css", "templates/task_init/*"]
 
 [dependency-groups]
 dev = ["pytest", "textual>=6.11.0", "typer[testing]"]

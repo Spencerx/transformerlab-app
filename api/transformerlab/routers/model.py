@@ -1,9 +1,10 @@
 from typing import Annotated
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Depends
 from huggingface_hub import HfApi
 
 from transformerlab.services import model_service
 from transformerlab.services.cache_service import cached
+from transformerlab.services.permission_service import require_permission
 from lab.dirs import get_workspace_dir
 from lab.model import Model
 from lab import storage
@@ -52,7 +53,11 @@ async def model_local_create(id: str, name: str, json_data={}):
 
 
 @router.get("/model/delete")
-async def model_local_delete(model_id: str, delete_from_cache: bool = False):
+async def model_local_delete(
+    model_id: str,
+    delete_from_cache: bool = False,
+    _: None = Depends(require_permission("model", "delete", id_param="model_id")),
+):
     # Try to delete from filesystem first using SDK
     try:
         model_obj = await Model.get(model_id)

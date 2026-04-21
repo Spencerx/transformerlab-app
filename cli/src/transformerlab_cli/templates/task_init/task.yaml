@@ -1,0 +1,28 @@
+# Transformer Lab task configuration
+# Docs: https://lab.cloud/for-teams/running-a-task/task-yaml-structure
+
+name: {{TASK_NAME}}
+
+# Compute requested for this task. Memory and disk_space are in GB.
+resources:
+  cpus: 2
+  memory: 4
+  # accelerators: "H100:1"   # e.g. 1x H100 GPU; format is "TYPE:COUNT"
+  # disk_space: 100
+  # num_nodes: 1             # >1 for distributed training
+
+# Commands that run on the remote machine BEFORE `run`. Use this for
+# installing deps, downloading data, etc.
+setup: |
+  pip install transformerlab
+
+# Main entry point. This is the command that executes your task.
+run: python main.py
+
+# Parameters are available inside main.py via `lab.get_config()`.
+# parameters:
+#   learning_rate: 0.001
+#   batch_size: 32
+
+# envs:
+#   HF_TOKEN: "${HF_TOKEN}"

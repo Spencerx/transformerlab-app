@@ -287,6 +287,34 @@ class QuotaHold(Base):
     )
 
 
+class ResourcePermission(Base):
+    """
+    Per-user, per-resource permission rules.
+    Denylist default: absence of a record means the user has full access.
+    resource_type: "experiment", "model", "dataset", or "*" (all types)
+    resource_id:   specific resource ID, or "*" (all of that type)
+    actions:       list subset of ["read", "write", "execute", "delete", "admin"]
+    """
+
+    __tablename__ = "resource_permissions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, nullable=False)
+    team_id: Mapped[str] = mapped_column(String, nullable=False)
+    resource_type: Mapped[str] = mapped_column(String, nullable=False)
+    resource_id: Mapped[str] = mapped_column(String, nullable=False)
+    actions: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[DateTime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "team_id", "resource_type", "resource_id", name="uq_resource_permission"),
+        Index("idx_resource_permissions_user_team", "user_id", "team_id"),
+    )
+
+
 class JobQueue(Base):
     """Persistent queue for jobs waiting to be dispatched by a background worker.
 

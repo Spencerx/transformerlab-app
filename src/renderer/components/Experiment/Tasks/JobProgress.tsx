@@ -6,7 +6,7 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import duration from 'dayjs/plugin/duration';
 import utc from 'dayjs/plugin/utc';
-import { jobChipColor } from 'renderer/lib/utils';
+import { isJobStopPending, jobChipColor } from 'renderer/lib/utils';
 import { useCallback } from 'react';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
@@ -41,16 +41,18 @@ interface JobProps {
   };
   launchProgress?: LaunchProgressInfo | null;
   hideCircularLaunchProgressAtOrAbove?: number;
+  onStopPendingChange?: (jobId: string, stopPending: boolean) => void;
 }
 
 export default function JobProgress({
   job,
   launchProgress,
   hideCircularLaunchProgressAtOrAbove,
+  onStopPendingChange,
 }: JobProps) {
   const { experimentInfo } = useExperimentInfo();
   const { fetchWithAuth } = useAuth();
-  const stopping = job?.status === 'STOPPING';
+  const stopping = isJobStopPending(job?.status, job?.job_data?.stop_requested);
   const effectiveLaunchProgress =
     job?.status === 'INTERACTIVE'
       ? null
@@ -62,6 +64,7 @@ export default function JobProgress({
     if (!confirm('Are you sure you want to stop this job?')) {
       return;
     }
+    onStopPendingChange?.(String(job.id), true);
 
     // Check if job has provider metadata (works for both remote and local providers)
     const providerId = job.job_data?.provider_id;
@@ -91,14 +94,21 @@ export default function JobProgress({
             chatAPI.Endpoints.Jobs.Update(experimentInfo.id, job.id, 'RUNNING'),
           );
         }
+        onStopPendingChange?.(String(job.id), false);
       }
     } else if (experimentInfo?.id && job?.id) {
       // For jobs without provider metadata, use the regular stop endpoint
-      await chatAPI.authenticatedFetch(
-        chatAPI.Endpoints.Jobs.Stop(experimentInfo.id, job.id),
-      );
+      try {
+        await chatAPI.authenticatedFetch(
+          chatAPI.Endpoints.Jobs.Stop(experimentInfo.id, job.id),
+        );
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to stop job:', error);
+        onStopPendingChange?.(String(job.id), false);
+      }
     }
-  }, [job, experimentInfo?.id, fetchWithAuth]);
+  }, [job, experimentInfo?.id, fetchWithAuth, onStopPendingChange]);
 
   // Ensure progress is a number
   const progress = (() => {
@@ -151,7 +161,7 @@ export default function JobProgress({
             sx={{ my: 0.5 }}
           />
         </>
-      ) : job?.status === 'STOPPING' ? (
+      ) : stopping ? (
         <>
           <Stack direction="row" alignItems="center" gap={1}>
             <Chip
