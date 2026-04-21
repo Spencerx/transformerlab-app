@@ -209,9 +209,6 @@ def run_evaluation():
         detailed_report_files = get_detailed_file_names(output_dir)
         lab.log(f"Found {len(detailed_report_files)} detailed report files")
 
-        # Process results
-        eval_results = {}
-
         # Parse evaluation results
         results_file = None
         samples_files = {}

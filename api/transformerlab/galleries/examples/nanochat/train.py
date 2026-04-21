@@ -66,7 +66,7 @@ def get_available_gpus():
     try:
         res = subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True, timeout=5)
         if res.returncode == 0:
-            lines = [l for l in res.stdout.strip().split("\n") if l.strip()]
+            lines = [l for l in res.stdout.strip().split("\n") if l.strip()]  # noqa: E741
             return len(lines)
     except Exception:
         pass

@@ -40,7 +40,6 @@ def train_gpt_oss():
         dataset_name = config.get("dataset", "HuggingFaceH4/Multilingual-Thinking")
         output_dir = config.get("output_dir", "./output")
         enable_lora = config.get("enable_lora", False)
-        enable_profiling = config.get("enable_profiling", False)
 
         # Convert string values to appropriate types (parameters from sweeps may come as strings)
         learning_rate_raw = config.get("learning_rate", 2e-4)
