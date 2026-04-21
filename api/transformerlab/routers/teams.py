@@ -1,34 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query
-from fastapi.responses import FileResponse, Response
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from transformerlab.utils.api_key_utils import mask_key
 from transformerlab.shared.models.user_model import get_async_session
-from transformerlab.shared.models.models import User, Team, UserTeam, TeamRole, TeamInvitation, InvitationStatus
+from transformerlab.shared.models.models import User, Team, TeamRole
 from transformerlab.models.users import current_active_user
 from transformerlab.routers.auth import require_team_owner, get_user_and_team
-from transformerlab.utils.email import send_team_invitation_email
-from transformerlab.shared.remote_workspace import create_bucket_for_team
+from transformerlab.schemas.secrets import TeamSecretsRequest, SpecialSecretRequest
+from lab.dirs import get_workspace_dir
 
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from sqlalchemy import select, delete, update, func, and_
-from datetime import datetime, timedelta
-import asyncio
-from os import getenv
-from PIL import Image
-import io
-import json
-import logging
-
-from lab import Experiment
-from lab.dirs import set_organization_id, get_workspace_dir
-from lab import storage
-from transformerlab.schemas.secrets import (
-    TeamSecretsRequest,
-    SpecialSecretRequest,
-    SPECIAL_SECRET_TYPES,
-    SPECIAL_SECRET_KEYS,
-)
+import transformerlab.services.team_service as team_service
 
 
 class TeamCreate(BaseModel):
@@ -89,116 +71,16 @@ async def create_team(
     user: User = Depends(current_active_user),
     logo: Optional[UploadFile] = File(None),
 ):
-    # Create team
-    team = Team(name=name)
-    session.add(team)
-    await session.commit()
-    await session.refresh(team)
-
-    # Add user to the team as owner
-    user_team = UserTeam(user_id=str(user.id), team_id=team.id, role=TeamRole.OWNER.value)
-    session.add(user_team)
-    await session.commit()
-
-    # Create storage (cloud bucket or local folder) for the new team
-    remote_storage_enabled = getenv("TFL_REMOTE_STORAGE_ENABLED", "false").lower() == "true"
-    if remote_storage_enabled or (getenv("TFL_STORAGE_PROVIDER") == "localfs" and getenv("TFL_STORAGE_URI")):
-        try:
-            await asyncio.to_thread(create_bucket_for_team, team.id, "transformerlab-s3")
-        except Exception as e:
-            # Log error but don't fail team creation if storage creation fails
-            print(f"Warning: Failed to create storage for team {team.id}: {e}")
-
-    # Create default experiment "alpha" for the new team
-    # Temporarily set the organization context to the new team ID
-    # so the experiment is created in the correct workspace
-    try:
-        # Set organization context to the new team ID
-        # The middleware will handle context for the next request
-        set_organization_id(team.id)
-
-        # Create the default experiment
-        await Experiment.create_or_get("alpha", create_new=True)
-
-        # Save logo if provided
-        if logo:
-            try:
-                workspace_dir = await get_workspace_dir()
-                logo_path = storage.join(workspace_dir, "logo.png")
-
-                # Validate content type
-                if logo.content_type and not logo.content_type.startswith("image/"):
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Invalid file type. Only image files are allowed. Got: {logo.content_type}",
-                    )
-
-                # Validate file extension
-                if logo.filename:
-                    filename_lower = logo.filename.lower()
-                    # Extract extension using string operation (works with any filename, not just paths)
-                    if "." in filename_lower:
-                        ext = "." + filename_lower.rpartition(".")[2]
-                    else:
-                        ext = ""
-                    allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
-                    if ext not in allowed_extensions:
-                        raise HTTPException(
-                            status_code=400,
-                            detail=f"Invalid file extension. Allowed extensions: {', '.join(allowed_extensions)}",
-                        )
-
-                # Read and check file size limit (1 MB)
-                contents = await logo.read()
-
-                MAX_LOGO_SIZE = 1 * 1024 * 1024  # 1 MB
-                file_size = len(contents)
-                if file_size > MAX_LOGO_SIZE:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Logo file size ({file_size / (1024 * 1024):.2f} MB) exceeds maximum allowed size (1 MB)",
-                    )
-
-                # Validate and process the image
-                try:
-                    image = Image.open(io.BytesIO(contents))
-                    # Verify it's actually a valid image by attempting to load it
-                    image.verify()
-                    # Reopen after verify() since verify() closes the image
-                    image = Image.open(io.BytesIO(contents))
-                except Exception as e:
-                    raise HTTPException(
-                        status_code=400, detail=f"Invalid image file. Please upload a valid image file. Error: {str(e)}"
-                    )
-
-                # Convert to RGB if necessary (handles RGBA, P, etc.)
-                if image.mode in ("RGBA", "LA", "P"):
-                    # Create a white background
-                    rgb_image = Image.new("RGB", image.size, (255, 255, 255))
-                    if image.mode == "P":
-                        image = image.convert("RGBA")
-                    rgb_image.paste(image, mask=image.split()[-1] if image.mode in ("RGBA", "LA") else None)
-                    image = rgb_image
-                elif image.mode != "RGB":
-                    image = image.convert("RGB")
-
-                # Save as PNG
-                async with await storage.open(logo_path, "wb") as f:
-                    image.save(f, format="PNG")
-            except HTTPException:
-                # Re-raise HTTPExceptions (validation errors)
-                raise
-            except Exception as e:
-                # Log error but don't fail team creation if logo save fails
-                print(f"Warning: Failed to save logo for team {team.id}: {e}")
-    except Exception as e:
-        # Log error but don't fail team creation if experiment creation fails
-        print(f"Warning: Failed to create default experiment 'alpha' for team {team.id}: {e}")
-    finally:
-        # Clear the organization context (middleware will set it for next request)
-        set_organization_id(None)
-
-    return TeamResponse(id=team.id, name=team.name)
+    logo_contents = await logo.read() if logo else None
+    result = await team_service.create_team(
+        session,
+        name,
+        user,
+        logo_contents=logo_contents,
+        logo_content_type=logo.content_type if logo else None,
+        logo_filename=logo.filename if logo else None,
+    )
+    return TeamResponse(**result)
 
 
 @router.put("/teams/{team_id}", response_model=TeamResponse)
@@ -208,22 +90,10 @@ async def update_team(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Update team name. Only team owners can update the team."""
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Update
-    stmt = update(Team).where(Team.id == team_id).values(name=team_data.name)
-    await session.execute(stmt)
-    await session.commit()
-
-    # Fetch updated
-    stmt = select(Team).where(Team.id == team_id)
-    result = await session.execute(stmt)
-    team = result.scalar_one()
-
-    return TeamResponse(id=team.id, name=team.name)
+    result = await team_service.update_team(session, team_id, team_data.name)
+    return TeamResponse(**result)
 
 
 @router.delete("/teams/{team_id}")
@@ -232,40 +102,9 @@ async def delete_team(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Delete a team. Only team owners can delete the team."""
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    user = owner_info["user"]
-    team = owner_info["team"]
-
-    # Check if this is a personal team (cannot delete personal teams)
-    # Personal teams are named "{username}'s Team" where username is from email or first_name
-    expected_personal_name = f"{user.first_name or user.email.split('@')[0]}'s Team"
-    if team.name == expected_personal_name:
-        raise HTTPException(status_code=400, detail="Cannot delete personal team")
-
-    # Check if user has other teams
-    stmt = select(UserTeam).where(UserTeam.user_id == str(user.id))
-    result = await session.execute(stmt)
-    user_teams = result.scalars().all()
-    if len(user_teams) <= 1:
-        raise HTTPException(status_code=400, detail="Cannot delete the last team")
-
-    # Delete all user-team associations for this team so no one can access it anymore.
-    # We intentionally keep the Team row and underlying workspace/storage so that
-    # historical data remains available for internal use.
-    stmt = delete(UserTeam).where(UserTeam.team_id == team_id)
-    await session.execute(stmt)
-
-    # Also remove any outstanding invitations for this team to prevent future joins.
-    stmt = delete(TeamInvitation).where(TeamInvitation.team_id == team_id)
-    await session.execute(stmt)
-
-    await session.commit()
-
-    return {"message": "Team deleted"}
+    return await team_service.delete_team(session, team_id, owner_info["user"], owner_info["team"])
 
 
 @router.get("/teams/{team_id}/members")
@@ -274,35 +113,9 @@ async def get_team_members(
     user_and_team=Depends(get_user_and_team),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Get all members of a team. Any team member can view this."""
-    # Verify team_id matches the one in header
     if team_id != user_and_team["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Get all members of the team
-    stmt = select(UserTeam).where(UserTeam.team_id == team_id)
-    result = await session.execute(stmt)
-    user_teams = result.scalars().all()
-
-    # Get user details
-    user_ids = [ut.user_id for ut in user_teams]
-    stmt = select(User).where(User.id.in_(user_ids))
-    result = await session.execute(stmt)
-    users = result.scalars().unique().all()
-
-    # Create a mapping
-    users_dict = {str(user.id): user for user in users}
-
-    members = [
-        MemberResponse(
-            user_id=ut.user_id,
-            email=users_dict[ut.user_id].email if ut.user_id in users_dict else "unknown",
-            role=ut.role,
-        )
-        for ut in user_teams
-    ]
-
-    return {"team_id": team_id, "members": members}
+    return await team_service.get_team_members(session, team_id)
 
 
 @router.post("/teams/{team_id}/members")
@@ -312,177 +125,16 @@ async def invite_member(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Create a team invitation. Only team owners can invite members.
-
-    This creates a pending invitation that the user must accept by clicking
-    the verification link sent to their email.
-
-    Returns a shareable invitation URL and email delivery status.
-    """
-    # TODO:  The verification email is sent using the OS mail system as a temporary solution.
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Validate role
-    if invite_data.role not in [TeamRole.OWNER.value, TeamRole.MEMBER.value]:
-        raise HTTPException(status_code=400, detail="Invalid role. Must be 'owner' or 'member'")
-
-    inviter_user = owner_info["user"]
-
-    # Get team details
-    stmt = select(Team).where(Team.id == team_id)
-    result = await session.execute(stmt)
-    team = result.scalar_one_or_none()
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-
-    # Check if user exists and is already in the team
-    stmt = select(User).where(User.email == invite_data.email)
-    result = await session.execute(stmt)
-    existing_user = result.scalar_one_or_none()
-
-    if existing_user:
-        # Check if already a member
-        stmt = select(UserTeam).where(UserTeam.user_id == str(existing_user.id), UserTeam.team_id == team_id)
-        result = await session.execute(stmt)
-        if result.scalar_one_or_none():
-            raise HTTPException(status_code=400, detail="User is already a member of this team")
-
-    # Check if there's already a pending invitation for this email and team
-    stmt = select(TeamInvitation).where(
-        and_(
-            TeamInvitation.email == invite_data.email,
-            TeamInvitation.team_id == team_id,
-            TeamInvitation.status == InvitationStatus.PENDING.value,
-        )
+    return await team_service.invite_member(
+        session,
+        team_id,
+        invite_data.email,
+        invite_data.role,
+        owner_info["user"],
+        owner_info["team"],
     )
-    result = await session.execute(stmt)
-    existing_invitation = result.scalar_one_or_none()
-
-    app_url = getenv("FRONTEND_URL", "http://localhost:1212")
-
-    if existing_invitation:
-        # Check if the existing invitation has expired
-        if existing_invitation.expires_at < datetime.utcnow():
-            # Expired invitation - extend the expiration and resend
-            existing_invitation.expires_at = datetime.utcnow() + timedelta(days=7)
-            await session.commit()
-            await session.refresh(existing_invitation)
-
-            # Use hash router format for the invitation URL
-            invitation_url = f"{app_url}/#/?invitation_token={existing_invitation.token}"
-
-            # Resend verification email with new expiration
-            try:
-                send_team_invitation_email(
-                    to_email=invite_data.email,
-                    team_name=team.name,
-                    inviter_email=inviter_user.email,
-                    invitation_url=invitation_url,
-                )
-                email_sent = True
-                email_error = None
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-            except (ConnectionError, RuntimeError) as e:
-                # Log warning but don't fail the invitation
-                logging.warning("Failed to send invitation email", exc_info=e)
-                email_sent = False
-                email_error = "Failed to send invitation email"
-
-            return {
-                "message": "Invitation renewed and resent",
-                "invitation_id": existing_invitation.id,
-                "email": existing_invitation.email,
-                "role": existing_invitation.role,
-                "expires_at": existing_invitation.expires_at.isoformat(),
-                "invitation_url": invitation_url,
-                "email_sent": email_sent,
-                "email_error": email_error,
-            }
-        else:
-            # Valid pending invitation - resend without changing expiration
-            # Use hash router format for the invitation URL
-            invitation_url = f"{app_url}/#/?invitation_token={existing_invitation.token}"
-
-            # Resend verification email
-            try:
-                send_team_invitation_email(
-                    to_email=invite_data.email,
-                    team_name=team.name,
-                    inviter_email=inviter_user.email,
-                    invitation_url=invitation_url,
-                )
-                email_sent = True
-                email_error = None
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e))
-            except (ConnectionError, RuntimeError) as e:
-                logging.warning("Failed to send invitation email", exc_info=e)
-                # Log warning but don't fail the invitation
-                email_sent = False
-                email_error = "Failed to send invitation email"
-
-            return {
-                "message": "Invitation already exists and was resent",
-                "invitation_id": existing_invitation.id,
-                "email": existing_invitation.email,
-                "role": existing_invitation.role,
-                "expires_at": existing_invitation.expires_at.isoformat(),
-                "invitation_url": invitation_url,
-                "email_sent": email_sent,
-                "email_error": email_error,
-            }
-
-    # Create invitation
-    invitation = TeamInvitation(
-        email=invite_data.email,
-        team_id=team_id,
-        invited_by_user_id=str(inviter_user.id),
-        role=invite_data.role,
-        status=InvitationStatus.PENDING.value,
-        expires_at=datetime.utcnow() + timedelta(days=7),
-    )
-    session.add(invitation)
-    await session.commit()
-    await session.refresh(invitation)
-
-    # Use hash router format for the invitation URL
-    invitation_url = f"{app_url}/#/?invitation_token={invitation.token}"
-
-    # Send verification email to validate the email address exists
-    try:
-        send_team_invitation_email(
-            to_email=invite_data.email,
-            team_name=team.name,
-            inviter_email=inviter_user.email,
-            invitation_url=invitation_url,
-        )
-        email_sent = True
-        email_error = None
-    except ValueError as e:
-        # Delete the invitation we just created since the email is invalid
-        await session.delete(invitation)
-        await session.commit()
-        raise HTTPException(status_code=400, detail=str(e))
-    except (ConnectionError, RuntimeError) as e:
-        # Log warning but don't fail the invitation
-        logging.warning("Failed to send invitation email", exc_info=e)
-        email_sent = False
-        email_error = "Failed to send invitation email"
-
-    return {
-        "message": "Invitation created successfully",
-        "invitation_id": invitation.id,
-        "email": invite_data.email,
-        "role": invite_data.role,
-        "expires_at": invitation.expires_at.isoformat(),
-        "invitation_url": invitation_url,
-        "email_sent": email_sent,
-        "email_error": email_error,
-    }
 
 
 @router.delete("/teams/{team_id}/members/me")
@@ -491,77 +143,13 @@ async def leave_team(
     user_and_team=Depends(get_user_and_team),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Allow the current user to leave a non-personal team."""
-    # Verify team_id matches the one resolved by get_user_and_team
-    resolved_team_id = user_and_team["team_id"]
-    if team_id != resolved_team_id:
+    if team_id != user_and_team["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    user: User = user_and_team["user"]
-
-    # Fetch team to check personal-team constraint
-    stmt = select(Team).where(Team.id == resolved_team_id)
-    result = await session.execute(stmt)
+    result = await session.execute(select(Team).where(Team.id == team_id))
     team = result.scalar_one_or_none()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
-
-    # Prevent leaving the personal team
-    expected_personal_name = f"{user.first_name or user.email.split('@')[0]}'s Team"
-    if team.name == expected_personal_name:
-        raise HTTPException(status_code=400, detail="Cannot leave personal team")
-
-    # If the user is not an owner, simply remove their membership.
-    if user_and_team["role"] != TeamRole.OWNER.value:
-        stmt = delete(UserTeam).where(UserTeam.user_id == str(user.id), UserTeam.team_id == team_id)
-        await session.execute(stmt)
-        await session.commit()
-        return {"message": "Left team"}
-
-    # User is an owner. Determine how many owners the team has.
-    stmt = (
-        select(func.count())
-        .select_from(UserTeam)
-        .where(UserTeam.team_id == team_id, UserTeam.role == TeamRole.OWNER.value)
-    )
-    result = await session.execute(stmt)
-    owner_count = result.scalar()
-
-    # If there are other owners, it's safe to leave without any promotion.
-    if owner_count > 1:
-        stmt = delete(UserTeam).where(UserTeam.user_id == str(user.id), UserTeam.team_id == team_id)
-        await session.execute(stmt)
-        await session.commit()
-        return {"message": "Left team"}
-
-    # User is the only owner. Look for another member to promote.
-    stmt = (
-        select(UserTeam).where(UserTeam.team_id == team_id, UserTeam.user_id != str(user.id)).order_by(UserTeam.user_id)
-    )
-    result = await session.execute(stmt)
-    next_member = result.scalars().first()
-
-    if next_member:
-        # Promote the selected member to owner, then remove the current owner.
-        stmt = (
-            update(UserTeam)
-            .where(UserTeam.user_id == next_member.user_id, UserTeam.team_id == team_id)
-            .values(role=TeamRole.OWNER.value)
-        )
-        await session.execute(stmt)
-
-        stmt = delete(UserTeam).where(UserTeam.user_id == str(user.id), UserTeam.team_id == team_id)
-        await session.execute(stmt)
-        await session.commit()
-        return {"message": "Left team"}
-
-    # No other members exist; remove this final membership, leaving the team
-    # unreachable from the UI but preserving the Team row and workspace
-    stmt = delete(UserTeam).where(UserTeam.user_id == str(user.id), UserTeam.team_id == team_id)
-    await session.execute(stmt)
-    await session.commit()
-
-    return {"message": "Left team"}
+    return await team_service.leave_team(session, team_id, user_and_team["user"], team, user_and_team["role"])
 
 
 @router.delete("/teams/{team_id}/members/{user_id}")
@@ -571,38 +159,9 @@ async def remove_member(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Remove a member from the team. Only team owners can remove members."""
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Check if the user to be removed exists in the team
-    stmt = select(UserTeam).where(UserTeam.user_id == user_id, UserTeam.team_id == team_id)
-    result = await session.execute(stmt)
-    user_team = result.scalar_one_or_none()
-
-    if not user_team:
-        raise HTTPException(status_code=404, detail="User is not a member of this team")
-
-    # If removing an owner, check that there's at least one other owner
-    if user_team.role == TeamRole.OWNER.value:
-        stmt = (
-            select(func.count())
-            .select_from(UserTeam)
-            .where(UserTeam.team_id == team_id, UserTeam.role == TeamRole.OWNER.value)
-        )
-        result = await session.execute(stmt)
-        owner_count = result.scalar()
-
-        if owner_count <= 1:
-            raise HTTPException(status_code=400, detail="Cannot remove the last owner from the team")
-
-    # Remove user from team
-    stmt = delete(UserTeam).where(UserTeam.user_id == user_id, UserTeam.team_id == team_id)
-    await session.execute(stmt)
-    await session.commit()
-
-    return {"message": "Member removed successfully"}
+    return await team_service.remove_member(session, team_id, user_id)
 
 
 @router.put("/teams/{team_id}/members/{user_id}/role")
@@ -613,45 +172,9 @@ async def update_member_role(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """Update a member's role. Only team owners can change roles."""
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Validate role
-    if role_data.role not in [TeamRole.OWNER.value, TeamRole.MEMBER.value]:
-        raise HTTPException(status_code=400, detail="Invalid role. Must be 'owner' or 'member'")
-
-    # Check if the user exists in the team
-    stmt = select(UserTeam).where(UserTeam.user_id == user_id, UserTeam.team_id == team_id)
-    result = await session.execute(stmt)
-    user_team = result.scalar_one_or_none()
-
-    if not user_team:
-        raise HTTPException(status_code=404, detail="User is not a member of this team")
-
-    # If demoting from owner to member, check that there's at least one other owner
-    if user_team.role == TeamRole.OWNER.value and role_data.role == TeamRole.MEMBER.value:
-        stmt = (
-            select(func.count())
-            .select_from(UserTeam)
-            .where(UserTeam.team_id == team_id, UserTeam.role == TeamRole.OWNER.value)
-        )
-        result = await session.execute(stmt)
-        owner_count = result.scalar()
-
-        if owner_count <= 1:
-            raise HTTPException(status_code=400, detail="Cannot demote the last owner")
-
-    # Update role
-    stmt = update(UserTeam).where(UserTeam.user_id == user_id, UserTeam.team_id == team_id).values(role=role_data.role)
-    await session.execute(stmt)
-    await session.commit()
-
-    return {"message": "Role updated successfully", "user_id": user_id, "new_role": role_data.role}
-
-
-# ==================== Team Invitation Endpoints ====================
+    return await team_service.update_member_role(session, team_id, user_id, role_data.role)
 
 
 @router.get("/invitations/me")
@@ -659,56 +182,7 @@ async def get_my_invitations(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Get all pending invitations for the current user.
-
-    Returns a list of pending team invitations created for the user's email address.
-    Users can accept these invitations to join teams.
-    """
-    # Get all pending invitations for this user's email
-    stmt = (
-        select(TeamInvitation)
-        .where(and_(TeamInvitation.email == user.email, TeamInvitation.status == InvitationStatus.PENDING.value))
-        .order_by(TeamInvitation.created_at.desc())
-    )
-
-    result = await session.execute(stmt)
-    invitations = result.scalars().all()
-
-    # Enrich with team and inviter information
-    invitation_responses = []
-    for invitation in invitations:
-        # Check if expired
-        if invitation.expires_at < datetime.utcnow():
-            invitation.status = InvitationStatus.EXPIRED.value
-            await session.commit()
-            continue
-
-        # Get team info
-        stmt = select(Team).where(Team.id == invitation.team_id)
-        result = await session.execute(stmt)
-        team = result.scalar_one_or_none()
-
-        # Get inviter info
-        stmt = select(User).where(User.id == invitation.invited_by_user_id)
-        result = await session.execute(stmt)
-        inviter = result.scalar_one_or_none()
-
-        invitation_responses.append(
-            InvitationResponse(
-                id=invitation.id,
-                email=invitation.email,
-                team_id=invitation.team_id,
-                team_name=team.name if team else "Unknown Team",
-                role=invitation.role,
-                status=invitation.status,
-                invited_by_email=inviter.email if inviter else "Unknown",
-                expires_at=invitation.expires_at.isoformat(),
-                created_at=invitation.created_at.isoformat(),
-            )
-        )
-
-    return {"invitations": invitation_responses}
+    return await team_service.get_my_invitations(session, user.email)
 
 
 @router.post("/invitations/accept")
@@ -717,63 +191,7 @@ async def accept_invitation(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Accept a team invitation using the invitation token.
-
-    The user must be authenticated and the invitation must match their email address.
-    Token is obtained from the invitation URL shared by the team owner.
-    """
-    # Find the invitation by token
-    stmt = select(TeamInvitation).where(TeamInvitation.token == accept_data.token)
-    result = await session.execute(stmt)
-    invitation = result.scalar_one_or_none()
-
-    if not invitation:
-        raise HTTPException(status_code=404, detail="Invitation not found")
-
-    # Verify the invitation is for this user
-    if invitation.email != user.email:
-        raise HTTPException(status_code=403, detail="This invitation is not for your email address")
-
-    # Check if invitation is still pending
-    if invitation.status != InvitationStatus.PENDING.value:
-        raise HTTPException(status_code=400, detail=f"Invitation is no longer pending (status: {invitation.status})")
-
-    # Check if expired
-    if invitation.expires_at < datetime.utcnow():
-        invitation.status = InvitationStatus.EXPIRED.value
-        await session.commit()
-        raise HTTPException(status_code=400, detail="Invitation has expired")
-
-    # Check if user is already in the team
-    stmt = select(UserTeam).where(UserTeam.user_id == str(user.id), UserTeam.team_id == invitation.team_id)
-    result = await session.execute(stmt)
-    if result.scalar_one_or_none():
-        # Mark invitation as accepted anyway
-        invitation.status = InvitationStatus.ACCEPTED.value
-        await session.commit()
-        raise HTTPException(status_code=400, detail="You are already a member of this team")
-
-    # Add user to team
-    user_team = UserTeam(user_id=str(user.id), team_id=invitation.team_id, role=invitation.role)
-    session.add(user_team)
-
-    # Update invitation status
-    invitation.status = InvitationStatus.ACCEPTED.value
-
-    await session.commit()
-
-    # Get team info
-    stmt = select(Team).where(Team.id == invitation.team_id)
-    result = await session.execute(stmt)
-    team = result.scalar_one_or_none()
-
-    return {
-        "message": "Invitation accepted successfully",
-        "team_id": invitation.team_id,
-        "team_name": team.name if team else None,
-        "role": invitation.role,
-    }
+    return await team_service.accept_invitation(session, user, token=accept_data.token)
 
 
 @router.post("/invitations/{invitation_id}/accept")
@@ -782,64 +200,7 @@ async def accept_invitation_by_id(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Accept a team invitation using the invitation ID.
-
-    This is primarily intended for in-app acceptance of invitations that are
-    shown in the UI (e.g. user settings). The user must be authenticated and
-    the invitation must match their email address.
-    """
-    # Find the invitation by ID
-    stmt = select(TeamInvitation).where(TeamInvitation.id == invitation_id)
-    result = await session.execute(stmt)
-    invitation = result.scalar_one_or_none()
-
-    if not invitation:
-        raise HTTPException(status_code=404, detail="Invitation not found")
-
-    # Verify the invitation is for this user
-    if invitation.email != user.email:
-        raise HTTPException(status_code=403, detail="This invitation is not for your email address")
-
-    # Check if invitation is still pending
-    if invitation.status != InvitationStatus.PENDING.value:
-        raise HTTPException(status_code=400, detail=f"Invitation is no longer pending (status: {invitation.status})")
-
-    # Check if expired
-    if invitation.expires_at < datetime.utcnow():
-        invitation.status = InvitationStatus.EXPIRED.value
-        await session.commit()
-        raise HTTPException(status_code=400, detail="Invitation has expired")
-
-    # Check if user is already in the team
-    stmt = select(UserTeam).where(UserTeam.user_id == str(user.id), UserTeam.team_id == invitation.team_id)
-    result = await session.execute(stmt)
-    if result.scalar_one_or_none():
-        # Mark invitation as accepted anyway
-        invitation.status = InvitationStatus.ACCEPTED.value
-        await session.commit()
-        raise HTTPException(status_code=400, detail="You are already a member of this team")
-
-    # Add user to team
-    user_team = UserTeam(user_id=str(user.id), team_id=invitation.team_id, role=invitation.role)
-    session.add(user_team)
-
-    # Update invitation status
-    invitation.status = InvitationStatus.ACCEPTED.value
-
-    await session.commit()
-
-    # Get team info
-    stmt = select(Team).where(Team.id == invitation.team_id)
-    result = await session.execute(stmt)
-    team = result.scalar_one_or_none()
-
-    return {
-        "message": "Invitation accepted successfully",
-        "team_id": invitation.team_id,
-        "team_name": team.name if team else None,
-        "role": invitation.role,
-    }
+    return await team_service.accept_invitation(session, user, invitation_id=invitation_id)
 
 
 @router.post("/invitations/{invitation_id}/reject")
@@ -848,32 +209,7 @@ async def reject_invitation(
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Reject a team invitation.
-
-    The user must be authenticated and the invitation must match their email address.
-    """
-    # Find the invitation
-    stmt = select(TeamInvitation).where(TeamInvitation.id == invitation_id)
-    result = await session.execute(stmt)
-    invitation = result.scalar_one_or_none()
-
-    if not invitation:
-        raise HTTPException(status_code=404, detail="Invitation not found")
-
-    # Verify the invitation is for this user
-    if invitation.email != user.email:
-        raise HTTPException(status_code=403, detail="This invitation is not for your email address")
-
-    # Check if invitation is still pending
-    if invitation.status != InvitationStatus.PENDING.value:
-        raise HTTPException(status_code=400, detail=f"Invitation is no longer pending (status: {invitation.status})")
-
-    # Update invitation status
-    invitation.status = InvitationStatus.REJECTED.value
-    await session.commit()
-
-    return {"message": "Invitation rejected successfully"}
+    return await team_service.reject_invitation(session, invitation_id, user.email)
 
 
 @router.get("/teams/{team_id}/invitations")
@@ -882,55 +218,9 @@ async def get_team_invitations(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Get all invitations for a team (pending, accepted, rejected, expired).
-
-    Only team owners can view this. Useful for tracking who has been invited
-    and the status of each invitation.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Get all invitations for this team
-    stmt = select(TeamInvitation).where(TeamInvitation.team_id == team_id).order_by(TeamInvitation.created_at.desc())
-
-    result = await session.execute(stmt)
-    invitations = result.scalars().all()
-
-    # Get team info
-    stmt = select(Team).where(Team.id == team_id)
-    result = await session.execute(stmt)
-    team = result.scalar_one_or_none()
-
-    invitation_responses = []
-    for invitation in invitations:
-        # Auto-expire if needed
-        if invitation.status == InvitationStatus.PENDING.value and invitation.expires_at < datetime.utcnow():
-            invitation.status = InvitationStatus.EXPIRED.value
-
-        # Get inviter info
-        stmt = select(User).where(User.id == invitation.invited_by_user_id)
-        result = await session.execute(stmt)
-        inviter = result.scalar_one_or_none()
-
-        invitation_responses.append(
-            InvitationResponse(
-                id=invitation.id,
-                email=invitation.email,
-                team_id=invitation.team_id,
-                team_name=team.name if team else "Unknown Team",
-                role=invitation.role,
-                status=invitation.status,
-                invited_by_email=inviter.email if inviter else "Unknown",
-                expires_at=invitation.expires_at.isoformat(),
-                created_at=invitation.created_at.isoformat(),
-            )
-        )
-
-    await session.commit()  # Commit any status updates
-
-    return {"team_id": team_id, "invitations": invitation_responses}
+    return await team_service.get_team_invitations(session, team_id)
 
 
 @router.delete("/teams/{team_id}/invitations/{invitation_id}")
@@ -940,30 +230,9 @@ async def cancel_invitation(
     owner_info=Depends(require_team_owner),
     session: AsyncSession = Depends(get_async_session),
 ):
-    """
-    Cancel a pending invitation. Only team owners can cancel invitations.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Find the invitation
-    stmt = select(TeamInvitation).where(and_(TeamInvitation.id == invitation_id, TeamInvitation.team_id == team_id))
-    result = await session.execute(stmt)
-    invitation = result.scalar_one_or_none()
-
-    if not invitation:
-        raise HTTPException(status_code=404, detail="Invitation not found")
-
-    # Check if invitation is still pending
-    if invitation.status != InvitationStatus.PENDING.value:
-        raise HTTPException(status_code=400, detail=f"Cannot cancel invitation with status: {invitation.status}")
-
-    # Update the invitation status to cancelled
-    invitation.status = InvitationStatus.CANCELLED.value
-    await session.commit()
-
-    return {"message": "Invitation cancelled successfully"}
+    return await team_service.cancel_invitation(session, team_id, invitation_id)
 
 
 @router.get("/teams/{team_id}/github_pat")
@@ -971,33 +240,10 @@ async def get_github_pat(
     team_id: str,
     user_and_team=Depends(get_user_and_team),
 ):
-    """
-    Get GitHub PAT for the team's workspace (DEPRECATED - use special_secrets endpoint instead).
-    Only reads from secrets (team_secrets.json).
-    Only team members can view (but it will be masked for security).
-    """
-    # Verify team_id matches the one in header
     if team_id != user_and_team["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-
-    # Check secrets only
-    secrets_path = storage.join(workspace_dir, "team_secrets.json")
-    if await storage.exists(secrets_path):
-        try:
-            async with await storage.open(secrets_path, "r") as f:
-                secrets = json.loads(await f.read())
-                if "_GITHUB_PAT_TOKEN" in secrets and secrets["_GITHUB_PAT_TOKEN"]:
-                    pat = secrets["_GITHUB_PAT_TOKEN"].strip()
-                    if pat:
-                        masked_pat = mask_key(pat)
-                        return {"status": "success", "pat_exists": True, "masked_pat": masked_pat}
-        except Exception as e:
-            print(f"Error reading GitHub PAT from secrets: {e}")
-            return {"status": "error", "message": "Failed to read GitHub PAT"}
-
-    return {"status": "error", "message": "GitHub PAT not found"}
+    return await team_service.get_github_pat(workspace_dir)
 
 
 @router.put("/teams/{team_id}/github_pat")
@@ -1006,45 +252,10 @@ async def set_github_pat(
     pat_data: GitHubPATRequest,
     owner_info=Depends(require_team_owner),
 ):
-    """
-    Set GitHub PAT for the team's workspace (DEPRECATED - use special_secrets endpoint instead).
-    Only stores in secrets (team_secrets.json).
-    Only team owners can set/update the PAT.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    secrets_path = storage.join(workspace_dir, "team_secrets.json")
-
-    try:
-        pat = pat_data.pat
-        if pat and pat.strip():
-            # Store in secrets only
-            existing_secrets = {}
-            if await storage.exists(secrets_path):
-                async with await storage.open(secrets_path, "r") as f:
-                    existing_secrets = json.loads(await f.read())
-
-            existing_secrets["_GITHUB_PAT_TOKEN"] = pat.strip()
-            await storage.makedirs(workspace_dir, exist_ok=True)
-            async with await storage.open(secrets_path, "w") as f:
-                await f.write(json.dumps(existing_secrets, indent=2))
-
-            return {"status": "success", "message": "GitHub PAT saved successfully"}
-        else:
-            # Remove the PAT if empty string is provided
-            if await storage.exists(secrets_path):
-                async with await storage.open(secrets_path, "r") as f:
-                    existing_secrets = json.loads(await f.read())
-                existing_secrets.pop("_GITHUB_PAT_TOKEN", None)
-                async with await storage.open(secrets_path, "w") as f:
-                    await f.write(json.dumps(existing_secrets, indent=2))
-            return {"status": "success", "message": "GitHub PAT removed successfully"}
-    except Exception as e:
-        print(f"Error saving GitHub PAT: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save GitHub PAT")
+    return await team_service.set_github_pat(workspace_dir, pat_data.pat)
 
 
 @router.get("/teams/{team_id}/logo")
@@ -1052,31 +263,10 @@ async def get_team_logo(
     team_id: str,
     user_and_team=Depends(get_user_and_team),
 ):
-    """
-    Get team logo. Returns logo.png from workspace if it exists, otherwise returns 404.
-    Any team member can view the logo.
-    """
-    # Verify team_id matches the one in header
     if team_id != user_and_team["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    logo_path = storage.join(workspace_dir, "logo.png")
-
-    if not await storage.exists(logo_path):
-        raise HTTPException(status_code=404, detail="Team logo not found")
-
-    try:
-        # For local filesystem, return file directly
-        if not storage.is_remote_path(workspace_dir):
-            return FileResponse(logo_path, media_type="image/png")
-        else:
-            # For remote storage, read and return as bytes
-            async with await storage.open(logo_path, "rb") as f:
-                return Response(content=await f.read(), media_type="image/png")
-    except Exception as e:
-        print(f"Error reading team logo: {e}")
-        raise HTTPException(status_code=500, detail="Failed to read team logo")
+    return await team_service.get_team_logo(workspace_dir)
 
 
 @router.put("/teams/{team_id}/logo")
@@ -1085,81 +275,11 @@ async def set_team_logo(
     logo: UploadFile = File(...),
     owner_info=Depends(require_team_owner),
 ):
-    """
-    Set team logo. Only team owners can set/update the logo.
-    Stored in workspace/logo.png file.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    logo_path = storage.join(workspace_dir, "logo.png")
-
-    try:
-        # Validate content type
-        if logo.content_type and not logo.content_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400, detail=f"Invalid file type. Only image files are allowed. Got: {logo.content_type}"
-            )
-
-        # Validate file extension
-        if logo.filename:
-            filename_lower = logo.filename.lower()
-            # Extract extension using string operation (works with any filename, not just paths)
-            if "." in filename_lower:
-                ext = "." + filename_lower.rpartition(".")[2]
-            else:
-                ext = ""
-            allowed_extensions = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
-            if ext not in allowed_extensions:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid file extension. Allowed extensions: {', '.join(allowed_extensions)}",
-                )
-
-        # Read and check file size limit (1 MB)
-        contents = await logo.read()
-
-        MAX_LOGO_SIZE = 1 * 1024 * 1024  # 1 MB
-        file_size = len(contents)
-        if file_size > MAX_LOGO_SIZE:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Logo file size ({file_size / (1024 * 1024):.2f} MB) exceeds maximum allowed size (1 MB)",
-            )
-
-        # Validate and process the image
-        try:
-            image = Image.open(io.BytesIO(contents))
-            # Verify it's actually a valid image by attempting to load it
-            image.verify()
-            # Reopen after verify() since verify() closes the image
-            image = Image.open(io.BytesIO(contents))
-        except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Invalid image file. Please upload a valid image file. Error: {str(e)}"
-            )
-
-        # Convert to RGB if necessary (handles RGBA, P, etc.)
-        if image.mode in ("RGBA", "LA", "P"):
-            # Create a white background
-            rgb_image = Image.new("RGB", image.size, (255, 255, 255))
-            if image.mode == "P":
-                image = image.convert("RGBA")
-            rgb_image.paste(image, mask=image.split()[-1] if image.mode in ("RGBA", "LA") else None)
-            image = rgb_image
-        elif image.mode != "RGB":
-            image = image.convert("RGB")
-
-        # Save as PNG
-        async with await storage.open(logo_path, "wb") as f:
-            image.save(f, format="PNG")
-
-        return {"status": "success", "message": "Team logo saved successfully"}
-    except Exception as e:
-        print(f"Error saving team logo: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save team logo")
+    contents = await logo.read()
+    return await team_service.set_team_logo(workspace_dir, contents, logo.content_type, logo.filename)
 
 
 @router.delete("/teams/{team_id}/logo")
@@ -1167,23 +287,10 @@ async def delete_team_logo(
     team_id: str,
     owner_info=Depends(require_team_owner),
 ):
-    """
-    Delete team logo. Only team owners can delete the logo.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    logo_path = storage.join(workspace_dir, "logo.png")
-
-    try:
-        if await storage.exists(logo_path):
-            await storage.rm(logo_path)
-        return {"status": "success", "message": "Team logo deleted successfully"}
-    except Exception as e:
-        print(f"Error deleting team logo: {e}")
-        raise HTTPException(status_code=500, detail="Failed to delete team logo")
+    return await team_service.delete_team_logo(workspace_dir)
 
 
 @router.get("/teams/{team_id}/secrets")
@@ -1192,45 +299,11 @@ async def get_team_secrets(
     user_and_team=Depends(get_user_and_team),
     include_values: bool = Query(False, description="Include actual secret values (only for team owners)"),
 ):
-    """
-    Get team secrets.
-    - Team members can view secret keys only (values are masked).
-    - Team owners can view actual values by setting include_values=true.
-    """
-    # Verify team_id matches the one in header
     if team_id != user_and_team["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    secrets_path = storage.join(workspace_dir, "team_secrets.json")
-
-    try:
-        if not await storage.exists(secrets_path):
-            return {"status": "success", "secrets": {}}
-
-        async with await storage.open(secrets_path, "r") as f:
-            secrets = json.loads(await f.read())
-
-        # Check if user is team owner and requested values
-        is_owner = user_and_team.get("role") == TeamRole.OWNER.value
-        if include_values and is_owner:
-            # Return actual values for team owners
-            return {
-                "status": "success",
-                "secrets": secrets,
-                "secret_keys": list(secrets.keys()),
-            }
-        else:
-            # Mask all secret values for security
-            masked_secrets = {key: "***" for key in secrets.keys()}
-            return {
-                "status": "success",
-                "secrets": masked_secrets,
-                "secret_keys": list(secrets.keys()),
-            }
-    except Exception as e:
-        print(f"Error reading team secrets: {e}")
-        raise HTTPException(status_code=500, detail="Failed to read team secrets")
+    is_owner = user_and_team.get("role") == TeamRole.OWNER.value
+    return await team_service.get_team_secrets(workspace_dir, is_owner, include_values)
 
 
 @router.put("/teams/{team_id}/secrets")
@@ -1239,53 +312,10 @@ async def set_team_secrets(
     secrets_data: TeamSecretsRequest,
     owner_info=Depends(require_team_owner),
 ):
-    """
-    Set team secrets. Only team owners can set/update secrets.
-    Stored in workspace/team_secrets.json file.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    secrets_path = storage.join(workspace_dir, "team_secrets.json")
-
-    try:
-        # Validate that all keys are valid environment variable names
-        # Environment variable names can contain letters, numbers, and underscores
-        import re
-
-        valid_key_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-
-        for key in secrets_data.secrets.keys():
-            if not valid_key_pattern.match(key):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid secret key '{key}'. Secret keys must start with a letter or underscore and contain only letters, numbers, and underscores.",
-                )
-            if key in SPECIAL_SECRET_KEYS:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Secret key '{key}' is a special secret and can only be set via the Special Secrets section.",
-                )
-
-        # Ensure workspace directory exists
-        await storage.makedirs(workspace_dir, exist_ok=True)
-
-        # Write secrets to file
-        async with await storage.open(secrets_path, "w") as f:
-            await f.write(json.dumps(secrets_data.secrets, indent=2))
-
-        return {
-            "status": "success",
-            "message": "Team secrets saved successfully",
-            "secret_keys": list(secrets_data.secrets.keys()),
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error saving team secrets: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save team secrets")
+    return await team_service.set_team_secrets(workspace_dir, secrets_data.secrets)
 
 
 @router.get("/teams/{team_id}/special_secrets")
@@ -1293,50 +323,10 @@ async def get_team_special_secrets(
     team_id: str,
     user_and_team=Depends(get_user_and_team),
 ):
-    """
-    Get team special secrets.
-    - Team members can view which special secrets are configured (values are masked).
-    - Team owners can view actual values by setting include_values=true.
-    """
-    # Verify team_id matches the one in header
     if team_id != user_and_team["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
     workspace_dir = await get_workspace_dir()
-    secrets_path = storage.join(workspace_dir, "team_secrets.json")
-
-    result = {}
-    try:
-        if await storage.exists(secrets_path):
-            async with await storage.open(secrets_path, "r") as f:
-                all_secrets = json.loads(await f.read())
-                # Filter only special secrets
-                for key in SPECIAL_SECRET_TYPES.keys():
-                    if key in all_secrets:
-                        result[key] = {
-                            "name": SPECIAL_SECRET_TYPES[key],
-                            "exists": True,
-                            "masked_value": mask_key(all_secrets[key]) if all_secrets[key] else None,
-                        }
-                    else:
-                        result[key] = {
-                            "name": SPECIAL_SECRET_TYPES[key],
-                            "exists": False,
-                            "masked_value": None,
-                        }
-        else:
-            # No secrets file, return all as not configured
-            for key in SPECIAL_SECRET_TYPES.keys():
-                result[key] = {
-                    "name": SPECIAL_SECRET_TYPES[key],
-                    "exists": False,
-                    "masked_value": None,
-                }
-    except Exception as e:
-        print(f"Error reading team special secrets: {e}")
-        raise HTTPException(status_code=500, detail="Failed to read team special secrets")
-
-    return {"status": "success", "special_secrets": result}
+    return await team_service.get_team_special_secrets(workspace_dir)
 
 
 @router.put("/teams/{team_id}/special_secrets")
@@ -1345,52 +335,7 @@ async def set_team_special_secret(
     secret_data: SpecialSecretRequest,
     owner_info=Depends(require_team_owner),
 ):
-    """
-    Set a team special secret. Only team owners can set/update special secrets.
-    Stored in workspace/team_secrets.json file.
-    """
-    # Verify team_id matches the one in header
     if team_id != owner_info["team_id"]:
         raise HTTPException(status_code=400, detail="Team ID mismatch")
-
-    # Validate secret type
-    if secret_data.secret_type not in SPECIAL_SECRET_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid secret type '{secret_data.secret_type}'. Must be one of: {', '.join(SPECIAL_SECRET_TYPES.keys())}",
-        )
-
     workspace_dir = await get_workspace_dir()
-    secrets_path = storage.join(workspace_dir, "team_secrets.json")
-
-    try:
-        # Load existing secrets
-        existing_secrets = {}
-        if await storage.exists(secrets_path):
-            async with await storage.open(secrets_path, "r") as f:
-                existing_secrets = json.loads(await f.read())
-
-        # Update or remove the special secret
-        if secret_data.value and secret_data.value.strip():
-            existing_secrets[secret_data.secret_type] = secret_data.value.strip()
-        else:
-            # Remove if empty
-            existing_secrets.pop(secret_data.secret_type, None)
-
-        # Ensure workspace directory exists
-        await storage.makedirs(workspace_dir, exist_ok=True)
-
-        # Write secrets to file
-        async with await storage.open(secrets_path, "w") as f:
-            await f.write(json.dumps(existing_secrets, indent=2))
-
-        return {
-            "status": "success",
-            "message": f"{SPECIAL_SECRET_TYPES[secret_data.secret_type]} saved successfully",
-            "secret_type": secret_data.secret_type,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error saving team special secret: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save team special secret")
+    return await team_service.set_team_special_secret(workspace_dir, secret_data.secret_type, secret_data.value)
