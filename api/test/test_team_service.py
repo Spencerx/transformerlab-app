@@ -1,6 +1,5 @@
 import io
 import pytest
-import sys
 import types
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
@@ -98,7 +97,7 @@ def test_validate_logo_accepts_valid_rgb_png():
 
 
 async def test_set_team_logo_writes_png_bytes_to_async_storage(monkeypatch):
-    from transformerlab.services.team_service import set_team_logo
+    from transformerlab.services import team_service
 
     write_mock = AsyncMock()
 
@@ -114,9 +113,9 @@ async def test_set_team_logo_writes_png_bytes_to_async_storage(monkeypatch):
         open=AsyncMock(return_value=_AsyncWriter()),
     )
 
-    monkeypatch.setitem(sys.modules, "lab", types.SimpleNamespace(storage=storage_mock))
+    monkeypatch.setattr(team_service, "storage", storage_mock)
 
-    result = await set_team_logo("/tmp/workspace", _make_png_bytes("RGBA"), "image/png", "logo.png")
+    result = await team_service.set_team_logo("/tmp/workspace", _make_png_bytes("RGBA"), "image/png", "logo.png")
 
     assert result["status"] == "success"
     write_mock.assert_awaited_once()
