@@ -49,11 +49,25 @@ function AppContent({
   const isInitialUserLoad =
     authContext.userIsLoading && !authContext.user && !authContext.userError;
 
+  useEffect(() => {
+    if (authContext.isAuthenticated) {
+      const redirect = localStorage.getItem('redirectAfterLogin');
+      if (redirect) {
+        localStorage.removeItem('redirectAfterLogin');
+        window.location.hash = redirect;
+      }
+    }
+  }, [authContext.isAuthenticated]);
+
   if (authContext.initializing || isInitialUserLoad) {
     return <FullPageLoader />;
   }
 
   if (!authContext?.isAuthenticated) {
+    const currentHash = window.location.hash;
+    if (currentHash && currentHash !== '#/' && currentHash !== '#') {
+      localStorage.setItem('redirectAfterLogin', currentHash);
+    }
     return <LoginPage />;
   }
 
