@@ -37,7 +37,9 @@ def version() -> None:
         if update_available:
             data["latest_version"] = latest
             data["upgrade_command"] = (
-                "uv tool install --force transformerlab-cli" if source is not None else "uv tool upgrade transformerlab-cli"
+                "uv tool install --force transformerlab-cli"
+                if source is not None
+                else "uv tool upgrade transformerlab-cli"
             )
         if source is not None:
             data["install_source"] = source
