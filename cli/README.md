@@ -56,7 +56,6 @@ uv run src/transformerlab_cli/main.py
 
 ### Build Locally
 
-You have two options. Pick based on whether you want `lab` available everywhere or isolated to a venv.
 
 #### Option A — Global install (simple)
 
@@ -64,7 +63,7 @@ You have two options. Pick based on whether you want `lab` available everywhere 
 uv tool install . --force --reinstall
 ```
 
-This installs `lab` into `~/.local/bin/` so it's available from any shell. `uv tool` is global by design — any other `uv tool install transformerlab-cli` on your machine targets the same location, so use `--force --reinstall` whenever you want your local checkout to win.
+This installs `lab` into `~/.local/bin/` so it's available from any shell.
 
 #### Option B — Editable install into an active venv (recommended for iterative dev)
 
