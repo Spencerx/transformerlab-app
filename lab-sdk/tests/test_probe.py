@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+
 @pytest.mark.asyncio
 async def test_probe_writes_sentinel_file():
     """Probe writes a sentinel JSON file to TFL_STORAGE_URI/debug/storage-probe-{job_id}.txt."""
