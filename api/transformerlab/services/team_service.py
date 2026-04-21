@@ -8,10 +8,14 @@ from os import getenv
 from typing import List, Optional
 
 from fastapi import HTTPException
+from fastapi.responses import FileResponse, Response
+from lab import Experiment, storage
+from lab.dirs import get_workspace_dir, set_organization_id
 from PIL import Image
 from sqlalchemy import and_, cast, delete, func, select, update, String
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from transformerlab.db.session import async_session
 from transformerlab.shared.models.models import (
     InvitationStatus,
     Team,
@@ -20,6 +24,7 @@ from transformerlab.shared.models.models import (
     User,
     UserTeam,
 )
+from transformerlab.shared.remote_workspace import create_bucket_for_team
 from transformerlab.schemas.secrets import SPECIAL_SECRET_KEYS, SPECIAL_SECRET_TYPES
 from transformerlab.utils.api_key_utils import mask_key
 from transformerlab.utils.email import send_team_invitation_email
@@ -96,7 +101,6 @@ def _is_personal_team(user: User, team: Team) -> bool:
 
 async def get_all_team_ids() -> List[str]:
     """Return the IDs of all teams in the database."""
-    from transformerlab.db.session import async_session
 
     async with async_session() as session:
         result = await session.execute(select(Team.id))
@@ -112,10 +116,6 @@ async def create_team(
     logo_filename: Optional[str] = None,
 ) -> dict:
     """Create a team, add the creator as owner, provision storage and default experiment."""
-    from lab import Experiment
-    from lab.dirs import set_organization_id, get_workspace_dir
-    from lab import storage
-    from transformerlab.shared.remote_workspace import create_bucket_for_team
 
     team = Team(name=name)
     session.add(team)
@@ -567,9 +567,6 @@ async def cancel_invitation(session: AsyncSession, team_id: str, invitation_id: 
 
 
 async def get_team_logo(workspace_dir: str):
-    from lab import storage
-    from fastapi.responses import FileResponse, Response
-
     logo_path = storage.join(workspace_dir, "logo.png")
     if not await storage.exists(logo_path):
         raise HTTPException(status_code=404, detail="Team logo not found")
@@ -588,8 +585,6 @@ async def get_team_logo(workspace_dir: str):
 async def set_team_logo(
     workspace_dir: str, contents: bytes, content_type: Optional[str], filename: Optional[str]
 ) -> dict:
-    from lab import storage
-
     logo_path = storage.join(workspace_dir, "logo.png")
     try:
         image = _validate_and_process_logo(contents, content_type, filename)
@@ -604,8 +599,6 @@ async def set_team_logo(
 
 
 async def delete_team_logo(workspace_dir: str) -> dict:
-    from lab import storage
-
     logo_path = storage.join(workspace_dir, "logo.png")
     try:
         if await storage.exists(logo_path):
@@ -620,8 +613,6 @@ async def delete_team_logo(workspace_dir: str) -> dict:
 
 
 async def get_github_pat(workspace_dir: str) -> dict:
-    from lab import storage
-
     secrets_path = storage.join(workspace_dir, "team_secrets.json")
     if await storage.exists(secrets_path):
         try:
@@ -637,8 +628,6 @@ async def get_github_pat(workspace_dir: str) -> dict:
 
 
 async def set_github_pat(workspace_dir: str, pat: Optional[str]) -> dict:
-    from lab import storage
-
     secrets_path = storage.join(workspace_dir, "team_secrets.json")
     try:
         existing: dict = {}
@@ -663,8 +652,6 @@ async def set_github_pat(workspace_dir: str, pat: Optional[str]) -> dict:
 
 
 async def get_team_secrets(workspace_dir: str, is_owner: bool, include_values: bool) -> dict:
-    from lab import storage
-
     secrets_path = storage.join(workspace_dir, "team_secrets.json")
     try:
         if not await storage.exists(secrets_path):
@@ -682,8 +669,6 @@ async def get_team_secrets(workspace_dir: str, is_owner: bool, include_values: b
 
 
 async def set_team_secrets(workspace_dir: str, secrets: dict) -> dict:
-    from lab import storage
-
     valid_key_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     for key in secrets:
         if not valid_key_pattern.match(key):
@@ -711,8 +696,6 @@ async def set_team_secrets(workspace_dir: str, secrets: dict) -> dict:
 
 
 async def get_team_special_secrets(workspace_dir: str) -> dict:
-    from lab import storage
-
     secrets_path = storage.join(workspace_dir, "team_secrets.json")
     result = {}
     try:
@@ -734,8 +717,6 @@ async def get_team_special_secrets(workspace_dir: str) -> dict:
 
 
 async def set_team_special_secret(workspace_dir: str, secret_type: str, value: Optional[str]) -> dict:
-    from lab import storage
-
     if secret_type not in SPECIAL_SECRET_TYPES:
         raise HTTPException(
             status_code=400,
