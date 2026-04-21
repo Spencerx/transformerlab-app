@@ -4,9 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import lab.storage  # noqa: F401
-
-
 @pytest.mark.asyncio
 async def test_probe_writes_sentinel_file():
     """Probe writes a sentinel JSON file to TFL_STORAGE_URI/debug/storage-probe-{job_id}.txt."""
@@ -29,12 +26,12 @@ async def test_probe_writes_sentinel_file():
             "TFL_STORAGE_PROVIDER": "localfs",
         },
     ):
-        with patch("lab.storage.makedirs", new=AsyncMock()):
-            with patch("lab.storage.open", return_value=mock_file):
-                import importlib
-                import lab.probe as probe_mod
+        import importlib
+        import lab.probe as probe_mod
 
-                importlib.reload(probe_mod)
+        importlib.reload(probe_mod)
+        with patch.object(probe_mod.storage, "makedirs", new=AsyncMock()):
+            with patch.object(probe_mod.storage, "open", return_value=mock_file):
                 await probe_mod._run()
 
     assert "data" in written
@@ -62,13 +59,13 @@ async def test_probe_falls_back_when_no_storage_uri(tmp_path):
     env["_TFL_JOB_ID"] = "job-xyz"
 
     with patch.dict(os.environ, env, clear=True):
-        with patch("lab.storage.makedirs", new=AsyncMock()):
-            with patch("lab.storage.open", return_value=mock_file):
-                with patch("lab.dirs.get_workspace_dir", new=AsyncMock(return_value=str(tmp_path))):
-                    import importlib
-                    import lab.probe as probe_mod
+        import importlib
+        import lab.probe as probe_mod
 
-                    importlib.reload(probe_mod)
+        importlib.reload(probe_mod)
+        with patch.object(probe_mod.storage, "makedirs", new=AsyncMock()):
+            with patch.object(probe_mod.storage, "open", return_value=mock_file):
+                with patch("lab.dirs.get_workspace_dir", new=AsyncMock(return_value=str(tmp_path))):
                     await probe_mod._run()
 
     assert "data" in written
