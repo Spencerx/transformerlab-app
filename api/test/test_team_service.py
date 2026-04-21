@@ -4,6 +4,7 @@ import sys
 import types
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
+from uuid import UUID
 
 from fastapi import HTTPException
 from PIL import Image
@@ -32,6 +33,17 @@ def _make_mock_session():
 
 
 # ==================== Logo validation ====================
+
+
+def test_normalize_uuid_ids_filters_invalid_values():
+    from transformerlab.services.team_service import _normalize_uuid_ids
+
+    valid_1 = "12345678-1234-1234-1234-1234567890ab"
+    valid_2 = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+    result = _normalize_uuid_ids([valid_1, "not-a-uuid", None, valid_2])  # type: ignore[list-item]
+
+    assert result == [UUID(valid_1), UUID(valid_2)]
 
 
 def test_validate_logo_rejects_non_image_content_type():

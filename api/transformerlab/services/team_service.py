@@ -6,13 +6,14 @@ import asyncio
 from datetime import datetime, timedelta
 from os import getenv
 from typing import List, Optional
+from uuid import UUID
 
 from fastapi import HTTPException
 from fastapi.responses import FileResponse, Response
 from lab import Experiment, storage
 from lab.dirs import get_workspace_dir, set_organization_id
 from PIL import Image
-from sqlalchemy import and_, cast, delete, func, select, update, String
+from sqlalchemy import and_, delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from transformerlab.db.session import async_session
@@ -36,6 +37,17 @@ _MAX_LOGO_SIZE = 1 * 1024 * 1024  # 1 MB
 
 
 # ==================== Logo Helper ====================
+
+
+def _normalize_uuid_ids(raw_ids: List[str]) -> List[UUID]:
+    """Convert string IDs to UUIDs, skipping malformed values."""
+    normalized: List[UUID] = []
+    for raw_id in raw_ids:
+        try:
+            normalized.append(UUID(str(raw_id)))
+        except (TypeError, ValueError):
+            continue
+    return normalized
 
 
 def _validate_and_process_logo(contents: bytes, content_type: Optional[str], filename: Optional[str]) -> Image.Image:
@@ -189,7 +201,8 @@ async def get_team_members(session: AsyncSession, team_id: str) -> dict:
     user_teams = result.scalars().all()
 
     user_ids = [ut.user_id for ut in user_teams]
-    result = await session.execute(select(User).where(cast(User.id, String).in_(user_ids)))
+    normalized_user_ids = _normalize_uuid_ids(user_ids)
+    result = await session.execute(select(User).where(User.id.in_(normalized_user_ids)))
     users = {str(u.id): u for u in result.scalars().unique().all()}
 
     members = [
@@ -420,9 +433,10 @@ async def get_my_invitations(session: AsyncSession, user_email: str) -> dict:
     inviter_ids = list({inv.invited_by_user_id for inv in valid})
 
     teams = {t.id: t for t in (await session.execute(select(Team).where(Team.id.in_(team_ids)))).scalars().all()}
+    normalized_inviter_ids = _normalize_uuid_ids(inviter_ids)
     inviters = {
         str(u.id): u
-        for u in (await session.execute(select(User).where(cast(User.id, String).in_(inviter_ids)))).scalars().all()
+        for u in (await session.execute(select(User).where(User.id.in_(normalized_inviter_ids)))).scalars().all()
     }
 
     responses = [
@@ -459,9 +473,10 @@ async def get_team_invitations(session: AsyncSession, team_id: str) -> dict:
     await session.commit()
 
     inviter_ids = list({inv.invited_by_user_id for inv in invitations})
+    normalized_inviter_ids = _normalize_uuid_ids(inviter_ids)
     inviters = {
         str(u.id): u
-        for u in (await session.execute(select(User).where(cast(User.id, String).in_(inviter_ids)))).scalars().all()
+        for u in (await session.execute(select(User).where(User.id.in_(normalized_inviter_ids)))).scalars().all()
     }
 
     responses = [
