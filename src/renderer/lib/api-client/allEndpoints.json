@@ -220,10 +220,6 @@
     }
   },
   "datasets": {
-    "editWithTemplate": {
-      "method": "GET",
-      "path": "data/edit_with_template?dataset_id={datasetId}&template={template}&offset={offset}&limit={limit}"
-    },
     "saveMetadata": {
       "method": "POST",
       "path": "data/save_metadata?dataset_id={datasetId}&new_dataset_id={newDatasetId}"
@@ -231,10 +227,6 @@
     "info": {
       "method": "GET",
       "path": "data/info?dataset_id={datasetId}"
-    },
-    "previewTemplate": {
-      "method": "GET",
-      "path": "data/preview_with_template?dataset_id={datasetId}&template={template}&offset={offset}&limit={limit}"
     }
   },
   "recipes": {
