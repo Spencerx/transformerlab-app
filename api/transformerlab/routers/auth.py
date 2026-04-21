@@ -549,7 +549,7 @@ async def get_user_teams(user: User = Depends(current_active_user), session: Asy
 
 @router.get("/users/me/secrets")
 async def get_user_secrets(
-    user: User = Depends(current_active_user),
+    user_and_team=Depends(get_user_and_team),
     include_values: bool = Query(False, description="Include actual secret values"),
 ):
     """
@@ -557,6 +557,7 @@ async def get_user_secrets(
     - Users can view their own secret keys and values.
     - Values are always included since users own their secrets.
     """
+    user = user_and_team["user"]
     user_id = str(user.id)
     workspace_dir = await get_workspace_dir()
     secrets_path = storage.join(workspace_dir, f"user_secrets_{user_id}.json")
@@ -591,12 +592,13 @@ async def get_user_secrets(
 @router.put("/users/me/secrets")
 async def set_user_secrets(
     secrets_data: UserSecretsRequest,
-    user: User = Depends(current_active_user),
+    user_and_team=Depends(get_user_and_team),
 ):
     """
     Set user-specific secrets. Users can set/update their own secrets.
     Stored in workspace/user_secrets_{user_id}.json file.
     """
+    user = user_and_team["user"]
     user_id = str(user.id)
     workspace_dir = await get_workspace_dir()
     secrets_path = storage.join(workspace_dir, f"user_secrets_{user_id}.json")
@@ -639,12 +641,13 @@ async def set_user_secrets(
 
 @router.get("/users/me/special_secrets")
 async def get_user_special_secrets(
-    user: User = Depends(current_active_user),
+    user_and_team=Depends(get_user_and_team),
 ):
     """
     Get user special secrets.
     Users can view which special secrets are configured (values are masked).
     """
+    user = user_and_team["user"]
     user_id = str(user.id)
     workspace_dir = await get_workspace_dir()
     secrets_path = storage.join(workspace_dir, f"user_secrets_{user_id}.json")
@@ -686,7 +689,7 @@ async def get_user_special_secrets(
 @router.put("/users/me/special_secrets")
 async def set_user_special_secret(
     secret_data: SpecialSecretRequest,
-    user: User = Depends(current_active_user),
+    user_and_team=Depends(get_user_and_team),
 ):
     """
     Set a user special secret. Users can set/update their own special secrets.
@@ -699,6 +702,7 @@ async def set_user_special_secret(
             detail=f"Invalid secret type '{secret_data.secret_type}'. Must be one of: {', '.join(SPECIAL_SECRET_TYPES.keys())}",
         )
 
+    user = user_and_team["user"]
     user_id = str(user.id)
     workspace_dir = await get_workspace_dir()
     secrets_path = storage.join(workspace_dir, f"user_secrets_{user_id}.json")

@@ -580,6 +580,17 @@ def server_install(
     Use --dry-run to preview the configuration without writing.
     Use --config <path> to skip prompts and install from a pre-written .env file.
     """
+    src_dir = os.path.realpath(os.path.expanduser("~/.transformerlab/src"))
+    cwd = os.path.realpath(os.getcwd())
+    if cwd == src_dir or cwd.startswith(src_dir + os.sep):
+        console.print(
+            "\n[error]You are running this command from inside ~/.transformerlab/src, "
+            "which is deleted during installation.[/error]\n"
+            "Please change to a different directory and try again:\n\n"
+            "  cd ~ && lab server install\n"
+        )
+        raise typer.Exit(1)
+
     if config:
         _install_from_config(config_path=config, dry_run=dry_run)
     else:
