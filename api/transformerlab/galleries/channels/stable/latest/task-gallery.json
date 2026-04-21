@@ -7,7 +7,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["huggingface"]
+      "framework": [
+        "huggingface"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -30,7 +32,9 @@
     "metadata": {
       "category": "rlhf",
       "modality": "text",
-      "framework": ["huggingface"]
+      "framework": [
+        "huggingface"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -53,7 +57,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["huggingface"]
+      "framework": [
+        "huggingface"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -76,7 +82,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["unsloth"]
+      "framework": [
+        "unsloth"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -99,7 +107,9 @@
     "metadata": {
       "category": "training",
       "modality": "text",
-      "framework": ["unsloth"]
+      "framework": [
+        "unsloth"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -122,7 +132,9 @@
     "metadata": {
       "category": "training",
       "modality": "audio",
-      "framework": ["unsloth"]
+      "framework": [
+        "unsloth"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -145,7 +157,9 @@
     "metadata": {
       "category": "training",
       "modality": "image",
-      "framework": ["diffusers"]
+      "framework": [
+        "diffusers"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -168,7 +182,9 @@
     "metadata": {
       "category": "training",
       "modality": "embedding",
-      "framework": ["sentence-transformers"]
+      "framework": [
+        "sentence-transformers"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -191,7 +207,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["huggingface"]
+      "framework": [
+        "huggingface"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -214,7 +232,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["nanochat"]
+      "framework": [
+        "nanochat"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -237,7 +257,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["lora"]
+      "framework": [
+        "lora"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -260,7 +282,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["trl"]
+      "framework": [
+        "trl"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -283,7 +307,9 @@
     "metadata": {
       "category": "finetuning",
       "modality": "text",
-      "framework": ["mlx"]
+      "framework": [
+        "mlx"
+      ]
     },
     "supportedAccelerators": {
       "AppleSilicon": {
@@ -302,7 +328,10 @@
     "metadata": {
       "category": "training",
       "modality": "other",
-      "framework": ["jax", "flax"]
+      "framework": [
+        "jax",
+        "flax"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -348,7 +377,9 @@
     "metadata": {
       "category": "training",
       "modality": "vision",
-      "framework": ["yolo"]
+      "framework": [
+        "yolo"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -371,7 +402,9 @@
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": ["huggingface"]
+      "framework": [
+        "huggingface"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -408,7 +441,9 @@
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": [""]
+      "framework": [
+        ""
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -431,7 +466,9 @@
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": ["eleutherai"]
+      "framework": [
+        "eleutherai"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -454,7 +491,9 @@
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": ["deepeval"]
+      "framework": [
+        "deepeval"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -470,6 +509,35 @@
     }
   },
   {
+    "title": "Video Generation with Wan2.1",
+    "description": "A video generation task using the Wan2.1-T2V model. Generates videos from text prompts using the Wan pipeline from Diffusers. Requires HF_TOKEN environment variable for model access.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
+    "github_repo_dir": "video-diffusion",
+    "metadata": {
+      "category": "generation",
+      "modality": "video",
+      "framework": [
+        "diffusers"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "A100:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Multinode Example Task",
+    "description": "A sample multinode task that just prints out node IPs on each node (2 node config).",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
+    "github_repo_dir": "multinode-example",
+    "metadata": {
+      "category": "training"
+    }
+  },
+  {
     "title": "Batch Image Generation using FLUX2",
     "description": "A task to generate images in batch using the FLUX2 model.",
     "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
@@ -477,7 +545,9 @@
     "metadata": {
       "category": "generation",
       "modality": "vision",
-      "framework": [""]
+      "framework": [
+        ""
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {

@@ -61,6 +61,8 @@ interface JobsListProps {
   onToggleHidden?: (jobId: string, currentValue: boolean) => void;
   hideJobId?: boolean;
   showInteractiveType?: boolean;
+  showFilesButton?: boolean;
+  forceArtifactsButtonVisible?: boolean;
   onStopPendingChange?: (jobId: string, stopPending: boolean) => void;
 }
 
@@ -88,6 +90,8 @@ const JobsList: React.FC<JobsListProps> = ({
   onToggleHidden,
   hideJobId = false,
   showInteractiveType = false,
+  showFilesButton = true,
+  forceArtifactsButtonVisible = false,
   onStopPendingChange,
 }) => {
   const showTrackioForStatus = (status?: string): boolean => {
@@ -396,31 +400,33 @@ const JobsList: React.FC<JobsListProps> = ({
                           </Box>
                         </Button>
                       )}
-                    {(job?.job_data?.artifacts ||
+                    {(forceArtifactsButtonVisible ||
+                      job?.job_data?.artifacts ||
                       job?.job_data?.artifacts_dir ||
                       job?.job_data?.generated_datasets ||
                       job?.job_data?.models ||
-                      job?.job_data?.has_profiling) && (
-                      <Button
-                        size="sm"
-                        variant="plain"
-                        onClick={() => onViewAllArtifacts?.(String(job?.id))}
-                        disabled={stopPending}
-                        startDecorator={<ArchiveIcon />}
-                      >
-                        <Box
-                          sx={{
-                            display: {
-                              xs: 'none',
-                              sm: 'none',
-                              md: 'inline-flex',
-                            },
-                          }}
+                      job?.job_data?.has_profiling) &&
+                      !job?.placeholder && (
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          onClick={() => onViewAllArtifacts?.(String(job?.id))}
+                          disabled={stopPending}
+                          startDecorator={<ArchiveIcon />}
                         >
-                          Artifacts
-                        </Box>
-                      </Button>
-                    )}
+                          <Box
+                            sx={{
+                              display: {
+                                xs: 'none',
+                                sm: 'none',
+                                md: 'inline-flex',
+                              },
+                            }}
+                          >
+                            Artifacts
+                          </Box>
+                        </Button>
+                      )}
                     {(job?.type === 'SWEEP' || job?.job_data?.sweep_parent) &&
                       job?.status === 'COMPLETE' && (
                         <Button
@@ -511,7 +517,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         </Box>
                       </Button>
                     )}
-                    {!job?.placeholder && (
+                    {showFilesButton && !job?.placeholder && (
                       <Button
                         size="sm"
                         variant="plain"
