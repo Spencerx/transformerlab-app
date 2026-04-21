@@ -1244,3 +1244,43 @@ async def test_copy_file_mounts_without_lab_init(tmp_path, monkeypatch):
     assert os.path.isfile(dest)
     with open(dest) as f:
         assert f.read() == "hi"
+
+
+def test_download_registry_model(tmp_path, monkeypatch):
+    _fresh(monkeypatch)
+    home = tmp_path / ".tfl_home"
+    ws = tmp_path / ".tfl_ws"
+    home.mkdir()
+    ws.mkdir()
+    monkeypatch.setenv("TFL_HOME_DIR", str(home))
+    monkeypatch.setenv("TFL_WORKSPACE_DIR", str(ws))
+
+    import asyncio
+    import os
+    import lab.storage as storage_module
+    from lab.lab_facade import Lab
+    from lab.model import Model
+
+    model_id = "test_registry_model"
+    asyncio.run(Model.create(model_id))
+
+    lab = Lab()
+    lab.init(experiment_id="test_exp")
+
+    copy_calls = []
+
+    async def fake_copy_dir(src: str, dest: str) -> None:
+        copy_calls.append((src, dest))
+
+    monkeypatch.setattr(storage_module, "copy_dir", fake_copy_dir)
+
+    result = lab.download_registry_model(model_id)
+
+    expected_dest = os.path.expanduser(f"~/tmp/{model_id}")
+    assert result == expected_dest
+    assert len(copy_calls) == 1
+
+    _m = asyncio.run(Model.get(model_id))
+    expected_src = asyncio.run(_m.get_dir())
+    assert copy_calls[0][0] == expected_src
+    assert copy_calls[0][1] == expected_dest
