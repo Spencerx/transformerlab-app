@@ -49,7 +49,11 @@ export default function JobDetailPage() {
     if (experimentName) setExperimentId(experimentName);
   }, [experimentName, setExperimentId]);
 
-  const { data: jobData, isError, isLoading: jobLoading } = useSWRWithAuth(
+  const {
+    data: jobData,
+    isError,
+    isLoading: jobLoading,
+  } = useSWRWithAuth(
     experimentInfo?.id && jobId
       ? chatAPI.Endpoints.Jobs.Get(experimentInfo.id, jobId)
       : null,
@@ -66,7 +70,14 @@ export default function JobDetailPage() {
 
   if (!experimentInfo) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+        }}
+      >
         <CircularProgress />
       </Box>
     );
@@ -90,7 +101,14 @@ export default function JobDetailPage() {
 
   if (jobLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100%',
+        }}
+      >
         <CircularProgress />
       </Box>
     );
