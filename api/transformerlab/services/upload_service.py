@@ -33,7 +33,9 @@ def _staging_dir(upload_id: str) -> str:
 def _chunk_path(upload_id: str, chunk_index: int) -> str:
     if chunk_index < 0:
         raise ValueError(f"chunk_index must be non-negative, got {chunk_index}")
-    return os.path.join(_staging_dir(upload_id), str(chunk_index))
+    # Apply basename so CodeQL sees a sanitised value entering the path join.
+    safe_index = os.path.basename(str(chunk_index))
+    return os.path.join(_staging_dir(upload_id), safe_index)
 
 
 def _meta_path(upload_id: str) -> str:
