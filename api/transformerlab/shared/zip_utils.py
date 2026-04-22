@@ -1,6 +1,34 @@
 import io
+import posixpath
 import zipfile
 from typing import List
+
+
+async def _add_file_to_zip(zip_file: zipfile.ZipFile, file_path: str, arcname: str, storage) -> None:
+    async with await storage.open(file_path, "rb") as f:
+        file_content = await f.read()
+        zip_file.writestr(arcname, file_content)
+
+
+async def _add_directory_to_zip(zip_file: zipfile.ZipFile, directory_path: str, root_prefix: str, storage) -> None:
+    try:
+        walk_entries = await storage.walk(directory_path)
+    except Exception as e:
+        print(f"Error walking directory during zipping: {directory_path}: {e}")
+        return
+
+    for root, _dirs, files in walk_entries:
+        for file_name in files:
+            file_path = storage.join(root, file_name)
+            try:
+                if not await storage.exists(file_path) or not await storage.isfile(file_path):
+                    continue
+                rel_from_dir = posixpath.relpath(file_path, directory_path)
+                arcname = posixpath.join(root_prefix, rel_from_dir)
+                await _add_file_to_zip(zip_file, file_path, arcname, storage)
+            except Exception as e:
+                print(f"Error adding nested file {file_path} to zip: {e}")
+                continue
 
 
 async def create_zip_from_storage(file_paths: List[str], storage) -> io.BytesIO:
@@ -28,18 +56,33 @@ async def create_zip_from_storage(file_paths: List[str], storage) -> io.BytesIO:
                     print(f"File not found during zipping: {file_path}")
                     continue
 
+                if await storage.isdir(file_path):
+                    await _add_directory_to_zip(zip_file, file_path, filename, storage)
+                    continue
+
                 if not await storage.isfile(file_path):
-                    # Skip directories
                     continue
 
                 # Read file content from storage
-                async with await storage.open(file_path, "rb") as f:
-                    file_content = await f.read()
-                    zip_file.writestr(filename, file_content)
+                await _add_file_to_zip(zip_file, file_path, filename, storage)
             except Exception as e:
                 print(f"Error adding file {file_path} to zip: {e}")
                 # Continue with other files even if one fails
                 continue
+
+    zip_buffer.seek(0)
+    return zip_buffer
+
+
+async def create_zip_from_directory(directory_path: str, storage, root_prefix: str | None = None) -> io.BytesIO:
+    """
+    Create a zip file from a single directory path.
+    """
+    zip_buffer = io.BytesIO()
+    prefix = root_prefix or (directory_path.split("/")[-1] if "/" in directory_path else directory_path)
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        await _add_directory_to_zip(zip_file, directory_path, prefix, storage)
 
     zip_buffer.seek(0)
     return zip_buffer
