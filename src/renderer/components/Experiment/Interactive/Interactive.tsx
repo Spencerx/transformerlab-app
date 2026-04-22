@@ -6,14 +6,7 @@ import React, {
   useRef,
 } from 'react';
 import Sheet from '@mui/joy/Sheet';
-import {
-  Button,
-  Stack,
-  Typography,
-  Box,
-  Skeleton,
-  Alert,
-} from '@mui/joy';
+import { Button, Stack, Typography, Box, Skeleton, Alert } from '@mui/joy';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { PlusIcon } from 'lucide-react';
@@ -1366,7 +1359,7 @@ export default function Interactive() {
           />
         )}
       />
-        {/* TODO: remove TaskTemplateList once migration is complete
+      {/* TODO: remove TaskTemplateList once migration is complete
         <TaskTemplateList
           tasksList={tasks}
           onDeleteTask={handleDeleteTask}

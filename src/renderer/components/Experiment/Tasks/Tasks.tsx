@@ -1442,7 +1442,9 @@ export default function Tasks({ subtype }: { subtype?: string }) {
               setViewCheckpointsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
             }
             onViewAllArtifacts={(jobId) =>
-              setViewAllArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
+              setViewAllArtifactsFromJob(
+                jobId && jobId !== 'NaN' ? jobId : null,
+              )
             }
             onViewEvalImages={(jobId) =>
               setViewEvalImagesFromJob(jobId && jobId !== 'NaN' ? jobId : null)
