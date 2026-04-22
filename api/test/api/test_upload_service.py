@@ -1,8 +1,7 @@
 import json
 import os
 import pytest
-import tempfile
-from unittest.mock import patch
+
 
 # Point staging at a temp dir for tests
 @pytest.fixture(autouse=True)
@@ -56,6 +55,7 @@ def test_save_chunk_idempotent():
     asyncio.run(save_chunk(uid, 0, b"second write"))
 
     from transformerlab.services.upload_service import STAGING_ROOT
+
     chunk_path = os.path.join(STAGING_ROOT, uid, "0")
     assert open(chunk_path, "rb").read() == b"second write"
 
@@ -78,9 +78,7 @@ def test_get_status_returns_received_chunks():
 
 def test_assemble_upload_concatenates_chunks():
     import asyncio
-    from transformerlab.services.upload_service import (
-        init_upload, save_chunk, assemble_upload_sync, STAGING_ROOT
-    )
+    from transformerlab.services.upload_service import init_upload, save_chunk, assemble_upload_sync, STAGING_ROOT
 
     r = asyncio.run(init_upload("data.bin", 6))
     uid = r["upload_id"]
@@ -166,6 +164,7 @@ def test_get_filename_returns_filename():
 def test_sweep_removes_old_uploads(tmp_path, monkeypatch):
     import asyncio
     from transformerlab.services import upload_service as svc
+
     monkeypatch.setattr(svc, "STAGING_ROOT", str(tmp_path / "staging"))
 
     r = asyncio.run(svc.init_upload("old.bin", 10))
@@ -173,12 +172,11 @@ def test_sweep_removes_old_uploads(tmp_path, monkeypatch):
 
     # Backdating meta.json created_at by 25 hours
     from datetime import datetime, timezone, timedelta
+
     meta_path = os.path.join(svc.STAGING_ROOT, uid, "meta.json")
     with open(meta_path) as f:
         meta = json.load(f)
-    meta["created_at"] = (
-        datetime.now(timezone.utc) - timedelta(hours=25)
-    ).isoformat()
+    meta["created_at"] = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
     with open(meta_path, "w") as f:
         json.dump(meta, f)
 

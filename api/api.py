@@ -152,6 +152,7 @@ async def lifespan(app: FastAPI):
 
         # Sweep abandoned chunked-upload staging dirs older than 24 h
         from transformerlab.services.upload_service import sweep_expired_uploads
+
         swept = await asyncio.to_thread(sweep_expired_uploads)
         print(f"✅ Upload staging sweep: removed {swept} expired upload(s)")
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
