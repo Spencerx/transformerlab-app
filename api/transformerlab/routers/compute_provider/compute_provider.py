@@ -5,6 +5,7 @@ Sub-router layout:
   /compute_provider/providers/{provider_id}/setup    → setup.py      (setup lifecycle)
   /compute_provider/providers/{provider_id}/clusters → clusters.py   (cluster + cluster-job management)
   /compute_provider/providers/{provider_id}/launch   → launch.py     (task launch + file upload)
+  /compute_provider/providers/{provider_id}/debug    → debug.py      (storage probe)
   /compute_provider/jobs/...                         → jobs.py       (job status, quota, checkpoint resume)
   /compute_provider/sweep/...                        → sweep.py      (sweep status + results)
   /compute_provider/settings/...                     → user_settings.py (per-user settings + SSH keys)
@@ -17,6 +18,7 @@ from transformerlab.routers.compute_provider import (
     setup,
     clusters,
     launch,
+    debug,
     jobs,
     sweep,
     user_settings,
@@ -30,6 +32,7 @@ router.include_router(providers.router)
 router.include_router(setup.router, prefix="/providers/{provider_id}")
 router.include_router(clusters.router, prefix="/providers/{provider_id}")
 router.include_router(launch.router, prefix="/providers/{provider_id}")
+router.include_router(debug.router, prefix="/providers/{provider_id}")
 
 # Flat sub-routers: own their full path namespace
 router.include_router(jobs.router)

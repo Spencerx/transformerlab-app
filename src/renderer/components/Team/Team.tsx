@@ -34,7 +34,7 @@ import {
   GithubIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAPI, useAuth } from 'renderer/lib/authContext';
 import { useNotification } from 'renderer/components/Shared/NotificationSystem';
@@ -77,6 +77,13 @@ export default function UserLoginTest(): JSX.Element {
   const [providerCheckStatus, setProviderCheckStatus] = useState<
     Record<string, boolean | null>
   >({});
+  type ProbeStatus = 'idle' | 'running' | 'passed' | 'failed' | 'error';
+  const [probeStatusMap, setProbeStatusMap] = useState<
+    Record<string, ProbeStatus>
+  >({});
+  const [probeMessageMap, setProbeMessageMap] = useState<
+    Record<string, string>
+  >({});
   const [githubPAT, setGithubPAT] = useState<string>('');
   const [githubPATMasked, setGithubPATMasked] = useState<string>('');
   const [githubPATExists, setGithubPATExists] = useState<boolean>(false);
@@ -89,6 +96,8 @@ export default function UserLoginTest(): JSX.Element {
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<number>(0);
+  const probePollTimeoutByProviderRef = useRef<Record<string, number>>({});
+  const probePollingActiveByProviderRef = useRef<Record<string, boolean>>({});
 
   // Get teams list (unchanged)
   const { data: teams, mutate: teamsMutate } = useAPI('teams', ['list']);
@@ -604,6 +613,123 @@ export default function UserLoginTest(): JSX.Element {
       setCheckingProviderId(null);
     }
   }
+
+  async function handleStorageProbe(id: string) {
+    probePollingActiveByProviderRef.current[id] = false;
+    const previousTimeout = probePollTimeoutByProviderRef.current[id];
+    if (previousTimeout !== undefined) {
+      window.clearTimeout(previousTimeout);
+      delete probePollTimeoutByProviderRef.current[id];
+    }
+    probePollingActiveByProviderRef.current[id] = true;
+
+    setProbeStatusMap((prev) => ({ ...prev, [id]: 'running' }));
+    setProbeMessageMap((prev) => ({ ...prev, [id]: 'Launching probe job…' }));
+
+    try {
+      const launchRes = await authContext.fetchWithAuth(
+        chatAPI.Endpoints.ComputeProvider.LaunchStorageProbe(id),
+        { method: 'POST' },
+      );
+      if (!launchRes.ok) {
+        setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+        setProbeMessageMap((prev) => ({
+          ...prev,
+          [id]: 'Failed to launch probe job.',
+        }));
+        return;
+      }
+      const { job_id: jobId } = await launchRes.json();
+
+      const MAX_POLLS = 10;
+      let polls = 0;
+      const pollStatus = async (): Promise<void> => {
+        if (!probePollingActiveByProviderRef.current[id]) {
+          return;
+        }
+
+        polls += 1;
+        const checkRes = await authContext.fetchWithAuth(
+          chatAPI.Endpoints.ComputeProvider.CheckStorageProbe(
+            id,
+            String(jobId),
+          ),
+          { method: 'GET' },
+        );
+        if (!probePollingActiveByProviderRef.current[id]) {
+          return;
+        }
+
+        if (!checkRes.ok) {
+          probePollingActiveByProviderRef.current[id] = false;
+          setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: 'Could not reach check endpoint.',
+          }));
+          return;
+        }
+        const checkData = await checkRes.json();
+        if (checkData.found) {
+          probePollingActiveByProviderRef.current[id] = false;
+          setProbeStatusMap((prev) => ({ ...prev, [id]: 'passed' }));
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: `Sentinel found in shared storage`,
+          }));
+        } else if (polls >= MAX_POLLS) {
+          probePollingActiveByProviderRef.current[id] = false;
+          setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: `Timed out — file not found in shared storage`,
+          }));
+        } else {
+          setProbeMessageMap((prev) => ({
+            ...prev,
+            [id]: 'Waiting for sentinel file…',
+          }));
+          probePollTimeoutByProviderRef.current[id] = window.setTimeout(
+            pollStatus,
+            20000,
+          );
+        }
+      };
+
+      await pollStatus();
+    } catch {
+      probePollingActiveByProviderRef.current[id] = false;
+      setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
+      setProbeMessageMap((prev) => ({
+        ...prev,
+        [id]: 'Unexpected error running storage probe.',
+      }));
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      const timeoutEntries = Object.entries(
+        probePollTimeoutByProviderRef.current,
+      );
+      timeoutEntries.forEach(([, timeoutId]) => {
+        window.clearTimeout(timeoutId);
+      });
+      probePollTimeoutByProviderRef.current = {};
+      probePollingActiveByProviderRef.current = {};
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutEntries = Object.entries(
+      probePollTimeoutByProviderRef.current,
+    );
+    timeoutEntries.forEach(([, timeoutId]) => {
+      window.clearTimeout(timeoutId);
+    });
+    probePollTimeoutByProviderRef.current = {};
+    probePollingActiveByProviderRef.current = {};
+  }, [authContext?.team?.id]);
 
   return (
     <Sheet sx={{ overflowY: 'auto', p: 2 }}>
@@ -1216,42 +1342,96 @@ export default function UserLoginTest(): JSX.Element {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <Stack
-                          direction="row"
+                          direction="column"
                           gap={0.5}
-                          justifyContent="flex-end"
+                          alignItems="flex-end"
                         >
-                          <Button
-                            size="sm"
-                            variant="outlined"
-                            onClick={() => {
-                              setProviderId(provider.id);
-                              setOpenProviderDetailsModal(true);
-                            }}
-                            disabled={
-                              provider.type === 'local' ||
-                              providersLoading ||
-                              providers === undefined
-                            }
-                            sx={{ minWidth: '60px', fontSize: '0.75rem' }}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            color="danger"
-                            variant="outlined"
-                            onClick={() =>
-                              handleDeleteProvider(provider.id, provider.name)
-                            }
-                            disabled={
-                              !iAmOwner ||
-                              providersLoading ||
-                              providers === undefined
-                            }
-                            sx={{ minWidth: '60px', fontSize: '0.75rem' }}
-                          >
-                            Delete
-                          </Button>
+                          <Stack direction="row" gap={0.5}>
+                            <Button
+                              size="sm"
+                              variant="outlined"
+                              loading={
+                                probeStatusMap[provider.id] === 'running'
+                              }
+                              disabled={!iAmOwner}
+                              title={
+                                iAmOwner
+                                  ? 'Launches a lightweight job to validate provider lifecycle and shared storage'
+                                  : 'Only admins can run lifecycle checks'
+                              }
+                              onClick={() => {
+                                if (probeStatusMap[provider.id] !== 'running') {
+                                  handleStorageProbe(provider.id);
+                                }
+                              }}
+                              sx={{ minWidth: '90px', fontSize: '0.75rem' }}
+                            >
+                              Verify Provider Lifecycle
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outlined"
+                              onClick={() => {
+                                setProviderId(provider.id);
+                                setOpenProviderDetailsModal(true);
+                              }}
+                              disabled={
+                                provider.type === 'local' ||
+                                providersLoading ||
+                                providers === undefined
+                              }
+                              sx={{ minWidth: '60px', fontSize: '0.75rem' }}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              color="danger"
+                              variant="outlined"
+                              onClick={() =>
+                                handleDeleteProvider(provider.id, provider.name)
+                              }
+                              disabled={
+                                !iAmOwner ||
+                                providersLoading ||
+                                providers === undefined
+                              }
+                              sx={{ minWidth: '60px', fontSize: '0.75rem' }}
+                            >
+                              Delete
+                            </Button>
+                          </Stack>
+                          {probeStatusMap[provider.id] === 'passed' && (
+                            <Chip color="success" size="sm" variant="soft">
+                              Storage OK
+                            </Chip>
+                          )}
+                          {(probeStatusMap[provider.id] === 'failed' ||
+                            probeStatusMap[provider.id] === 'error') && (
+                            <Chip color="danger" size="sm" variant="soft">
+                              {probeStatusMap[provider.id] === 'failed'
+                                ? 'File not found'
+                                : 'Error'}
+                            </Chip>
+                          )}
+                          {probeMessageMap[provider.id] && (
+                            <Typography
+                              level="body-xs"
+                              sx={{
+                                color:
+                                  probeStatusMap[provider.id] === 'passed'
+                                    ? 'success.600'
+                                    : probeStatusMap[provider.id] === 'running'
+                                      ? 'text.secondary'
+                                      : 'danger.600',
+                                fontFamily: 'monospace',
+                                maxWidth: '240px',
+                                wordBreak: 'break-all',
+                              }}
+                            >
+                              {probeMessageMap[provider.id]}
+                            </Typography>
+                          )}
                         </Stack>
                       </td>
                     </tr>
