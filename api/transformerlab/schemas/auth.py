@@ -32,3 +32,4 @@ class CurrentUserResponse(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     api_key_team_id: Optional[str] = None
+    is_default_password: bool = False
