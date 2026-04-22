@@ -1,9 +1,8 @@
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from transformerlab.routers.auth import get_user_and_team
 from transformerlab.services import upload_service
 
 router = APIRouter(prefix="/upload", tags=["upload"])
@@ -21,7 +20,6 @@ class CompleteRequest(BaseModel):
 @router.post("/init")
 async def init_upload(
     body: InitRequest,
-    user_and_team=Depends(get_user_and_team),
 ):
     return await upload_service.init_upload(body.filename, body.total_size)
 
@@ -30,9 +28,7 @@ async def init_upload(
 async def upload_chunk(
     upload_id: str,
     chunk_index: int,
-    total_chunks: int,
     request: Request,
-    user_and_team=Depends(get_user_and_team),
 ):
     data = await request.body()
     try:
@@ -45,7 +41,6 @@ async def upload_chunk(
 @router.get("/{upload_id}/status")
 async def get_upload_status(
     upload_id: str,
-    user_and_team=Depends(get_user_and_team),
 ):
     try:
         return await upload_service.get_status(upload_id)
@@ -57,7 +52,6 @@ async def get_upload_status(
 async def complete_upload(
     upload_id: str,
     body: CompleteRequest,
-    user_and_team=Depends(get_user_and_team),
 ):
     try:
         temp_path = await asyncio.to_thread(upload_service.assemble_upload_sync, upload_id, body.total_chunks)
@@ -69,7 +63,6 @@ async def complete_upload(
 @router.delete("/{upload_id}")
 async def delete_upload(
     upload_id: str,
-    user_and_team=Depends(get_user_and_team),
 ):
     await upload_service.delete_upload(upload_id)
     return {"status": "deleted"}
