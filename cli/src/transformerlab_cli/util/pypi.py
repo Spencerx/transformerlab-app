@@ -3,7 +3,7 @@
 import json
 import os
 import time
-from importlib.metadata import PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, distribution
 from importlib.metadata import version as pkg_version
 
 import httpx
@@ -13,14 +13,50 @@ from transformerlab_cli.util.shared import CONFIG_DIR
 PYPI_URL = "https://pypi.org/pypi/transformerlab-cli/json"
 CACHE_FILE = os.path.join(CONFIG_DIR, ".version_cache.json")
 CACHE_TTL_SECONDS = 4 * 60 * 60  # 4 hours
+PACKAGE_NAME = "transformerlab-cli"
 
 
 def get_installed_version() -> str:
     """Return the installed CLI version from package metadata, or 'unknown'."""
     try:
-        return pkg_version("transformerlab-cli")
+        return pkg_version(PACKAGE_NAME)
     except PackageNotFoundError:
         return "unknown"
+
+
+def get_install_source() -> dict | None:
+    """Return PEP 610 direct_url.json contents for non-PyPI installs, else None.
+
+    PyPI installs have no direct_url.json. Local paths, editable installs, and
+    VCS (git) installs do — so its presence means `uv tool upgrade` will resolve
+    against that source rather than PyPI.
+    """
+    try:
+        dist = distribution(PACKAGE_NAME)
+        raw = dist.read_text("direct_url.json")
+        if raw is None:
+            return None
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def describe_install_source(direct_url: dict) -> str:
+    """Human-readable description of a direct_url.json entry."""
+    url = direct_url.get("url", "") or ""
+    dir_info = direct_url.get("dir_info") or {}
+    vcs_info = direct_url.get("vcs_info") or {}
+
+    if vcs_info:
+        vcs = vcs_info.get("vcs", "vcs")
+        commit = (vcs_info.get("commit_id") or "")[:7]
+        suffix = f" @ {commit}" if commit else ""
+        return f"{vcs}: {url}{suffix}"
+    if url.startswith("file://"):
+        path = url[len("file://") :]
+        kind = "editable directory" if dir_info.get("editable") else "local directory"
+        return f"{kind}: {path}"
+    return url or "unknown source"
 
 
 def _parse_version(v: str) -> tuple[int, ...]:
