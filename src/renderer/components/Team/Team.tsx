@@ -34,7 +34,7 @@ import {
   GithubIcon,
   Trash2Icon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAPI, useAuth } from 'renderer/lib/authContext';
 import { useNotification } from 'renderer/components/Shared/NotificationSystem';
@@ -96,6 +96,8 @@ export default function UserLoginTest(): JSX.Element {
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<number>(0);
+  const probePollTimeoutByProviderRef = useRef<Record<string, number>>({});
+  const probePollingActiveByProviderRef = useRef<Record<string, boolean>>({});
 
   // Get teams list (unchanged)
   const { data: teams, mutate: teamsMutate } = useAPI('teams', ['list']);
@@ -613,6 +615,14 @@ export default function UserLoginTest(): JSX.Element {
   }
 
   async function handleStorageProbe(id: string) {
+    probePollingActiveByProviderRef.current[id] = false;
+    const previousTimeout = probePollTimeoutByProviderRef.current[id];
+    if (previousTimeout !== undefined) {
+      window.clearTimeout(previousTimeout);
+      delete probePollTimeoutByProviderRef.current[id];
+    }
+    probePollingActiveByProviderRef.current[id] = true;
+
     setProbeStatusMap((prev) => ({ ...prev, [id]: 'running' }));
     setProbeMessageMap((prev) => ({ ...prev, [id]: 'Launching probe job…' }));
 
@@ -634,6 +644,10 @@ export default function UserLoginTest(): JSX.Element {
       const MAX_POLLS = 10;
       let polls = 0;
       const pollStatus = async (): Promise<void> => {
+        if (!probePollingActiveByProviderRef.current[id]) {
+          return;
+        }
+
         polls += 1;
         const checkRes = await authContext.fetchWithAuth(
           chatAPI.Endpoints.ComputeProvider.CheckStorageProbe(
@@ -642,7 +656,12 @@ export default function UserLoginTest(): JSX.Element {
           ),
           { method: 'GET' },
         );
+        if (!probePollingActiveByProviderRef.current[id]) {
+          return;
+        }
+
         if (!checkRes.ok) {
+          probePollingActiveByProviderRef.current[id] = false;
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
           setProbeMessageMap((prev) => ({
             ...prev,
@@ -652,12 +671,14 @@ export default function UserLoginTest(): JSX.Element {
         }
         const checkData = await checkRes.json();
         if (checkData.found) {
+          probePollingActiveByProviderRef.current[id] = false;
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'passed' }));
           setProbeMessageMap((prev) => ({
             ...prev,
             [id]: `Sentinel found in shared storage`,
           }));
         } else if (polls >= MAX_POLLS) {
+          probePollingActiveByProviderRef.current[id] = false;
           setProbeStatusMap((prev) => ({ ...prev, [id]: 'failed' }));
           setProbeMessageMap((prev) => ({
             ...prev,
@@ -668,12 +689,16 @@ export default function UserLoginTest(): JSX.Element {
             ...prev,
             [id]: 'Waiting for sentinel file…',
           }));
-          window.setTimeout(pollStatus, 20000);
+          probePollTimeoutByProviderRef.current[id] = window.setTimeout(
+            pollStatus,
+            20000,
+          );
         }
       };
 
       await pollStatus();
     } catch {
+      probePollingActiveByProviderRef.current[id] = false;
       setProbeStatusMap((prev) => ({ ...prev, [id]: 'error' }));
       setProbeMessageMap((prev) => ({
         ...prev,
@@ -681,6 +706,30 @@ export default function UserLoginTest(): JSX.Element {
       }));
     }
   }
+
+  useEffect(() => {
+    return () => {
+      const timeoutEntries = Object.entries(
+        probePollTimeoutByProviderRef.current,
+      );
+      timeoutEntries.forEach(([, timeoutId]) => {
+        window.clearTimeout(timeoutId);
+      });
+      probePollTimeoutByProviderRef.current = {};
+      probePollingActiveByProviderRef.current = {};
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeoutEntries = Object.entries(
+      probePollTimeoutByProviderRef.current,
+    );
+    timeoutEntries.forEach(([, timeoutId]) => {
+      window.clearTimeout(timeoutId);
+    });
+    probePollTimeoutByProviderRef.current = {};
+    probePollingActiveByProviderRef.current = {};
+  }, [authContext?.team?.id]);
 
   return (
     <Sheet sx={{ overflowY: 'auto', p: 2 }}>
