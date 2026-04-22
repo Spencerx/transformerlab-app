@@ -38,6 +38,7 @@ from transformerlab.services.task_service import task_service
 from transformerlab.shared import galleries
 from transformerlab.shared.github_utils import generate_github_clone_setup, read_github_pat_from_workspace
 from transformerlab.shared.interactive_gallery_utils import find_interactive_gallery_entry, resolve_interactive_command
+from transformerlab.shared.disk_space_utils import parse_disk_space_gb
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
@@ -604,12 +605,7 @@ async def launch_template_on_provider(
         job_id, {k: v for k, v in job_data.items() if v is not None}, request.experiment_id
     )
 
-    disk_size = None
-    if request.disk_space:
-        try:
-            disk_size = int(request.disk_space)
-        except (TypeError, ValueError):
-            disk_size = None
+    disk_size = parse_disk_space_gb(request.disk_space)
 
     # When file_mounts is True we use lab.copy_file_mounts() in setup; do not send to provider
     file_mounts_for_provider = request.file_mounts if isinstance(request.file_mounts, dict) else {}
