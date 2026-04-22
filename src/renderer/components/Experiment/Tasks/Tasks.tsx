@@ -20,6 +20,7 @@ import { useAuth } from 'renderer/lib/authContext';
 import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import { analytics } from 'renderer/components/Shared/analytics/AnalyticsContext';
 import TaskTemplateList from './TaskTemplateList';
+import JobsPanel from './JobsPanel';
 import JobsList from './JobsList';
 import NewInteractiveTaskModal from './NewInteractiveTaskModal';
 import InteractiveModal from './InteractiveModal';
@@ -1364,133 +1365,138 @@ export default function Tasks({ subtype }: { subtype?: string }) {
           loading={templatesIsLoading}
         />
       </Sheet>
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        gap={2}
-        sx={{ mt: 1 }}
-      >
-        <Typography level="title-md">Jobs</Typography>
-        <Stack direction="row" gap={1}>
-          <Button
-            size="sm"
-            variant={isCompareSelectMode ? 'solid' : 'outlined'}
-            onClick={() => {
-              setIsCompareSelectMode((prev) => {
-                const next = !prev;
-                if (!next) {
-                  setCompareEvalJobIds([]);
-                  setCompareEvalModalOpen(false);
+      <JobsPanel
+        title="Jobs"
+        jobs={filteredJobsForDisplay as any}
+        loading={jobsIsLoading}
+        searchPlaceholder="Search jobs…"
+        headerActions={
+          <Stack direction="row" gap={1}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setIsCompareSelectMode((prev) => {
+                  const next = !prev;
+                  if (!next) {
+                    setCompareEvalJobIds([]);
+                    setCompareEvalModalOpen(false);
+                  }
+                  return next;
+                });
+              }}
+              variant={isCompareSelectMode ? 'solid' : 'outlined'}
+            >
+              {isCompareSelectMode ? 'Cancel' : 'Select'}
+            </Button>
+            {isCompareSelectMode && (
+              <Button
+                size="sm"
+                variant="solid"
+                disabled={compareEvalJobIds.length !== 2}
+                onClick={() => {
+                  if (compareEvalJobIds.length === 2) {
+                    setCompareEvalModalOpen(true);
+                  }
+                }}
+              >
+                Compare selected evals
+              </Button>
+            )}
+            <IconButton
+              size="sm"
+              variant={showFavoritesOnly ? 'solid' : 'outlined'}
+              color={showFavoritesOnly ? 'warning' : 'neutral'}
+              onClick={() => setShowFavoritesOnly((prev) => !prev)}
+              title={
+                showFavoritesOnly ? 'Show all jobs' : 'Show favorites only'
+              }
+            >
+              <BookmarkIcon
+                size={16}
+                fill={showFavoritesOnly ? 'currentColor' : 'none'}
+              />
+            </IconButton>
+            {hiddenJobCount > 0 && (
+              <Button
+                size="sm"
+                variant={showHidden ? 'solid' : 'outlined'}
+                onClick={() => setShowHidden((prev) => !prev)}
+              >
+                {showHidden ? 'Hide hidden' : `Show hidden (${hiddenJobCount})`}
+              </Button>
+            )}
+          </Stack>
+        }
+        renderList={(filteredJobs, loading) => (
+          <JobsList
+            jobs={filteredJobs}
+            launchProgressByJobId={launchProgressByJobId}
+            onDeleteJob={handleDeleteJob}
+            onViewOutput={(jobId) => {
+              const jobIdStr =
+                jobId === null || jobId === undefined ? '' : String(jobId);
+              if (!jobIdStr || jobIdStr === '-1' || jobIdStr === 'NaN') return;
+              setViewOutputFromJob(jobIdStr);
+            }}
+            onViewCheckpoints={(jobId) =>
+              setViewCheckpointsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
+            }
+            onViewAllArtifacts={(jobId) =>
+              setViewAllArtifactsFromJob(
+                jobId && jobId !== 'NaN' ? jobId : null,
+              )
+            }
+            onViewEvalImages={(jobId) =>
+              setViewEvalImagesFromJob(jobId && jobId !== 'NaN' ? jobId : null)
+            }
+            onViewEvalResults={(jobId) =>
+              setViewEvalResultsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
+            }
+            onViewGeneratedDataset={(_jobId, datasetId) => {
+              setPreviewDatasetModal({ open: true, datasetId });
+            }}
+            onViewSweepOutput={(jobId) => {
+              setViewOutputFromSweepJob(true);
+              const jobIdStr =
+                jobId === null || jobId === undefined ? '' : String(jobId);
+              if (!jobIdStr || jobIdStr === '-1' || jobIdStr === 'NaN') return;
+              setViewOutputFromJob(jobIdStr);
+            }}
+            onViewSweepResults={(jobId) => {
+              setViewSweepResultsFromJob(
+                jobId && jobId !== 'NaN' ? jobId : null,
+              );
+            }}
+            onViewInteractive={(jobId) =>
+              setInteractiveJobForModal(jobId && jobId !== 'NaN' ? jobId : null)
+            }
+            onViewTrackio={(jobId) =>
+              setTrackioJobIdForModal(jobId && jobId !== 'NaN' ? jobId : null)
+            }
+            loading={loading}
+            selectMode={isCompareSelectMode}
+            selectedJobIds={compareEvalJobIds.map((id) => String(id))}
+            onToggleJobSelected={(jobId) => {
+              setCompareEvalJobIds((prev) => {
+                const id = jobId;
+                if (!id || id === 'NaN') return prev;
+                if (prev.includes(id)) {
+                  return prev.filter((existing) => existing !== id);
                 }
-                return next;
+                if (prev.length === 0) return [id];
+                if (prev.length === 1) return [...prev, id];
+                // If already two selected, replace the oldest with the new one
+                return [prev[1], id];
               });
             }}
-          >
-            {isCompareSelectMode ? 'Cancel' : 'Select'}
-          </Button>
-          {isCompareSelectMode && (
-            <Button
-              size="sm"
-              variant="solid"
-              disabled={compareEvalJobIds.length !== 2}
-              onClick={() => {
-                if (compareEvalJobIds.length === 2) {
-                  setCompareEvalModalOpen(true);
-                }
-              }}
-            >
-              Compare selected evals
-            </Button>
-          )}
-          <IconButton
-            size="sm"
-            variant={showFavoritesOnly ? 'solid' : 'outlined'}
-            color={showFavoritesOnly ? 'warning' : 'neutral'}
-            onClick={() => setShowFavoritesOnly((prev) => !prev)}
-            title={showFavoritesOnly ? 'Show all jobs' : 'Show favorites only'}
-          >
-            <BookmarkIcon
-              size={16}
-              fill={showFavoritesOnly ? 'currentColor' : 'none'}
-            />
-          </IconButton>
-          {hiddenJobCount > 0 && (
-            <Button
-              size="sm"
-              variant={showHidden ? 'solid' : 'outlined'}
-              onClick={() => setShowHidden((prev) => !prev)}
-            >
-              {showHidden ? 'Hide hidden' : `Show hidden (${hiddenJobCount})`}
-            </Button>
-          )}
-        </Stack>
-      </Stack>
-      <Sheet sx={{ px: 1, mt: 1, mb: 1, flex: 2, overflow: 'auto' }}>
-        <JobsList
-          jobs={filteredJobsForDisplay as any}
-          launchProgressByJobId={launchProgressByJobId}
-          onDeleteJob={handleDeleteJob}
-          onViewOutput={(jobId) => {
-            const jobIdStr =
-              jobId === null || jobId === undefined ? '' : String(jobId);
-            if (!jobIdStr || jobIdStr === '-1' || jobIdStr === 'NaN') return;
-            setViewOutputFromJob(jobIdStr);
-          }}
-          onViewCheckpoints={(jobId) =>
-            setViewCheckpointsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewAllArtifacts={(jobId) =>
-            setViewAllArtifactsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewEvalImages={(jobId) =>
-            setViewEvalImagesFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewEvalResults={(jobId) =>
-            setViewEvalResultsFromJob(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewGeneratedDataset={(jobId, datasetId) => {
-            setPreviewDatasetModal({ open: true, datasetId });
-          }}
-          onViewSweepOutput={(jobId) => {
-            setViewOutputFromSweepJob(true);
-            const jobIdStr =
-              jobId === null || jobId === undefined ? '' : String(jobId);
-            if (!jobIdStr || jobIdStr === '-1' || jobIdStr === 'NaN') return;
-            setViewOutputFromJob(jobIdStr);
-          }}
-          onViewSweepResults={(jobId) => {
-            setViewSweepResultsFromJob(jobId && jobId !== 'NaN' ? jobId : null);
-          }}
-          onViewInteractive={(jobId) =>
-            setInteractiveJobForModal(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          onViewTrackio={(jobId) =>
-            setTrackioJobIdForModal(jobId && jobId !== 'NaN' ? jobId : null)
-          }
-          loading={jobsIsLoading}
-          selectMode={isCompareSelectMode}
-          selectedJobIds={compareEvalJobIds.map((id) => String(id))}
-          onToggleJobSelected={(jobId) => {
-            setCompareEvalJobIds((prev) => {
-              const id = jobId;
-              if (!id || id === 'NaN') return prev;
-              if (prev.includes(id)) {
-                return prev.filter((existing) => existing !== id);
-              }
-              if (prev.length === 0) return [id];
-              if (prev.length === 1) return [...prev, id];
-              // If already two selected, replace the oldest with the new one
-              return [prev[1], id];
-            });
-          }}
-          onToggleFavorite={handleToggleFavorite}
-          onToggleHidden={handleToggleHidden}
-          showFilesButton={false}
-          forceArtifactsButtonVisible
-          onStopPendingChange={handleStopPendingChange}
-        />
-      </Sheet>
+            onToggleFavorite={handleToggleFavorite}
+            onToggleHidden={handleToggleHidden}
+            showFilesButton={false}
+            forceArtifactsButtonVisible
+            onStopPendingChange={handleStopPendingChange}
+          />
+        )}
+      />
       <ViewSweepResultsModal
         jobId={viewSweepResultsFromJob}
         setJobId={(jobId: string | null) => setViewSweepResultsFromJob(jobId)}
