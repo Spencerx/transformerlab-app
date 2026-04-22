@@ -50,6 +50,7 @@ from transformerlab.routers import (  # noqa: E402
     asset_versions,
     trackio,
     permissions,
+    upload,
 )
 from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 
@@ -317,6 +318,7 @@ app.include_router(ssh_keys.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(asset_versions.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(trackio.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(permissions.router, dependencies=[Depends(get_user_and_team)])
+app.include_router(upload.router, dependencies=[Depends(get_user_and_team)])
 
 
 # @app.get("/")
