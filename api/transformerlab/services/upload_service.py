@@ -33,8 +33,13 @@ def _staging_dir(upload_id: str) -> str:
 def _chunk_path(upload_id: str, chunk_index: int) -> str:
     if chunk_index < 0:
         raise ValueError(f"chunk_index must be non-negative, got {chunk_index}")
-    # Apply basename so CodeQL sees a sanitised value entering the path join.
-    safe_index = os.path.basename(str(chunk_index))
+    # Enforce a strict numeric chunk filename policy for user-controlled input.
+    # This ensures the path component is canonical and contains only digits.
+    if chunk_index > 10_000_000:
+        raise ValueError(f"chunk_index is too large, got {chunk_index}")
+    safe_index = str(int(chunk_index))
+    if not safe_index.isdigit():
+        raise ValueError(f"Invalid chunk_index: {chunk_index!r}")
     return os.path.join(_staging_dir(upload_id), safe_index)
 
 
