@@ -69,6 +69,7 @@ def generate_aws_credentials_setup(
 def generate_gcp_credentials_setup(sa_json_path: str) -> str:
     """Read service account JSON from *sa_json_path* and emit a setup script that writes
     it to the standard ADC location so GCP client libraries pick it up automatically."""
+    sa_json_path = os.path.expanduser(sa_json_path)
     with open(sa_json_path, "r", encoding="utf-8") as f:
         encoded = base64.b64encode(f.read().encode()).decode()
     adc_path = "~/.config/gcloud/application_default_credentials.json"

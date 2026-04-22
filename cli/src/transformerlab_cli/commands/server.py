@@ -182,6 +182,7 @@ def _prompt_storage(existing: dict[str, str]) -> dict[str, str]:
                 show_default=False,
             ).strip()
             if sa_path:
+                sa_path = os.path.expanduser(sa_path)
                 if not os.path.isfile(sa_path):
                     console.print(
                         f"[error]File not found: {sa_path} — skipping service account key setup.[/error]"
