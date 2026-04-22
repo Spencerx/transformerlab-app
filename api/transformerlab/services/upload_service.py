@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -10,12 +11,28 @@ logger = logging.getLogger(__name__)
 STAGING_ROOT = os.path.join(os.path.expanduser("~"), ".transformerlab", "uploads", "staging")
 CHUNK_SIZE = 64 * 1024 * 1024  # 64 MB
 
+# upload_id is always uuid4().hex — 32 lowercase hex chars, no separators.
+_UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _validate_upload_id(upload_id: str) -> str:
+    """Reject upload_ids that could cause path traversal before they reach the filesystem."""
+    if not _UPLOAD_ID_RE.match(upload_id):
+        raise ValueError(f"Invalid upload_id: {upload_id!r}")
+    staging_root_real = os.path.realpath(STAGING_ROOT)
+    candidate = os.path.realpath(os.path.join(STAGING_ROOT, upload_id))
+    if not candidate.startswith(staging_root_real + os.sep):
+        raise ValueError(f"Invalid upload_id: {upload_id!r}")
+    return upload_id
+
 
 def _staging_dir(upload_id: str) -> str:
-    return os.path.join(STAGING_ROOT, upload_id)
+    return os.path.join(STAGING_ROOT, _validate_upload_id(upload_id))
 
 
 def _chunk_path(upload_id: str, chunk_index: int) -> str:
+    if chunk_index < 0:
+        raise ValueError(f"chunk_index must be non-negative, got {chunk_index}")
     return os.path.join(_staging_dir(upload_id), str(chunk_index))
 
 

@@ -145,8 +145,17 @@ def test_save_chunk_raises_on_unknown_upload_id():
     import asyncio
     from transformerlab.services.upload_service import save_chunk
 
+    # Must be a valid 32-char hex UUID format but refer to an upload that doesn't exist.
     with pytest.raises(ValueError, match="not found"):
-        asyncio.run(save_chunk("nonexistent-id", 0, b"data"))
+        asyncio.run(save_chunk("a" * 32, 0, b"data"))
+
+
+def test_save_chunk_raises_on_invalid_upload_id():
+    import asyncio
+    from transformerlab.services.upload_service import save_chunk
+
+    with pytest.raises(ValueError, match="Invalid upload_id"):
+        asyncio.run(save_chunk("../../etc/passwd", 0, b"data"))
 
 
 def test_get_filename_returns_filename():
