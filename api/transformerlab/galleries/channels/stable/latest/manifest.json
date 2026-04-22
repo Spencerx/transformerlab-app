@@ -1,11 +1,10 @@
 {
-  "bundle_version": "20260415184435",
+  "bundle_version": "20260421193056",
   "channel": "stable",
-  "released_at": "2026-04-15T18:44:35.364579+00:00",
+  "released_at": "2026-04-21T19:30:56.442725+00:00",
   "files": {
     "task-gallery.json": 25,
     "interactive-gallery.json": 9,
     "announcement-gallery.json": 2
-  },
-  "min_supported_app_version": "0.0.0"
+  }
 }
