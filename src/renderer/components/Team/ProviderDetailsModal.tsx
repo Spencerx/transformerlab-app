@@ -784,7 +784,7 @@ export default function ProviderDetailsModal({
                   <Option value="skypilot">Skypilot</Option>
                   <Option value="slurm">SLURM</Option>
                   <Option value="runpod">Runpod</Option>
-                  <Option value="dstack">dstack (beta) </Option>
+                  <Option value="dstack">dstack</Option>
                   {!hasLocalProvider && !providerId && (
                     <Option value="local">Local</Option>
                   )}
