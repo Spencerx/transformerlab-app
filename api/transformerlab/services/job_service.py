@@ -781,14 +781,18 @@ def job_update_type_and_status_sync(job_id: str, job_type: str, status: str, exp
         pass
 
 
-async def format_artifact(file_path: str) -> Optional[Dict[str, any]]:
+async def format_artifact(file_path: str, is_directory: bool = False) -> Optional[Dict[str, Any]]:
     """
     Format a single artifact file into the response structure.
     Returns None if the artifact can't be processed.
     """
     try:
         filename = file_path.split("/")[-1] if "/" in file_path else file_path
-        artifact = {"filename": filename, "full_path": file_path}
+        artifact = {
+            "filename": filename,
+            "full_path": file_path,
+            "is_directory": is_directory,
+        }
         return artifact
     except Exception as e:
         print(f"Error formatting artifact {file_path}: {e}")
@@ -845,19 +849,23 @@ async def get_artifacts_from_directory(artifacts_dir: str) -> List[Dict]:
         items = await storage.ls(artifacts_dir, detail=False)
 
         for item in items:
+            is_directory = False
             # Handle both string paths and dict responses from storage.ls
             if isinstance(item, dict):
                 # Extract path from dict (some storage backends return dicts even with detail=False)
                 file_path = item.get("name") or item.get("path") or str(item)
-                # Skip if it's a directory
-                if item.get("type") == "directory":
-                    continue
+                is_directory = item.get("type") == "directory"
             else:
                 file_path = str(item)
+                try:
+                    is_directory = await storage.isdir(file_path)
+                except Exception:
+                    is_directory = False
 
             if item:
-                artifact = await format_artifact(file_path)
-                artifacts.append(artifact)
+                artifact = await format_artifact(file_path, is_directory=is_directory)
+                if artifact:
+                    artifacts.append(artifact)
     except Exception as e:
         print(f"Error reading artifacts directory {artifacts_dir}: {e}")
 
