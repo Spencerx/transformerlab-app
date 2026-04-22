@@ -14,7 +14,6 @@ from lab import storage
 from lab.dataset import Dataset as dataset_service
 from datasets.data_files import EmptyDatasetError
 from transformerlab.shared.shared import slugify
-from transformerlab.shared import galleries
 from datasets.exceptions import DatasetNotFoundError
 import numpy as np
 import wave
@@ -60,17 +59,12 @@ class ErrorResponse(BaseModel):
     },
 )
 async def dataset_gallery() -> Any:
-    gallery = await galleries.get_data_gallery()
-    # list datasets from filesystem store
+    # Dataset galleries are no longer managed in API; return filesystem datasets.
     try:
         local_datasets = await dataset_service.list_all()
     except Exception:
         local_datasets = []
-
-    local_dataset_names = set(str(dataset.get("dataset_id")) for dataset in local_datasets)
-    for dataset in gallery:
-        dataset["downloaded"] = True if dataset["huggingfacerepo"] in local_dataset_names else False
-    return {"status": "success", "data": gallery}
+    return {"status": "success", "data": local_datasets}
 
 
 @router.get("/info", summary="Fetch the details of a particular dataset.")
@@ -494,13 +488,8 @@ async def dataset_download(dataset_id: str, config_name: str = None):
     except FileNotFoundError:
         pass
 
-    # Try to get the dataset info from the gallery
-    gallery = []
+    # Dataset galleries are no longer managed in API.
     json_data = {}
-    gallery = await galleries.get_data_gallery()
-    for dataset in gallery:
-        if dataset["huggingfacerepo"] == dataset_id:
-            json_data = dataset
 
     try:
         dataset_config = json_data.get("dataset_config", None)
@@ -590,7 +579,7 @@ async def dataset_download(dataset_id: str, config_name: str = None):
                     raise
 
     try:
-        dataset = await load_dataset_thread(dataset_id, config_name)
+        await load_dataset_thread(dataset_id, config_name)
 
     except ValueError as e:
         await log(f"Exception occurred while downloading dataset: {type(e).__name__}: {e}")
