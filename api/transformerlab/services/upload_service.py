@@ -15,19 +15,19 @@ CHUNK_SIZE = 64 * 1024 * 1024  # 64 MB
 _UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
-def _validate_upload_id(upload_id: str) -> str:
-    """Reject upload_ids that could cause path traversal before they reach the filesystem."""
+def _staging_dir(upload_id: str) -> str:
     if not _UPLOAD_ID_RE.match(upload_id):
         raise ValueError(f"Invalid upload_id: {upload_id!r}")
-    staging_root_real = os.path.realpath(STAGING_ROOT)
-    candidate = os.path.realpath(os.path.join(STAGING_ROOT, upload_id))
-    if not candidate.startswith(staging_root_real + os.sep):
+    # os.path.basename is a CodeQL-recognised path-traversal sanitizer: it strips
+    # directory components ("../../etc" → "etc"). If it changes the value the id
+    # contained separators and must be rejected.
+    safe_id = os.path.basename(upload_id)
+    if safe_id != upload_id:
         raise ValueError(f"Invalid upload_id: {upload_id!r}")
-    return upload_id
-
-
-def _staging_dir(upload_id: str) -> str:
-    return os.path.join(STAGING_ROOT, _validate_upload_id(upload_id))
+    real = os.path.realpath(os.path.join(STAGING_ROOT, safe_id))
+    if not real.startswith(os.path.realpath(STAGING_ROOT) + os.sep):
+        raise ValueError(f"Invalid upload_id: {upload_id!r}")
+    return real
 
 
 def _chunk_path(upload_id: str, chunk_index: int) -> str:

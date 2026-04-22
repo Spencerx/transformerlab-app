@@ -88,7 +88,8 @@ def test_assemble_upload_concatenates_chunks():
     path = assemble_upload_sync(uid, total_chunks=2)
 
     assert open(path, "rb").read() == b"ABCDEF"
-    assert path == os.path.join(STAGING_ROOT, uid, "assembled")
+    # _staging_dir returns os.path.realpath(), so compare against the resolved path.
+    assert path == os.path.realpath(os.path.join(STAGING_ROOT, uid, "assembled"))
 
 
 def test_assemble_upload_raises_on_missing_chunks():
