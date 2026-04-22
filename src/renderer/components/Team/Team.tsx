@@ -693,6 +693,15 @@ export default function UserLoginTest(): JSX.Element {
     providerId: string,
     providerName: string,
   ) {
+    if (localSetupInProgressProviderId) {
+      addNotification({
+        type: 'warning',
+        message:
+          'A local provider refresh is already in progress. Please wait for it to finish.',
+      });
+      return;
+    }
+
     // eslint-disable-next-line no-alert
     const confirmed = window.confirm(
       `Are you sure you want to refresh "${providerName || 'Local Provider'}"? This will reinstall the base environment.`,
@@ -1380,7 +1389,8 @@ export default function UserLoginTest(): JSX.Element {
                               disabled={
                                 !iAmOwner ||
                                 providersLoading ||
-                                providers === undefined
+                                providers === undefined ||
+                                Boolean(localSetupInProgressProviderId)
                               }
                               sx={{ minWidth: '70px', fontSize: '0.75rem' }}
                             >
