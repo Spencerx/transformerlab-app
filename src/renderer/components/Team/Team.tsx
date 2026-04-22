@@ -47,6 +47,8 @@ import SshKeySection from './SshKeySection';
 import PermissionsSection from './PermissionsSection';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
 
+const STORAGE_PROBE_STATE_KEY_PREFIX = 'team-storage-probe-state:';
+
 /*
   Minimal in-file auth utilities and request helpers.
   - getAccessToken / updateAccessToken / logoutUser
@@ -682,6 +684,52 @@ export default function UserLoginTest(): JSX.Element {
     }
   }
 
+  useEffect(() => {
+    const teamId = authContext?.team?.id;
+    if (!teamId || typeof window === 'undefined') return;
+
+    try {
+      const saved = window.localStorage.getItem(
+        `${STORAGE_PROBE_STATE_KEY_PREFIX}${teamId}`,
+      );
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved) as {
+        probeStatusMap?: Record<string, ProbeStatus>;
+        probeMessageMap?: Record<string, string>;
+      };
+
+      if (parsed.probeStatusMap && typeof parsed.probeStatusMap === 'object') {
+        setProbeStatusMap(parsed.probeStatusMap);
+      }
+      if (
+        parsed.probeMessageMap &&
+        typeof parsed.probeMessageMap === 'object'
+      ) {
+        setProbeMessageMap(parsed.probeMessageMap);
+      }
+    } catch {
+      // Ignore invalid saved probe state.
+    }
+  }, [authContext?.team?.id]);
+
+  useEffect(() => {
+    const teamId = authContext?.team?.id;
+    if (!teamId || typeof window === 'undefined') return;
+
+    try {
+      window.localStorage.setItem(
+        `${STORAGE_PROBE_STATE_KEY_PREFIX}${teamId}`,
+        JSON.stringify({
+          probeStatusMap,
+          probeMessageMap,
+        }),
+      );
+    } catch {
+      // Ignore storage errors.
+    }
+  }, [authContext?.team?.id, probeStatusMap, probeMessageMap]);
+
   return (
     <Sheet sx={{ overflowY: 'auto', p: 2 }}>
       <Typography level="h2" mb={2}>
@@ -1304,6 +1352,12 @@ export default function UserLoginTest(): JSX.Element {
                               loading={
                                 probeStatusMap[provider.id] === 'running'
                               }
+                              disabled={!iAmOwner}
+                              title={
+                                iAmOwner
+                                  ? 'Launches a lightweight job to validate provider lifecycle and shared storage'
+                                  : 'Only admins can run lifecycle checks'
+                              }
                               onClick={() => {
                                 if (probeStatusMap[provider.id] !== 'running') {
                                   handleStorageProbe(provider.id);
@@ -1311,7 +1365,7 @@ export default function UserLoginTest(): JSX.Element {
                               }}
                               sx={{ minWidth: '90px', fontSize: '0.75rem' }}
                             >
-                              Test Storage
+                              Verify Provider Lifecycle
                             </Button>
                             <Button
                               size="sm"
