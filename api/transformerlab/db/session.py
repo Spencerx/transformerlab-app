@@ -45,38 +45,38 @@ async def run_alembic_migrations():
     """
     Run Alembic migrations to create/update database schema.
     This replaces the previous create_all() approach.
+
+    Raises RuntimeError on migration failure. Callers should let this propagate:
+    starting the app against a half-migrated database produces confusing downstream
+    errors (e.g. cascading "relation does not exist") that are much harder to debug
+    than a clear migration failure at startup.
     """
-    try:
-        # Get the directory containing this file (transformerlab/db)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        # Go up to api directory where alembic.ini is located
-        api_dir = os.path.dirname(os.path.dirname(current_dir))
+    # Get the directory containing this file (transformerlab/db)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # Go up to api directory where alembic.ini is located
+    api_dir = os.path.dirname(os.path.dirname(current_dir))
 
-        # Run alembic upgrade head
-        # Pass environment variables to ensure DATABASE_URL is available in subprocess
-        env = os.environ.copy()
-        result = subprocess.run(
-            [sys.executable, "-m", "alembic", "upgrade", "head"],
-            cwd=api_dir,
-            capture_output=True,
-            text=True,
-            check=False,
-            env=env,
-        )
+    # Run alembic upgrade head
+    # Pass environment variables to ensure DATABASE_URL is available in subprocess
+    env = os.environ.copy()
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=api_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
 
-        if result.returncode != 0:
-            print(f"⚠️  Alembic migration warning: {result.stderr}")
-            # Don't fail completely - the database might already be up to date
-            # or there might be a minor issue
-            if "Target database is not up to date" not in result.stderr:
-                print(f"Migration output: {result.stdout}")
-        else:
-            print("✅ Database migrations applied")
-    except Exception as e:
-        print(f"⚠️  Error running Alembic migrations: {e}")
-        print("Continuing with startup - database may need manual migration")
-        # Don't raise - allow the app to continue
-        # The database might already be in the correct state
+    if result.returncode != 0:
+        print(f"❌ Alembic migration failed (returncode={result.returncode})")
+        if result.stdout:
+            print(f"stdout:\n{result.stdout}")
+        if result.stderr:
+            print(f"stderr:\n{result.stderr}")
+        raise RuntimeError(f"Alembic migration failed with returncode {result.returncode}. See stderr above.")
+
+    print("✅ Database migrations applied")
 
 
 async def init():
