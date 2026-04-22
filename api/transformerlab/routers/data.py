@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, Query, Depends
 import csv
 import os
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from io import BytesIO
 import base64
 from lab import dirs
@@ -24,6 +24,7 @@ from werkzeug.utils import secure_filename
 
 from transformerlab.services import dataset_service as dataset_service_module
 from transformerlab.services.permission_service import require_permission
+from transformerlab.services.upload_service import get_assembled_path, get_filename, delete_upload
 
 
 async def log(msg):
@@ -698,35 +699,52 @@ async def dataset_delete(
 
 
 @router.post("/fileupload", summary="Upload the contents of a dataset.")
-async def create_upload_file(dataset_id: str, files: list[UploadFile]):
+async def create_upload_file(
+    dataset_id: str,
+    files: list[UploadFile] = [],
+    upload_id: Optional[str] = None,
+):
     dataset_id = slugify(dataset_id)
     uploaded_filenames = []
 
-    for file in files:
-        print("uploading filename is: " + str(file.filename))
-
-        # # ensure filename is in the format <something>_train.jsonl or <something>_eval.jsonl
-        # if not re.match(r"^.+_(train|eval).jsonl$", str(file.filename)):
-        #     raise HTTPException(
-        #         status_code=403, detail=f"The filenames must be named EXACTLY: {dataset_id}_train.jsonl and {dataset_id}_eval.jsonl")
-
-        # ensure the filename is exactly {dataset_id}_train.jsonl or {dataset_id}_eval.jsonl
-
-        # if not re.match(rf"^{dataset_id}_(train|eval).jsonl$", str(file.filename)):
-        #     raise HTTPException(
-        #         status_code=403, detail=f"The filenames must be named EXACTLY: {dataset_id}_train.jsonl and {dataset_id}_eval.jsonl")
-
+    if upload_id is not None:
         try:
-            content = await file.read()
-            dataset_dir = await dirs.dataset_dir_by_id(dataset_id)
-            target_path = storage.join(dataset_dir, str(file.filename))
-            # aiofiles doesn't support URIs, so we need to use storage.open instead
-            await storage.makedirs(dataset_dir, exist_ok=True)
-            async with await storage.open(target_path, "wb") as out_file:
-                await out_file.write(content)
-            uploaded_filenames.append(str(file.filename))
-        except Exception:
-            raise HTTPException(status_code=403, detail="There was a problem uploading the file")
+            assembled_path = await get_assembled_path(upload_id)
+            filename = await get_filename(upload_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        dataset_dir = await dirs.dataset_dir_by_id(dataset_id)
+        target_path = storage.join(dataset_dir, filename)
+        await storage.makedirs(dataset_dir, exist_ok=True)
+        await storage.copy_file(assembled_path, target_path)
+        await delete_upload(upload_id)
+        uploaded_filenames.append(filename)
+    else:
+        for file in files:
+            print("uploading filename is: " + str(file.filename))
+
+            # # ensure filename is in the format <something>_train.jsonl or <something>_eval.jsonl
+            # if not re.match(r"^.+_(train|eval).jsonl$", str(file.filename)):
+            #     raise HTTPException(
+            #         status_code=403, detail=f"The filenames must be named EXACTLY: {dataset_id}_train.jsonl and {dataset_id}_eval.jsonl")
+
+            # ensure the filename is exactly {dataset_id}_train.jsonl or {dataset_id}_eval.jsonl
+
+            # if not re.match(rf"^{dataset_id}_(train|eval).jsonl$", str(file.filename)):
+            #     raise HTTPException(
+            #         status_code=403, detail=f"The filenames must be named EXACTLY: {dataset_id}_train.jsonl and {dataset_id}_eval.jsonl")
+
+            try:
+                content = await file.read()
+                dataset_dir = await dirs.dataset_dir_by_id(dataset_id)
+                target_path = storage.join(dataset_dir, str(file.filename))
+                # aiofiles doesn't support URIs, so we need to use storage.open instead
+                await storage.makedirs(dataset_dir, exist_ok=True)
+                async with await storage.open(target_path, "wb") as out_file:
+                    await out_file.write(content)
+                uploaded_filenames.append(str(file.filename))
+            except Exception:
+                raise HTTPException(status_code=403, detail="There was a problem uploading the file")
 
     # Update dataset metadata with uploaded files
     if uploaded_filenames:

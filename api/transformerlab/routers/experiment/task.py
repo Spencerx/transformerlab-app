@@ -24,6 +24,7 @@ from lab import storage
 from transformerlab.services.task_service import task_service
 from transformerlab.services.cache_service import cache, cached
 from transformerlab.services.provider_service import list_team_providers
+from transformerlab.services.upload_service import get_assembled_path, delete_upload
 from transformerlab.shared import galleries
 from transformerlab.shared.github_utils import (
     fetch_task_json_from_github,
@@ -819,6 +820,7 @@ async def create_task(
     request: Request,
     user_and_team=Depends(get_user_and_team),
     session: AsyncSession = Depends(get_async_session),
+    upload_id: Optional[str] = None,
 ):
     """
     Unified creation for blank, GitHub, and uploaded directory sources.
@@ -827,7 +829,25 @@ async def create_task(
     - JSON: { "source": "blank" } to create a blank task template.
     - JSON: { "github_repo_url": "...", "github_repo_dir": "...", "github_repo_branch": "...", "create_if_missing": bool }
     - Multipart/form-data: directory_zip=<zip>
+    - Query param: upload_id=<id> to create from a previously uploaded zip
     """
+    if upload_id is not None:
+        try:
+            zip_path = await get_assembled_path(upload_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        task_id = await task_service.create_task_from_zip_path(
+            experimentId,
+            zip_path,
+            user_and_team,
+            session,
+            _resolve_provider,
+            _parse_yaml_to_task_data,
+        )
+        await delete_upload(upload_id)
+        await cache.invalidate(f"tasks:{experimentId}")
+        return {"id": task_id}
+
     content_type = (request.headers.get("content-type") or "").lower()
     task_id: Optional[str] = None
 

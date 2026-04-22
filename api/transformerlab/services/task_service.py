@@ -287,6 +287,47 @@ class TaskService:
             await self.update_task(task_id, {"file_mounts": True})
             return task_id
 
+    async def create_task_from_zip_path(
+        self,
+        experiment_id: str,
+        zip_path: str,
+        user_and_team: dict,
+        session: Any,
+        resolve_provider: Any,
+        parse_yaml: Any,
+    ) -> str:
+        """Like create_task_from_directory_zip but accepts a local file path instead of bytes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                zf.extractall(tmpdir)
+
+            yaml_candidates = []
+            for root, _dirs, files in os.walk(tmpdir):
+                for name in files:
+                    if name == "task.yaml":
+                        yaml_candidates.append(os.path.join(root, name))
+            if not yaml_candidates:
+                raise HTTPException(status_code=400, detail="ZIP must contain a task.yaml file.")
+
+            task_yaml_path = yaml_candidates[0]
+            task_root = os.path.dirname(task_yaml_path)
+            with open(task_yaml_path, "r", encoding="utf-8") as f:
+                task_yaml_content = f.read()
+
+            task_data = parse_yaml(task_yaml_content)
+            task_data["experiment_id"] = experiment_id
+            task_data.setdefault("type", "REMOTE")
+            task_data.setdefault("plugin", "remote_orchestrator")
+            await resolve_provider(task_data, user_and_team, session)
+            if "name" in task_data:
+                task_data["name"] = secure_filename(task_data["name"])
+            task_id = await self.add_task(task_data)
+            task_dir = await self.get_task_dir(task_id)
+            await storage.makedirs(task_dir, exist_ok=True)
+            await storage.copy_dir(task_root, task_dir)
+            await self.update_task(task_id, {"file_mounts": True})
+            return task_id
+
 
 # Create a singleton instance
 task_service = TaskService()

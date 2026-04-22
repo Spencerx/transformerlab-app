@@ -20,6 +20,7 @@ import { IoCloudUploadOutline } from 'renderer/components/Icons';
 import * as chatAPI from '../../lib/transformerlab-api-sdk';
 
 import { fetcher, authenticatedFetch } from '../../lib/transformerlab-api-sdk';
+import { chunkedUpload, deleteUpload } from '../../lib/chunkedUpload';
 
 export default function DatasetDetailsModal({ open, setOpen }) {
   const [newDatasetName, setNewDatasetName] = useState('');
@@ -38,23 +39,50 @@ export default function DatasetDetailsModal({ open, setOpen }) {
     mutate();
   };
 
-  const uploadFiles = async (formData) => {
+  const uploadFiles = async (formData: FormData) => {
     setUploading(true);
-    const response = await authenticatedFetch(
+    const createResp = await authenticatedFetch(
       chatAPI.Endpoints.Dataset.Create(newDatasetName),
     );
-    const data = await response.json();
-    if (data.status === 'error') {
-      alert(data.message);
-    } else {
-      await authenticatedFetch(
-        chatAPI.Endpoints.Dataset.FileUpload(newDatasetName),
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
+    const createData = await createResp.json();
+    if (createData.status === 'error') {
+      alert(createData.message);
+      setUploading(false);
+      return;
     }
+
+    const fileEntries = Array.from(formData.entries()).filter(
+      ([, v]) => v instanceof File,
+    ) as [string, File][];
+
+    for (const [, file] of fileEntries) {
+      let upload_id: string | null = null;
+      try {
+        const result = await chunkedUpload({ file, filename: file.name });
+        upload_id = result.upload_id;
+        const resp = await authenticatedFetch(
+          chatAPI.Endpoints.Dataset.FileUpload(newDatasetName) +
+            `&upload_id=${upload_id}`,
+          { method: 'POST' },
+        );
+        if (!resp.ok) {
+          alert(`Failed to upload ${file.name}`);
+          setUploading(false);
+          return;
+        }
+      } catch (e) {
+        alert(
+          `Upload error for ${file.name}: ${e instanceof Error ? e.message : e}`,
+        );
+        setUploading(false);
+        return;
+      } finally {
+        if (upload_id) {
+          await deleteUpload(upload_id).catch(() => {});
+        }
+      }
+    }
+
     setUploading(false);
     handleClose();
   };

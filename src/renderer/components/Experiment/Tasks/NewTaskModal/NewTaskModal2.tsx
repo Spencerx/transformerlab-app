@@ -18,6 +18,7 @@ import {
 import { PlayIcon } from 'lucide-react';
 import JSZip from 'jszip';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
+import { chunkedUpload, deleteUpload } from '../../../../lib/chunkedUpload';
 import TaskDirectoryUploader from './TaskDirectoryUploader';
 
 type NewTaskModal2Props = {
@@ -148,22 +149,37 @@ export default function NewTaskModal2({
         zip.file(path, blob);
       };
       await Promise.all(directoryFiles.map(addFile));
-      const blob = await zip.generateAsync({ type: 'blob' });
-      const formData = new FormData();
-      formData.append('directory_zip', blob, 'directory.zip');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-      const response = await chatAPI.authenticatedFetch(
-        chatAPI.Endpoints.Task.FromDirectory(experimentId),
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
+      const { upload_id } = await chunkedUpload({
+        file: zipBlob,
+        filename: 'directory.zip',
+        onProgress: (pct) => console.debug(`task zip upload: ${pct}%`),
+      });
+
+      let response: Response;
+      try {
+        response = await chatAPI.authenticatedFetch(
+          chatAPI.Endpoints.Task.FromDirectory(experimentId) +
+            `?upload_id=${upload_id}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          },
+        );
+      } catch (e) {
+        await deleteUpload(upload_id).catch(() => {});
+        throw e;
+      }
+
       if (!response.ok) {
+        await deleteUpload(upload_id).catch(() => {});
         const err = await response.json().catch(() => ({}));
         setSubmitError(err.detail || `Request failed: ${response.status}`);
         return;
       }
+      await deleteUpload(upload_id).catch(() => {});
       const data = await response.json();
       onTaskCreated(data.id);
       onClose();
