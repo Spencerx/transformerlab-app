@@ -27,7 +27,7 @@ export default function LoginForm() {
   >([]);
   const [emailMethod, setEmailMethod] = useState('smtp');
 
-  const { login, setIsDefaultPassword } = useAuth();
+  const { login } = useAuth();
   const { addNotification } = useNotification();
   const navigate = useNavigate();
 
@@ -146,10 +146,6 @@ export default function LoginForm() {
           result.info?.message ??
             'Login failed. Please check your credentials.',
         );
-      } else {
-        if (password === 'admin123') {
-          setIsDefaultPassword(true);
-        }
       }
     } catch (err) {
       setError(
