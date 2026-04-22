@@ -11,6 +11,7 @@ import {
   Typography,
   Box,
   CircularProgress,
+  LinearProgress,
   Select,
   Option,
 } from '@mui/joy';
@@ -27,6 +28,7 @@ export default function DatasetDetailsModal({ open, setOpen }) {
   const [datasetType, setDatasetType] = useState('text');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [dropzoneActive, setDropzoneActive] = useState(false);
 
   const swrKey = open ? chatAPI.Endpoints.Dataset.LocalList(false) : null;
@@ -41,6 +43,7 @@ export default function DatasetDetailsModal({ open, setOpen }) {
 
   const uploadFiles = async (formData: FormData) => {
     setUploading(true);
+    setUploadProgress(0);
     const createResp = await authenticatedFetch(
       chatAPI.Endpoints.Dataset.Create(newDatasetName),
     );
@@ -55,10 +58,19 @@ export default function DatasetDetailsModal({ open, setOpen }) {
       ([, v]) => v instanceof File,
     ) as [string, File][];
 
-    for (const [, file] of fileEntries) {
+    for (let i = 0; i < fileEntries.length; i++) {
+      const [, file] = fileEntries[i];
+      const baseProgress = (i / fileEntries.length) * 100;
       let upload_id: string | null = null;
       try {
-        const result = await chunkedUpload({ file, filename: file.name });
+        const result = await chunkedUpload({
+          file,
+          filename: file.name,
+          onProgress: (pct) =>
+            setUploadProgress(
+              Math.round(baseProgress + pct / fileEntries.length),
+            ),
+        });
         upload_id = result.upload_id;
         const resp = await authenticatedFetch(
           chatAPI.Endpoints.Dataset.FileUpload(newDatasetName) +
@@ -84,6 +96,7 @@ export default function DatasetDetailsModal({ open, setOpen }) {
     }
 
     setUploading(false);
+    setUploadProgress(0);
     handleClose();
   };
 
@@ -511,6 +524,7 @@ export default function DatasetDetailsModal({ open, setOpen }) {
                 </Button>
               </>
             )}
+            {uploading && <LinearProgress determinate value={uploadProgress} />}
           </Box>
         </ModalDialog>
       </Modal>

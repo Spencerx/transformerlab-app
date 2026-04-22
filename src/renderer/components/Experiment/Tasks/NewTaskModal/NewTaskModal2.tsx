@@ -14,6 +14,7 @@ import {
   FormLabel,
   Input,
   Stack,
+  LinearProgress,
 } from '@mui/joy';
 import { PlayIcon } from 'lucide-react';
 import JSZip from 'jszip';
@@ -44,6 +45,7 @@ export default function NewTaskModal2({
   const [gitBranch, setGitBranch] = React.useState<string>('');
   const [directoryFiles, setDirectoryFiles] = React.useState<File[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState(0);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [showCreateBlank, setShowCreateBlank] = React.useState(false);
   const [creatingBlank, setCreatingBlank] = React.useState(false);
@@ -151,10 +153,11 @@ export default function NewTaskModal2({
       await Promise.all(directoryFiles.map(addFile));
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
+      setUploadProgress(0);
       const { upload_id } = await chunkedUpload({
         file: zipBlob,
         filename: 'directory.zip',
-        onProgress: (pct) => console.debug(`task zip upload: ${pct}%`),
+        onProgress: setUploadProgress,
       });
 
       let response: Response;
@@ -187,6 +190,7 @@ export default function NewTaskModal2({
       setSubmitError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -300,6 +304,9 @@ export default function NewTaskModal2({
                   </div>
                 )}
               </div>
+            )}
+            {submitting && selectedOption === 'upload' && (
+              <LinearProgress determinate value={uploadProgress} />
             )}
           </Stack>
         </DialogContent>

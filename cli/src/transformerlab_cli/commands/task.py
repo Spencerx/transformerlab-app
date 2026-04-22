@@ -9,6 +9,7 @@ import httpx
 import typer
 import yaml
 from rich.panel import Panel
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 from rich.syntax import Syntax
 
 import transformerlab_cli.util.api as api
@@ -175,29 +176,35 @@ def add_task_from_directory(
         )
 
         with open(tmp_zip_path, "rb") as zip_fh:
-            for i in range(total_chunks):
-                if i in already_received:
-                    continue
-                start = i * CHUNK_SIZE
-                zip_fh.seek(start)
-                chunk_data = zip_fh.read(CHUNK_SIZE)
-                with console.status(
-                    f"[bold success]Uploading chunk {i + 1}/{total_chunks}...[/bold success]",
-                    spinner="dots",
-                ):
+            with Progress(
+                TextColumn("[bold success]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                upload_task = progress.add_task("Uploading", total=total_chunks)
+                progress.advance(upload_task, len(already_received))
+                for i in range(total_chunks):
+                    if i in already_received:
+                        continue
+                    start = i * CHUNK_SIZE
+                    zip_fh.seek(start)
+                    chunk_data = zip_fh.read(CHUNK_SIZE)
                     chunk_resp = api.put(
                         f"/upload/{upload_id}/chunk?chunk_index={i}",
                         content=chunk_data,
                         headers={"Content-Type": "application/octet-stream"},
                     )
-                if chunk_resp.status_code != 200:
-                    console.print(f"[error]Error:[/error] Chunk {i} failed ({chunk_resp.status_code})")
-                    raise typer.Exit(1)
+                    if chunk_resp.status_code != 200:
+                        console.print(f"[error]Error:[/error] Chunk {i} failed ({chunk_resp.status_code})")
+                        raise typer.Exit(1)
+                    progress.advance(upload_task)
 
         with console.status("[bold success]Assembling upload...[/bold success]", spinner="dots"):
             complete_resp = api.post_json(
                 f"/upload/{upload_id}/complete",
                 json_data={"total_chunks": total_chunks},
+                timeout=None,
             )
         if complete_resp.status_code != 200:
             console.print(f"[error]Error:[/error] Upload complete failed ({complete_resp.status_code})")
@@ -207,6 +214,7 @@ def add_task_from_directory(
             response = api.post_json(
                 f"/experiment/{experiment_id}/task/create?upload_id={upload_id}",
                 json_data={},
+                timeout=None,
             )
     finally:
         os.unlink(tmp_zip_path)

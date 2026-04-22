@@ -24,7 +24,7 @@ from lab import storage
 from transformerlab.services.task_service import task_service
 from transformerlab.services.cache_service import cache, cached
 from transformerlab.services.provider_service import list_team_providers
-from transformerlab.services.upload_service import get_assembled_path, delete_upload
+from transformerlab.services.upload_service import get_assembled_path, get_filename, delete_upload
 from transformerlab.shared import galleries
 from transformerlab.shared.github_utils import (
     fetch_task_json_from_github,
@@ -420,7 +420,8 @@ async def task_delete_file(experimentId: str, task_id: str, file_path: str):
 async def task_upload_file(
     experimentId: str,
     task_id: str,
-    files: list[UploadFile] = File(...),
+    files: list[UploadFile] = File(default=[]),
+    upload_id: Optional[str] = None,
 ):
     task = await task_service.task_get_by_id(task_id)
     if not task:
@@ -434,18 +435,33 @@ async def task_upload_file(
     await storage.makedirs(task_dir, exist_ok=True)
 
     saved_files: list[str] = []
-    for uploaded in files:
-        original_name = (uploaded.filename or "").strip()
-        if not original_name:
-            continue
-        safe_name = secure_filename(original_name)
+
+    if upload_id is not None:
+        try:
+            assembled_path = await get_assembled_path(upload_id)
+            filename = await get_filename(upload_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        safe_name = secure_filename(filename)
         if not safe_name:
-            continue
+            raise HTTPException(status_code=400, detail="Invalid filename")
         target = storage.join(task_dir, safe_name)
-        content = await uploaded.read()
-        async with await storage.open(target, "wb") as f:
-            await f.write(content)
+        await storage.copy_file(assembled_path, target)
+        await delete_upload(upload_id)
         saved_files.append(safe_name)
+    else:
+        for uploaded in files:
+            original_name = (uploaded.filename or "").strip()
+            if not original_name:
+                continue
+            safe_name = secure_filename(original_name)
+            if not safe_name:
+                continue
+            target = storage.join(task_dir, safe_name)
+            content = await uploaded.read()
+            async with await storage.open(target, "wb") as f:
+                await f.write(content)
+            saved_files.append(safe_name)
 
     if not saved_files:
         raise HTTPException(status_code=400, detail="No valid files uploaded")

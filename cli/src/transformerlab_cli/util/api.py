@@ -63,7 +63,7 @@ def post(path: str, data: dict = None, files: dict = None, timeout: float = 60.0
     return response
 
 
-def post_json(path: str, json_data: dict = None, timeout: float = 60.0) -> httpx.Response:
+def post_json(path: str, json_data: dict = None, timeout: float | None = 60.0) -> httpx.Response:
     """
     Makes a POST HTTP request with JSON body.
 
