@@ -57,7 +57,6 @@ const DEFAULT_CONFIGS = {
   "ssh_port": 22
 }`,
   runpod: `{
-  "api_key": "<Your Runpod API key>",
   "api_base_url": "https://rest.runpod.io/v1"
 }`,
   dstack: `{
@@ -124,6 +123,11 @@ export default function ProviderDetailsModal({
   const [dstackApiToken, setDstackApiToken] = useState('');
   const [dstackApiTokenChanged, setDstackApiTokenChanged] = useState(false);
   const [dstackProjectName, setDstackProjectName] = useState('');
+
+  // RunPod-specific form fields
+  const [runpodApiKey, setRunpodApiKey] = useState('');
+  const [runpodApiKeyChanged, setRunpodApiKeyChanged] = useState(false);
+  const [runpodApiBaseUrl, setRunpodApiBaseUrl] = useState('');
 
   const { fetchWithAuth } = useAuth();
   const { data: providerData, isLoading: providerDataLoading } = useAPI(
@@ -289,6 +293,38 @@ export default function ProviderDetailsModal({
     providerId,
   ]);
 
+  const parseRunpodConfig = (configObj: any) => {
+    if (configObj && typeof configObj === 'object') {
+      setRunpodApiKey(
+        configObj.api_key === '***' ? '' : configObj.api_key || '',
+      );
+      setRunpodApiKeyChanged(false);
+      setRunpodApiBaseUrl(configObj.api_base_url || '');
+      if (configObj.supported_accelerators) {
+        setSupportedAccelerators(configObj.supported_accelerators);
+      }
+    }
+  };
+
+  const buildRunpodConfig = useCallback(() => {
+    const configObj: any = {
+      api_base_url: runpodApiBaseUrl || 'https://rest.runpod.io/v1',
+    };
+    if (!providerId || runpodApiKeyChanged) {
+      configObj.api_key = runpodApiKey;
+    }
+    if (supportedAccelerators && supportedAccelerators.length > 0) {
+      configObj.supported_accelerators = supportedAccelerators;
+    }
+    return configObj;
+  }, [
+    runpodApiKey,
+    runpodApiKeyChanged,
+    runpodApiBaseUrl,
+    supportedAccelerators,
+    providerId,
+  ]);
+
   // if a providerId is passed then we are editing an existing provider
   // Otherwise we are creating a new provider
   useEffect(() => {
@@ -335,6 +371,9 @@ export default function ProviderDetailsModal({
       if (providerData.type === 'dstack') {
         parseDstackConfig(rawConfigObj);
       }
+      if (providerData.type === 'runpod') {
+        parseRunpodConfig(rawConfigObj);
+      }
       setConfig(JSON.stringify(rawConfigObj, null, 2));
     } else if (!providerId) {
       // Reset form when in "add" mode (no providerId)
@@ -366,6 +405,9 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setRunpodApiKey('');
+      setRunpodApiKeyChanged(false);
+      setRunpodApiBaseUrl('');
     }
   }, [providerId, providerData]);
 
@@ -400,6 +442,9 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setRunpodApiKey('');
+      setRunpodApiKeyChanged(false);
+      setRunpodApiBaseUrl('');
     }
   }, [open]);
 
@@ -475,6 +520,14 @@ export default function ProviderDetailsModal({
           // Ignore parse errors
         }
       }
+      if (type === 'runpod') {
+        try {
+          const configObj = JSON.parse(defaultConfig);
+          parseRunpodConfig(configObj);
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
     }
   }, [type, providerId]);
 
@@ -494,11 +547,16 @@ export default function ProviderDetailsModal({
         const configObj = buildDstackConfig();
         setConfig(JSON.stringify(configObj, null, 2));
       }
+      if (type === 'runpod') {
+        const configObj = buildRunpodConfig();
+        setConfig(JSON.stringify(configObj, null, 2));
+      }
     }
   }, [
     buildSlurmConfig,
     buildSkypilotConfig,
     buildDstackConfig,
+    buildRunpodConfig,
     type,
     providerId,
   ]);
@@ -628,6 +686,8 @@ export default function ProviderDetailsModal({
         parsedConfig = buildSkypilotConfig();
       } else if (type === 'dstack') {
         parsedConfig = buildDstackConfig();
+      } else if (type === 'runpod') {
+        parsedConfig = buildRunpodConfig();
       } else if (type === 'local') {
         // Local providers are configured via supported accelerators only
         parsedConfig = {};
@@ -1140,10 +1200,50 @@ export default function ProviderDetailsModal({
                 </>
               )}
 
+              {type === 'runpod' && (
+                <>
+                  <FormControl sx={{ mt: 2 }}>
+                    <FormLabel>RunPod API Key *</FormLabel>
+                    <Input
+                      value={runpodApiKey}
+                      onChange={(event) => {
+                        setRunpodApiKeyChanged(true);
+                        setRunpodApiKey(event.currentTarget.value);
+                      }}
+                      placeholder={
+                        providerId
+                          ? 'Leave blank to keep existing key'
+                          : 'Your RunPod API key'
+                      }
+                      type="password"
+                      fullWidth
+                    />
+                  </FormControl>
+                  <FormControl sx={{ mt: 1 }}>
+                    <FormLabel>API Base URL</FormLabel>
+                    <Input
+                      value={runpodApiBaseUrl}
+                      onChange={(event) =>
+                        setRunpodApiBaseUrl(event.currentTarget.value)
+                      }
+                      placeholder="https://rest.runpod.io/v1"
+                      fullWidth
+                    />
+                    <Typography
+                      level="body-sm"
+                      sx={{ mt: 0.5, color: 'text.tertiary' }}
+                    >
+                      Leave blank to use the default RunPod API endpoint.
+                    </Typography>
+                  </FormControl>
+                </>
+              )}
+
               {/* Generic JSON config for non-structured providers or advanced editing */}
               {type !== 'slurm' &&
                 type !== 'skypilot' &&
                 type !== 'dstack' &&
+                type !== 'runpod' &&
                 type !== 'local' && (
                   <FormControl sx={{ mt: 1 }}>
                     <FormLabel>Configuration</FormLabel>
@@ -1161,8 +1261,11 @@ export default function ProviderDetailsModal({
                   </FormControl>
                 )}
 
-              {/* Show JSON for SLURM or SkyPilot providers in edit mode for advanced users */}
-              {(type === 'slurm' || type === 'skypilot' || type === 'dstack') &&
+              {/* Show JSON for structured providers in edit mode for advanced users */}
+              {(type === 'slurm' ||
+                type === 'skypilot' ||
+                type === 'dstack' ||
+                type === 'runpod') &&
                 providerId && (
                   <FormControl sx={{ mt: 1 }}>
                     <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
@@ -1185,6 +1288,8 @@ export default function ProviderDetailsModal({
                             parseSkypilotConfig(configObj);
                           } else if (type === 'dstack') {
                             parseDstackConfig(configObj);
+                          } else if (type === 'runpod') {
+                            parseRunpodConfig(configObj);
                           }
                         } catch (e) {
                           // Ignore parse errors
