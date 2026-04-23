@@ -41,11 +41,8 @@ import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import RenameTeamModal from './RenameTeamModal';
 import InviteUserModal from './InviteUserModal';
 import ProviderDetailsModal from './ProviderDetailsModal';
-<<<<<<< HEAD
 import ProviderResourceGroupsModal from './ProviderResourceGroupsModal';
-=======
 import LocalProviderRefreshModal from './LocalProviderRefreshModal';
->>>>>>> bd89ad52813dfa4c97bceda41cae6bae652e5d86
 import QuotaSettingsSection from './QuotaSettingsSection';
 import TeamSecretsSection from './TeamSecretsSection';
 import SshKeySection from './SshKeySection';
@@ -1606,21 +1603,21 @@ export default function UserLoginTest(): JSX.Element {
                               Edit
                             </Button>
                             <Button
-                            size="sm"
-                            variant="outlined"
-                            onClick={() => {
-                              setProviderForResourceGroups(provider);
-                              setOpenProviderResourceGroupsModal(true);
-                            }}
-                            disabled={
-                              !iAmOwner ||
-                              providersLoading ||
-                              providers === undefined
-                            }
-                            sx={{ minWidth: '70px', fontSize: '0.75rem' }}
-                          >
-                            Groups
-                          </Button>
+                              size="sm"
+                              variant="outlined"
+                              onClick={() => {
+                                setProviderForResourceGroups(provider);
+                                setOpenProviderResourceGroupsModal(true);
+                              }}
+                              disabled={
+                                !iAmOwner ||
+                                providersLoading ||
+                                providers === undefined
+                              }
+                              sx={{ minWidth: '70px', fontSize: '0.75rem' }}
+                            >
+                              Groups
+                            </Button>
                             <Button
                               size="sm"
                               color="danger"
