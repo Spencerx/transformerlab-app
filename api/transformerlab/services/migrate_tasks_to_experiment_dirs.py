@@ -21,6 +21,7 @@ from lab import storage
 from lab.dirs import get_workspace_dir, set_organization_id as lab_set_org_id
 
 from transformerlab.services import team_service
+from transformerlab.services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +106,7 @@ async def _migrate_org_tasks(org_id: str) -> dict[str, Any]:
     _set_org_context(org_id)
     moved_tasks = 0
     skipped_tasks = 0
+    touched_experiment_ids: set[str] = set()
 
     try:
         workspace_dir = await get_workspace_dir()
@@ -162,11 +164,26 @@ async def _migrate_org_tasks(org_id: str) -> dict[str, Any]:
             await storage.copy_dir(task_dir, dest_dir)
             await storage.rm_tree(task_dir)
             moved_tasks += 1
+            touched_experiment_ids.add(str(experiment_id))
+
+        # Invalidate task list/detail cache tags for affected experiments so
+        # clients don't wait for TTL after migration.
+        for experiment_id in sorted(touched_experiment_ids):
+            try:
+                await cache.invalidate(f"tasks:{experiment_id}")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Tasks migration: org %s: cache invalidation failed for experiment %s: %s",
+                    org_id,
+                    experiment_id,
+                    exc,
+                )
 
         return {
             "org_id": org_id,
             "moved_tasks": moved_tasks,
             "skipped_tasks": skipped_tasks,
+            "cache_invalidated_experiments": sorted(touched_experiment_ids),
             "status": "migrated",
         }
     except Exception as exc:  # noqa: BLE001
