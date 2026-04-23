@@ -9,7 +9,9 @@ from transformerlab_cli.util.pypi import (
     _parse_version,
     _read_cache,
     _write_cache,
+    describe_install_source,
     fetch_latest_version,
+    get_install_source,
     is_update_available,
 )
 
@@ -144,3 +146,44 @@ def test_is_update_available_unknown_version():
         installed, latest = is_update_available()
     assert installed == "unknown"
     assert latest is None
+
+
+def test_get_install_source_pypi_returns_none():
+    """A PyPI install has no direct_url.json, so get_install_source returns None."""
+    mock_dist = MagicMock()
+    mock_dist.read_text.return_value = None
+    with patch("transformerlab_cli.util.pypi.distribution", return_value=mock_dist):
+        assert get_install_source() is None
+
+
+def test_get_install_source_local_path():
+    """A local-path install returns parsed direct_url.json contents."""
+    payload = {"url": "file:///Users/alice/project/cli", "dir_info": {"editable": False}}
+    mock_dist = MagicMock()
+    mock_dist.read_text.return_value = json.dumps(payload)
+    with patch("transformerlab_cli.util.pypi.distribution", return_value=mock_dist):
+        assert get_install_source() == payload
+
+
+def test_get_install_source_package_not_found():
+    """Never raises — returns None if the package metadata lookup fails."""
+    with patch("transformerlab_cli.util.pypi.distribution", side_effect=Exception("missing")):
+        assert get_install_source() is None
+
+
+def test_describe_install_source_local():
+    payload = {"url": "file:///Users/alice/project/cli", "dir_info": {"editable": False}}
+    assert describe_install_source(payload) == "local directory: /Users/alice/project/cli"
+
+
+def test_describe_install_source_editable():
+    payload = {"url": "file:///Users/alice/project/cli", "dir_info": {"editable": True}}
+    assert describe_install_source(payload) == "editable directory: /Users/alice/project/cli"
+
+
+def test_describe_install_source_vcs():
+    payload = {
+        "url": "https://github.com/example/repo",
+        "vcs_info": {"vcs": "git", "commit_id": "abcdef1234567890"},
+    }
+    assert describe_install_source(payload) == "git: https://github.com/example/repo @ abcdef1"

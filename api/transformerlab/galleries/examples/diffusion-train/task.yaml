@@ -1,0 +1,18 @@
+name: diffusion-train-task
+github_repo_url: https://github.com/transformerlab/transformerlab-examples
+github_repo_dir: diffusion-train
+resources:
+  accelerators: "A100-80GB:1"
+setup: "uv pip install transformerlab diffusers peft safetensors torch torchvision accelerate 'datasets==4.4.2' 'pyarrow==22.0.0' huggingface_hub 'transformers==4.57.3'"
+run: "python ~/diffusion-train/train.py"
+envs:
+  WANDB_PROJECT: "stable-diffusion-training"
+  PYTHONUNBUFFERED: "1"
+  HF_TOKEN: "{{secret._HF_TOKEN}}"
+  WANDB_API_KEY: "{{secret._WANDB_API_KEY}}"
+parameters:
+  model_name: "CompVis/stable-diffusion-v1-4"
+  dataset: "nkasmanoff/nasa_earth_instagram"
+  num_train_epochs: 1
+  train_batch_size: 1
+  learning_rate: 0.0001

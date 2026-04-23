@@ -443,6 +443,7 @@ async def get_current_user(
     request: Request,
     user: User = Depends(current_active_user),
     session: AsyncSession = Depends(get_async_session),
+    user_manager=Depends(get_user_manager),
 ):
     """
     Get current user information.
@@ -462,6 +463,8 @@ async def get_current_user(
         # Fallback: ignore API key-specific info if authentication helper fails
         api_key_team_id = None
 
+    is_default_password, _ = user_manager.password_helper.verify_and_update("admin123", user.hashed_password)
+
     return CurrentUserResponse(
         id=str(user.id),
         email=user.email,
@@ -471,6 +474,7 @@ async def get_current_user(
         first_name=user.first_name,
         last_name=user.last_name,
         api_key_team_id=api_key_team_id,
+        is_default_password=is_default_password,
     )
 
 

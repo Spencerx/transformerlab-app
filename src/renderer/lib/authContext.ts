@@ -383,6 +383,10 @@ export function AuthProvider({ connection, children }: AuthProviderProps) {
     }
   }, [user]);
 
+  useEffect(() => {
+    setIsDefaultPassword(Boolean(user?.is_default_password));
+  }, [user?.is_default_password]);
+
   // Login handler
   const handleLogin = useCallback(
     async (username: string, password: string) => {
@@ -482,6 +486,7 @@ export function AuthProvider({ connection, children }: AuthProviderProps) {
     logoutUser();
     resetUser();
     setIsAuthenticated(false);
+    setIsDefaultPassword(false);
     setTeamState(null);
     // Clear team cookie
     document.cookie = 'tlab_team_id=; Max-Age=0; path=/; SameSite=Lax';
