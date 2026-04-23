@@ -1,6 +1,7 @@
 """Tests for config command and utility functions."""
 
 import json
+import os
 from typer.testing import CliRunner
 from transformerlab_cli.main import app
 from transformerlab_cli.util.config import (
@@ -135,6 +136,54 @@ def test_load_config_with_data(tmp_config_dir):
     with _patch_config_paths(config_dir, config_file):
         config = load_config()
         assert config["server"] == "http://test:8338"
+
+
+def test_load_config_corrupt_moves_aside_and_returns_empty(tmp_config_dir):
+    """A corrupt config must not silently resolve to {}; it must be renamed aside."""
+    import glob
+
+    config_dir, config_file = tmp_config_dir
+    with open(config_file, "w", encoding="utf-8") as f:
+        f.write("{not: valid json,,")
+    with _patch_config_paths(config_dir, config_file):
+        config = load_config()
+        assert config == {}
+    assert not os.path.exists(config_file), "corrupt config should have been renamed aside"
+    backups = glob.glob(f"{config_file}.corrupt-*")
+    assert len(backups) == 1, f"expected one backup, got {backups}"
+
+
+def test_set_config_does_not_wipe_existing_keys_when_file_is_fine(tmp_config_dir):
+    """Regression: a set_config call must merge, never wipe unrelated keys."""
+    config_dir, config_file = tmp_config_dir
+    with open(config_file, "w", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {
+                    "server": "http://localhost:8338",
+                    "team_id": "abc-123",
+                    "user_email": "u@example.com",
+                    "current_experiment": "alpha",
+                }
+            )
+        )
+    with _patch_config_paths(config_dir, config_file):
+        assert set_config("current_experiment", "beta") is True
+        with open(config_file, "r", encoding="utf-8") as f:
+            data = json.loads(f.read())
+    assert data["server"] == "http://localhost:8338"
+    assert data["team_id"] == "abc-123"
+    assert data["user_email"] == "u@example.com"
+    assert data["current_experiment"] == "beta"
+
+
+def test_save_config_is_atomic_no_tmp_left_behind(tmp_config_dir):
+    """After a successful save, the sibling .tmp file must not exist."""
+    config_dir, config_file = tmp_config_dir
+    with _patch_config_paths(config_dir, config_file):
+        assert set_config("server", "http://localhost:8338") is True
+    assert os.path.exists(config_file)
+    assert not os.path.exists(f"{config_file}.tmp")
 
 
 # --- JSON format output ---

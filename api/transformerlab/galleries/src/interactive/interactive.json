@@ -4,11 +4,15 @@
     "interactive_type": "vscode",
     "name": "VS Code",
     "description": "Remote VS Code development environment via tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-vscode",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-vscode",
     "env_parameters": [],
     "icon": "https://lab.cloud/img/icons/vscode.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD"],
+    "supported_accelerators": [
+      "cpu",
+      "NVIDIA",
+      "AMD"
+    ],
     "remoteOnly": true,
     "_comment_ports": "VS Code tunnel does not expose fixed local ports; the tunnel URL is generated dynamically by the VS Code CLI.",
     "ports": [],
@@ -42,8 +46,8 @@
     "interactive_type": "jupyter",
     "name": "Jupyter Notebook",
     "description": "Jupyter Lab notebook environment via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-jupyter",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-jupyter",
     "env_parameters": [
       {
         "field_name": "ngrok Auth Token",
@@ -56,7 +60,12 @@
       }
     ],
     "icon": "https://lab.cloud/img/icons/jupyter.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD", "AppleSilicon"],
+    "supported_accelerators": [
+      "cpu",
+      "NVIDIA",
+      "AMD",
+      "AppleSilicon"
+    ],
     "_comment_ports": "Jupyter Lab listens on port 8888. The ngrok tunnel exposes this port externally.",
     "ports": [
       {
@@ -89,8 +98,8 @@
     "interactive_type": "vllm",
     "name": "vLLM Server",
     "description": "vLLM OpenAI-compatible API server via ngrok tunnel (plus Open WebUI)",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-vllm",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-vllm",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -127,7 +136,10 @@
         "password": true
       }
     ],
-    "supported_accelerators": ["NVIDIA", "AMD"],
+    "supported_accelerators": [
+      "NVIDIA",
+      "AMD"
+    ],
     "icon": "https://lab.cloud/img/icons/vllm.png",
     "_comment_ports": "vLLM API on 8000, Open WebUI on 8080. Both tunneled via ngrok.",
     "ports": [
@@ -179,8 +191,8 @@
     "interactive_type": "ollama",
     "name": "Ollama + Open WebUI",
     "description": "Ollama model server with Open WebUI chat interface via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-ollama-openwebui",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-ollama-openwebui",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -201,7 +213,12 @@
       }
     ],
     "icon": "https://lab.cloud/img/icons/ollama.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD", "AppleSilicon"],
+    "supported_accelerators": [
+      "cpu",
+      "NVIDIA",
+      "AMD",
+      "AppleSilicon"
+    ],
     "_comment_ports": "Ollama API on 11434, Open WebUI on 8080. Both tunneled via ngrok.",
     "ports": [
       {
@@ -251,8 +268,8 @@
     "id": "ollama_gradio",
     "name": "Ollama + Gradio",
     "description": "Ollama model server with Gradio chat UI via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "inference-ollama-gradio-chat",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/inference-ollama-gradio-chat",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -264,7 +281,12 @@
       }
     ],
     "icon": "https://lab.cloud/img/icons/ollama.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD", "AppleSilicon"],
+    "supported_accelerators": [
+      "cpu",
+      "NVIDIA",
+      "AMD",
+      "AppleSilicon"
+    ],
     "_comment_ports": "Ollama API on 11434, Gradio UI on 7860. Both tunneled via ngrok.",
     "ports": [
       {
@@ -301,8 +323,8 @@
     "id": "comfy_ui",
     "name": "ComfyUI",
     "description": "ComfyUI server via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-comfyui",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-comfyui",
     "env_parameters": [
       {
         "field_name": "ngrok Auth Token",
@@ -315,7 +337,12 @@
       }
     ],
     "icon": "https://lab.cloud/img/icons/comfyui.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD", "AppleSilicon"],
+    "supported_accelerators": [
+      "cpu",
+      "NVIDIA",
+      "AMD",
+      "AppleSilicon"
+    ],
     "ports": [
       {
         "port": 8188,
@@ -347,8 +374,8 @@
     "interactive_type": "ssh",
     "name": "SSH",
     "description": "SSH access via ngrok TCP tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-ssh",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-ssh",
     "env_parameters": [
       {
         "field_name": "ngrok Auth Token",
@@ -361,7 +388,11 @@
       }
     ],
     "icon": "https://lab.cloud/img/icons/ssh.png",
-    "supported_accelerators": ["cpu", "NVIDIA", "AMD"],
+    "supported_accelerators": [
+      "cpu",
+      "NVIDIA",
+      "AMD"
+    ],
     "remoteOnly": true,
     "_comment_ports": "SSH runs on port 22, tunneled via ngrok TCP tunnel.",
     "ports": [
@@ -411,8 +442,8 @@
     "id": "mlx_gradio",
     "name": "MLX LM + Gradio",
     "description": "MLX LM inference server with Gradio chat UI for Apple Silicon",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "inference-mlx-gradio-chat",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/inference-mlx-gradio-chat",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -424,7 +455,9 @@
       }
     ],
     "icon": "https://github.com/ml-explore.png",
-    "supported_accelerators": ["AppleSilicon"],
+    "supported_accelerators": [
+      "AppleSilicon"
+    ],
     "_comment_ports": "MLX LM API on 8001, Gradio UI on 7860.",
     "ports": [
       {
@@ -461,8 +494,8 @@
     "id": "mlx_audio_tts",
     "name": "MLX Audio TTS + Gradio",
     "description": "Text-to-Speech using MLX Audio with Gradio UI for Apple Silicon",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "inference-mlx-audio-tts",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/inference-mlx-audio-tts",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -474,7 +507,9 @@
       }
     ],
     "icon": "https://github.com/ml-explore.png",
-    "supported_accelerators": ["AppleSilicon"],
+    "supported_accelerators": [
+      "AppleSilicon"
+    ],
     "_comment_ports": "Gradio TTS UI on 7860.",
     "ports": [
       {

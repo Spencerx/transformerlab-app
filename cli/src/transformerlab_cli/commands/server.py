@@ -1,3 +1,4 @@
+import json
 import os
 import secrets
 import shutil
@@ -173,6 +174,40 @@ def _prompt_storage(existing: dict[str, str]) -> dict[str, str]:
             if project.strip():
                 env["GCP_PROJECT"] = project.strip()
             env["REMOTE_WORKSPACE_HOST"] = "gcp"
+
+            default_sa_path = existing.get("TFL_GCP_SERVICE_ACCOUNT_JSON_PATH", "")
+            sa_path = typer.prompt(
+                "Path to service account JSON key file (for remote job launches, press Enter to skip)",
+                default=default_sa_path,
+                show_default=False,
+            ).strip()
+            if sa_path:
+                sa_path = os.path.expanduser(sa_path)
+                if not os.path.isfile(sa_path):
+                    console.print(
+                        f"[error]File not found: {sa_path} — skipping service account key setup.[/error]"
+                        "\n[bold error]WARNING: Remote Job (using GCP for storage) launches will fail without a valid service account key.[/bold error]"
+                    )
+                else:
+                    try:
+                        with open(sa_path, "r", encoding="utf-8") as _f:
+                            json.load(_f)
+                        env["TFL_GCP_SERVICE_ACCOUNT_JSON_PATH"] = sa_path
+                    except json.JSONDecodeError:
+                        console.print(
+                            "[error]File is not valid JSON — skipping service account key setup.[/error]"
+                            "\n[bold error]WARNING: Remote Job (using GCP for storage) launches will fail without a valid service account key.[/bold error]"
+                        )
+                    except OSError as e:
+                        console.print(
+                            f"[error]Could not read file: {e} — skipping service account key setup.[/error]"
+                            "\n[bold error]WARNING: Remote Job (using GCP for storage) launches will fail without a valid service account key.[/bold error]"
+                        )
+            else:
+                console.print(
+                    "[bold error]WARNING: No service account key provided. Remote Job (using GCP for storage) launches will fail.[/bold error]"
+                    "\n[dim]You can re-run 'lab server init' to configure this later.[/dim]"
+                )
         elif provider == "azure":
             console.print("\n[info]Azure Blob Storage authentication:[/info]")
             use_conn_string = typer.confirm("Use a connection string?", default=True)
