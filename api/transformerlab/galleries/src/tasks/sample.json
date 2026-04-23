@@ -2,12 +2,14 @@
   {
     "title": "Batch Image Generation using FLUX2",
     "description": "A task to generate images in batch using the FLUX2 model.",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "batch-image-gen-flux",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/batch-image-gen-flux",
     "metadata": {
       "category": "generation",
       "modality": "vision",
-      "framework": [""]
+      "framework": [
+        ""
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -25,8 +27,8 @@
   {
     "title": "Sample Task Example",
     "description": "A sample PyTorch training task that clones a repository and runs training script",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "sample-task",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/sample-task",
     "metadata": {
       "category": "other",
       "modality": "other",
@@ -62,8 +64,8 @@
   {
     "title": "Dataset Generation Task Example",
     "description": "A sample dataset generation task that runs a dataset generation script and creates a dataset.",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "demo-generate-task",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/demo-generate-task",
     "metadata": {
       "category": "dataset-generation",
       "modality": "other",

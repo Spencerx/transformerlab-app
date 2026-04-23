@@ -23,6 +23,7 @@ import {
   Option,
   Checkbox,
   Chip,
+  Textarea,
 } from '@mui/joy';
 import { Editor } from '@monaco-editor/react';
 import {
@@ -130,6 +131,8 @@ export default function QueueTaskModal({
     React.useState(false);
   const [showParameterOverrides, setShowParameterOverrides] =
     React.useState(true);
+  const [jobDescription, setJobDescription] = React.useState('');
+  const [showDescription, setShowDescription] = React.useState(false);
   const resourceOverridesRef = React.useRef<HTMLDivElement | null>(null);
   const loadingMessages = React.useMemo(
     () => [
@@ -666,6 +669,13 @@ export default function QueueTaskModal({
           ? String(initMinutesRequested)
           : '',
       );
+      const initDescription = cfg.description ?? task.description ?? '';
+      const normalizedDescription =
+        initDescription !== null && initDescription !== undefined
+          ? String(initDescription)
+          : '';
+      setJobDescription(normalizedDescription);
+      setShowDescription(Boolean(normalizedDescription.trim()));
     }
   }, [open, task, providers]);
 
@@ -808,6 +818,9 @@ export default function QueueTaskModal({
       if (!Number.isNaN(parsedMinutes) && parsedMinutes > 0) {
         config.minutes_requested = parsedMinutes;
       }
+    }
+    if (jobDescription.trim()) {
+      config.description = jobDescription.trim();
     }
 
     // For SLURM providers, add optional per-job SBATCH flags override
@@ -1653,6 +1666,53 @@ export default function QueueTaskModal({
               parameters={parameters}
               disabled={isSubmitting}
             />
+
+            <Divider />
+
+            {/* Optional Description Section */}
+            <Stack spacing={1}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ cursor: isSubmitting ? 'default' : 'pointer' }}
+                onClick={() => {
+                  if (!isSubmitting) {
+                    setShowDescription((prev) => !prev);
+                  }
+                }}
+              >
+                <Typography level="title-sm">
+                  Add description (optional)
+                </Typography>
+                <ChevronDownIcon
+                  size={18}
+                  style={{
+                    transform: showDescription
+                      ? 'rotate(180deg)'
+                      : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </Stack>
+              {showDescription && (
+                <FormControl>
+                  <FormLabel>Run description</FormLabel>
+                  <Textarea
+                    minRows={3}
+                    maxRows={8}
+                    placeholder="Describe what changed, your hypothesis, and what to watch for in this run."
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                  <FormHelperText>
+                    Stored with the job and shown in job details. Markdown is
+                    supported.
+                  </FormHelperText>
+                </FormControl>
+              )}
+            </Stack>
 
             {/* Optional Resource Overrides Section */}
             <Divider />

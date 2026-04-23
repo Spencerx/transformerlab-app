@@ -55,7 +55,6 @@ from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 
 
 from transformerlab.routers.experiment import experiment  # noqa: E402
-from transformerlab.routers.experiment import jobs  # noqa: E402
 from transformerlab.shared import shared  # noqa: E402
 from transformerlab.shared import dirs  # noqa: E402
 from lab.dirs import set_organization_id as lab_set_org_id  # noqa: E402
@@ -306,7 +305,6 @@ app.include_router(model.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(serverinfo.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(data.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(experiment.router, dependencies=[Depends(get_user_and_team)])
-app.include_router(jobs.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(config.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(teams.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(compute_provider.router)

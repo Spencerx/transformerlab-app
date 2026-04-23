@@ -2,12 +2,14 @@
   {
     "title": "Evaluation Task Example",
     "description": "A sample evaluation task that runs an evaluation script and creates reports.",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "demo-eval-task",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/demo-eval-task",
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": ["huggingface"]
+      "framework": [
+        "huggingface"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -39,12 +41,14 @@
   {
     "title": "Basic Evaluation Metrics",
     "description": "Evaluating outputs of LLMs using basic defined metrics including regex patterns, word counts, and custom Python code.",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "basic-evals-metrics",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/basic-evals-metrics",
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": [""]
+      "framework": [
+        ""
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -62,12 +66,14 @@
   {
     "title": "EleutherAI LM Evaluation Harness",
     "description": "EleutherAI LM Evaluation Harness for evaluating language models on various benchmarks.",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "eleutherai-lm-evaluation-harness",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/eleutherai-lm-evaluation-harness",
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": ["eleutherai"]
+      "framework": [
+        "eleutherai"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {
@@ -85,12 +91,14 @@
   {
     "title": "Objective Metrics Evaluation",
     "description": "Evaluating outputs of LLMs using objective metrics powered by DeepEval Framework. Supports metrics like Rouge, BLEU, Exact Match, Quasi Exact Match, Quasi Contains, and BERT Score.",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "objective-eval",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/objective-eval",
     "metadata": {
       "category": "eval",
       "modality": "text",
-      "framework": ["deepeval"]
+      "framework": [
+        "deepeval"
+      ]
     },
     "supportedAccelerators": {
       "NVIDIA": {

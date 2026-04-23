@@ -167,6 +167,10 @@ Endpoints.ComputeProvider = {
     }
     return `${API_URL()}compute_provider/jobs/ensure-quota-recorded`;
   },
+  LaunchStorageProbe: (providerId: string) =>
+    `${API_URL()}compute_provider/providers/${providerId}/debug/storage-probe`,
+  CheckStorageProbe: (providerId: string, jobId: string) =>
+    `${API_URL()}compute_provider/providers/${providerId}/debug/storage-probe/${jobId}`,
 };
 
 Endpoints.SshKeys = {
@@ -338,6 +342,8 @@ Endpoints.Experiment = {
     fileIndex: number = 0,
   ) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_eval_results?task=${task}&file_index=${fileIndex}`,
+  GetSweepResults: (experimentId: string, jobId: string) =>
+    `${API_URL()}experiment/${experimentId}/jobs/${jobId}/sweep_results`,
   GetGeneratedDataset: (experimentId: string, jobId: string) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_generated_dataset`,
   GetPlotJSON: (experimentId: string, jobId: string) =>
