@@ -61,7 +61,6 @@ const DEFAULT_CONFIGS = {
 }`,
   dstack: `{
   "server_url": "<Your dstack server URL e.g. http://0.0.0.0:3000>",
-  "api_token": "<Your dstack API token>",
   "dstack_project": "<Your dstack project name e.g. main>"
 }`,
   local: `{}`,
@@ -442,6 +441,9 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setIsSetupInProgress(false);
+      setSetupStatus(null);
+      setSetupLogTail('');
       setRunpodApiKey('');
       setRunpodApiKeyChanged(false);
       setRunpodApiBaseUrl('');
@@ -1258,54 +1260,6 @@ export default function ProviderDetailsModal({
                       minRows={5}
                       maxRows={10}
                     />
-                  </FormControl>
-                )}
-
-              {/* Show JSON for structured providers in edit mode for advanced users */}
-              {(type === 'slurm' ||
-                type === 'skypilot' ||
-                type === 'dstack' ||
-                type === 'runpod') &&
-                providerId && (
-                  <FormControl sx={{ mt: 1 }}>
-                    <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
-                    <Textarea
-                      value={
-                        typeof config === 'string'
-                          ? config
-                          : JSON.stringify(config)
-                      }
-                      onChange={(event) => {
-                        setConfig(event.currentTarget.value);
-                        // Try to parse and update form fields
-                        try {
-                          const configObj = JSON.parse(
-                            event.currentTarget.value,
-                          );
-                          if (type === 'slurm') {
-                            parseSlurmConfig(configObj);
-                          } else if (type === 'skypilot') {
-                            parseSkypilotConfig(configObj);
-                          } else if (type === 'dstack') {
-                            parseDstackConfig(configObj);
-                          } else if (type === 'runpod') {
-                            parseRunpodConfig(configObj);
-                          }
-                        } catch (e) {
-                          // Ignore parse errors
-                        }
-                      }}
-                      placeholder="JSON sent to provider"
-                      minRows={3}
-                      maxRows={5}
-                    />
-                    <Typography
-                      level="body-sm"
-                      sx={{ mt: 0.5, color: 'text.tertiary' }}
-                    >
-                      Edit JSON directly for advanced configuration. Changes
-                      will sync to form fields above.
-                    </Typography>
                   </FormControl>
                 )}
             </>

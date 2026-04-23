@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from typing import Any
 from urllib.parse import urlparse
 
@@ -21,7 +22,12 @@ cached_config = None
 
 
 def load_config() -> dict[str, Any]:
-    """Load config from file, return empty dict if not found."""
+    """Load config from file, return empty dict if not found.
+
+    If the file exists but cannot be parsed (corrupt/truncated), move it
+    aside to config.json.corrupt-<ts> and return {} so the next write
+    does not silently overwrite a recoverable file.
+    """
     global cached_config
 
     if cached_config is not None:
@@ -33,21 +39,47 @@ def load_config() -> dict[str, Any]:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             cached_config = json.loads(f.read())
         return cached_config
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as e:
+        backup_path = f"{CONFIG_FILE}.corrupt-{int(time.time())}"
+        try:
+            os.rename(CONFIG_FILE, backup_path)
+            console.print(
+                f"[error]Error:[/error] Config file is unreadable ({e}). "
+                f"Moved to [label]{backup_path}[/label] to avoid overwriting it."
+            )
+        except OSError as rename_err:
+            console.print(
+                f"[error]Error:[/error] Config file is unreadable ({e}) and could not be "
+                f"backed up ({rename_err}). Refusing to continue."
+            )
+            raise typer.Exit(1)
         return {}
 
 
 def _save_config(config: dict[str, Any]) -> bool:
-    """Save config to file. Returns True on success."""
+    """Save config to file atomically. Returns True on success.
+
+    Writes to a sibling tmp file and renames over the target so readers
+    never observe a truncated or partially-written config.
+    """
     global cached_config
+    tmp_path = f"{CONFIG_FILE}.tmp"
     try:
         os.makedirs(CONFIG_DIR, exist_ok=True)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(config, indent=2))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, CONFIG_FILE)
         cached_config = config
         return True
     except OSError as e:
         console.print(f"[error]Error:[/error] Failed to save config: {e}")
+        try:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+        except OSError:
+            pass
         return False
 
 
