@@ -37,6 +37,10 @@ interface GroupSummary {
   latest_version_label: string | null;
 }
 
+interface GroupVersionEntry {
+  version_label: string;
+}
+
 export interface SaveVersionInfo {
   /** The display name for the group (new name or existing display name) */
   groupName: string;
@@ -78,6 +82,26 @@ const TAG_COLORS: Record<
 
 const TAG_OPTIONS = ['latest', 'production', 'draft'];
 
+const getNextVersionLabel = (
+  group: GroupSummary | null,
+  groupVersions?: GroupVersionEntry[],
+): string => {
+  if (!group) return 'v1';
+
+  let highestVersion = 0;
+  for (const entry of groupVersions ?? []) {
+    const versionMatch = entry.version_label.match(/^v(\d+)$/i);
+    if (versionMatch) {
+      highestVersion = Math.max(highestVersion, Number(versionMatch[1]));
+    }
+  }
+  if (highestVersion > 0) {
+    return `v${highestVersion + 1}`;
+  }
+
+  return `v${(group.version_count ?? 0) + 1}`;
+};
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SaveToRegistryDialog({
@@ -108,12 +132,24 @@ export default function SaveToRegistryDialog({
     mode === 'existing' && existingTarget
       ? groups.find((g) => g.group_id === existingTarget)
       : null;
+  const { data: selectedGroupVersionsData } = useSWR(
+    mode === 'existing' && selectedGroup
+      ? chatAPI.Endpoints.AssetVersions.ListVersions(
+          type,
+          selectedGroup.group_id,
+        )
+      : null,
+    fetcher,
+  );
+  const selectedGroupVersions: GroupVersionEntry[] = Array.isArray(
+    selectedGroupVersionsData,
+  )
+    ? selectedGroupVersionsData
+    : [];
   const nextVersionLabel =
     mode === 'new'
       ? 'v1'
-      : selectedGroup
-        ? `v${(selectedGroup.version_count ?? 0) + 1}`
-        : 'v1';
+      : getNextVersionLabel(selectedGroup, selectedGroupVersions);
 
   // Reset state when opening
   useEffect(() => {
