@@ -11,7 +11,7 @@ import {
   Stack,
   CircularProgress,
 } from '@mui/joy';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
 import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
@@ -21,28 +21,20 @@ interface ViewSweepResultsModalProps {
   setJobId: (jobId: string | null) => void;
 }
 
-export default function ViewSweepResultsModal({
-  jobId,
-  setJobId,
-}: ViewSweepResultsModalProps) {
+export function SweepResultsBody({ jobId }: { jobId: string }) {
   const { experimentInfo } = useExperimentInfo();
   const [sortBy, setSortBy] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
-  // Always call hooks at the top level - conditionally enable the query instead
   const { data, error, isLoading } = useSWR(
     jobId && experimentInfo
-      ? chatAPI.Endpoints.ComputeProvider.GetSweepResults(String(jobId))
+      ? chatAPI.Endpoints.ComputeProvider.GetSweepResults(jobId)
       : null,
     fetcher,
     {
-      refreshInterval: 5000, // Poll every 5 seconds in case results are still being aggregated
+      refreshInterval: 5000,
     },
   );
-
-  if (!jobId || !experimentInfo) {
-    return null;
-  }
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
@@ -99,10 +91,8 @@ export default function ViewSweepResultsModal({
     const bestJobId = data.data.best_job_id;
     const bestMetric = data.data.best_metric;
     const sweepMetric = data.data.sweep_metric || 'eval/loss';
-    const lowerIsBetter = data.data.lower_is_better !== false;
 
-    // Sort results if sortBy is set
-    let sortedResults = [...results];
+    const sortedResults = [...results];
     if (sortBy === 'metric') {
       sortedResults.sort((a, b) => {
         const aVal = a.metric_value ?? Infinity;
@@ -117,13 +107,11 @@ export default function ViewSweepResultsModal({
       });
     }
 
-    // Get all parameter names from the first result
     const paramNames =
       results.length > 0 ? Object.keys(results[0].config || {}) : [];
 
     return (
       <Box>
-        {/* Best Configuration Summary */}
         {bestConfig && (
           <Sheet
             variant="soft"
@@ -157,7 +145,6 @@ export default function ViewSweepResultsModal({
           </Sheet>
         )}
 
-        {/* Results Table */}
         <Box sx={{ overflowX: 'auto' }}>
           <Table stickyHeader sx={{ minWidth: 600 }}>
             <thead>
@@ -186,6 +173,12 @@ export default function ViewSweepResultsModal({
             <tbody>
               {sortedResults.map((result: any) => {
                 const isBest = result.job_id === bestJobId;
+                let statusColor: 'success' | 'danger' | 'neutral' = 'neutral';
+                if (result.status === 'COMPLETE') {
+                  statusColor = 'success';
+                } else if (result.status === 'FAILED') {
+                  statusColor = 'danger';
+                }
                 return (
                   <tr
                     key={result.run_index}
@@ -199,17 +192,7 @@ export default function ViewSweepResultsModal({
                       <strong>{result.run_index}</strong>
                     </td>
                     <td>
-                      <Chip
-                        size="sm"
-                        color={
-                          result.status === 'COMPLETE'
-                            ? 'success'
-                            : result.status === 'FAILED'
-                              ? 'danger'
-                              : 'neutral'
-                        }
-                        variant="soft"
-                      >
+                      <Chip size="sm" color={statusColor} variant="soft">
                         {result.status}
                       </Chip>
                     </td>
@@ -256,6 +239,17 @@ export default function ViewSweepResultsModal({
     );
   };
 
+  return <>{renderResults()}</>;
+}
+
+export default function ViewSweepResultsModal({
+  jobId,
+  setJobId,
+}: ViewSweepResultsModalProps) {
+  if (!jobId) {
+    return null;
+  }
+
   return (
     <Modal
       open={jobId !== -1}
@@ -275,7 +269,7 @@ export default function ViewSweepResultsModal({
             overflowX: 'auto',
           }}
         >
-          {renderResults()}
+          <SweepResultsBody jobId={jobId} />
         </Box>
       </ModalDialog>
     </Modal>
