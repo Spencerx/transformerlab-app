@@ -47,6 +47,27 @@ export default function OverviewSection({ job }: { job: JobRecord | null }) {
         <Row label="Provider" value={String(d.provider_name)} />
       )}
       {d.cluster_name && <Row label="Cluster" value={String(d.cluster_name)} />}
+      {typeof d.description === 'string' && d.description.trim() && (
+        <Box sx={{ py: 0.75 }}>
+          <Typography
+            level="body-sm"
+            sx={{ width: 160, color: 'text.secondary', mb: 0.5 }}
+          >
+            Description
+          </Typography>
+          <Typography
+            level="body-sm"
+            sx={{
+              whiteSpace: 'pre-wrap',
+              background: 'var(--joy-palette-background-surface)',
+              p: 1.5,
+              borderRadius: 'sm',
+            }}
+          >
+            {String(d.description)}
+          </Typography>
+        </Box>
+      )}
       {(d as any).template_name && (
         <Row label="Template" value={String((d as any).template_name)} />
       )}

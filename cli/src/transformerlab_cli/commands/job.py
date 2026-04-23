@@ -275,6 +275,7 @@ def _render_job(job) -> None:
         "ID": job.get("id", "N/A"),
         "Experiment ID": job.get("experiment_id", "N/A"),
         "Task Name": job_data.get("task_name", "N/A"),
+        "Description": job_data.get("description", "N/A"),
         "Command": run_command,
         "Cluster Name": job_data.get("cluster_name", "N/A"),
         "CPUs": job_data.get("cpus", "N/A"),
