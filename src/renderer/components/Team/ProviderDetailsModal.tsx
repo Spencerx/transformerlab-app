@@ -1259,54 +1259,6 @@ export default function ProviderDetailsModal({
                     />
                   </FormControl>
                 )}
-
-              {/* Show JSON for structured providers in edit mode for advanced users */}
-              {(type === 'slurm' ||
-                type === 'skypilot' ||
-                type === 'dstack' ||
-                type === 'runpod') &&
-                providerId && (
-                  <FormControl sx={{ mt: 1 }}>
-                    <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
-                    <Textarea
-                      value={
-                        typeof config === 'string'
-                          ? config
-                          : JSON.stringify(config)
-                      }
-                      onChange={(event) => {
-                        setConfig(event.currentTarget.value);
-                        // Try to parse and update form fields
-                        try {
-                          const configObj = JSON.parse(
-                            event.currentTarget.value,
-                          );
-                          if (type === 'slurm') {
-                            parseSlurmConfig(configObj);
-                          } else if (type === 'skypilot') {
-                            parseSkypilotConfig(configObj);
-                          } else if (type === 'dstack') {
-                            parseDstackConfig(configObj);
-                          } else if (type === 'runpod') {
-                            parseRunpodConfig(configObj);
-                          }
-                        } catch (e) {
-                          // Ignore parse errors
-                        }
-                      }}
-                      placeholder="JSON sent to provider"
-                      minRows={3}
-                      maxRows={5}
-                    />
-                    <Typography
-                      level="body-sm"
-                      sx={{ mt: 0.5, color: 'text.tertiary' }}
-                    >
-                      Edit JSON directly for advanced configuration. Changes
-                      will sync to form fields above.
-                    </Typography>
-                  </FormControl>
-                )}
             </>
           )}
         </DialogContent>
