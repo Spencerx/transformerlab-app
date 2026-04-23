@@ -1054,6 +1054,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
       const {
         provider_id: _pid,
         provider_name: _pname,
+        description,
         enable_trackio,
         enable_profiling,
         enable_profiling_torch,
@@ -1072,6 +1073,7 @@ export default function Tasks({ subtype }: { subtype?: string }) {
         experiment_id: experimentInfo.id,
         task_id: task.id,
         task_name: task.name,
+        description: description?.trim() || undefined,
         cluster_name: cfg.cluster_name || task.cluster_name,
         run: cfg.run || task.run,
         subtype: cfg.subtype || task.subtype,
