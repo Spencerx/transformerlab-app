@@ -16,6 +16,8 @@ from transformerlab_cli.commands.task import app as task_app
 from transformerlab_cli.commands.job import app as job_app
 from transformerlab_cli.commands.provider import app as provider_app
 from transformerlab_cli.commands.server import app as server_app
+from transformerlab_cli.commands.dataset import app as dataset_app
+from transformerlab_cli.commands.model import app as model_app
 
 
 # Create custom Help screen so we can show the logo
@@ -43,6 +45,8 @@ app.add_typer(task_app, name="task", help="Task management commands", no_args_is
 app.add_typer(job_app, name="job", help="Job management commands", no_args_is_help=True)
 app.add_typer(provider_app, name="provider", help="Compute provider management commands", no_args_is_help=True)
 app.add_typer(server_app, name="server", help="Server installation and configuration commands", no_args_is_help=True)
+app.add_typer(dataset_app, name="dataset", help="Dataset management commands", no_args_is_help=True)
+app.add_typer(model_app, name="model", help="Model management commands", no_args_is_help=True)
 
 
 # Apply common setup to all commands
