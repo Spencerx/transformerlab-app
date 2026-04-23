@@ -1338,6 +1338,21 @@ async def get_artifact(job_id: str, experimentId: str, filename: str, task: str 
     if not await storage.exists(artifact_file_path):
         return Response("Artifact not found", status_code=404)
 
+    # Handle directory artifacts as downloadable zip archives
+    if await storage.isdir(artifact_file_path):
+        if task != "download":
+            return Response("Directory artifacts can only be downloaded", status_code=400)
+        dir_name = posixpath.basename(str(artifact_file_path).rstrip("/")) or secure_filename(filename)
+        zip_buffer = await zip_utils.create_zip_from_directory(artifact_file_path, storage, root_prefix=dir_name)
+        zip_filename = f"{dir_name}.zip"
+        headers = {
+            "Content-Disposition": f'attachment; filename="{zip_filename}"',
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        }
+        return StreamingResponse(iter([zip_buffer.getvalue()]), media_type="application/zip", headers=headers)
+
     # Determine media type based on file extension
     _, ext = os.path.splitext(filename.lower())
     media_type_map = {

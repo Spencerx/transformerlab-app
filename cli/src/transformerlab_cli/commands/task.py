@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import sys
 import zipfile
 from pathlib import Path
 
@@ -262,8 +263,8 @@ def _print_next_steps(include_main_py: bool) -> None:
     console.print("- Docs: https://lab.cloud/for-teams/running-a-task/task-yaml-structure")
 
 
-def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str) -> None:
-    if os.path.exists(task_yaml_path):
+def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str, force: bool = False) -> None:
+    if os.path.exists(task_yaml_path) and not force:
         if cli_state.output_format == "json":
             print(json.dumps({"error": "task.yaml already exists"}))
         else:
@@ -297,8 +298,8 @@ def _task_init_default(task_yaml_path: str, main_py_path: str, folder_name: str)
     _print_next_steps(include_main_py=not main_py_existed)
 
 
-def _task_init_interactive(task_yaml_path: str, folder_name: str) -> None:
-    if os.path.exists(task_yaml_path):
+def _task_init_interactive(task_yaml_path: str, folder_name: str, force: bool = False) -> None:
+    if os.path.exists(task_yaml_path) and not force:
         if cli_state.output_format == "json":
             print(json.dumps({"error": "task.yaml already exists"}))
             raise typer.Exit(1)
@@ -375,6 +376,7 @@ def _task_init_interactive(task_yaml_path: str, folder_name: str) -> None:
 @app.command("init")
 def command_task_init(
     interactive: bool = typer.Option(False, "--interactive", help="Prompt for task settings instead of using defaults"),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing task.yaml without prompting"),
 ):
     """Initialize a task.yaml and main.py in the current directory."""
     cwd = os.getcwd()
@@ -383,9 +385,9 @@ def command_task_init(
     folder_name = os.path.basename(cwd).strip() or "my-task"
 
     if interactive:
-        _task_init_interactive(task_yaml_path, folder_name)
+        _task_init_interactive(task_yaml_path, folder_name, force=force)
     else:
-        _task_init_default(task_yaml_path, main_py_path, folder_name)
+        _task_init_default(task_yaml_path, main_py_path, folder_name, force=force)
 
 
 @app.command("add")
@@ -448,6 +450,7 @@ def build_launch_payload(
     provider_name: str,
     param_values: dict | None = None,
     resource_overrides: dict | None = None,
+    description: str | None = None,
 ) -> dict:
     """Build the payload for launching a task on a provider."""
     cfg = task.get("config") or {}
@@ -466,6 +469,7 @@ def build_launch_payload(
         "experiment_id": task.get("experiment_id"),
         "task_id": task.get("id"),
         "task_name": task.get("name"),
+        "description": description,
         "run": task.get("run"),
         "setup": task.get("setup"),
         "cpus": pick("cpus"),
@@ -610,7 +614,12 @@ def _prompt_parameters(parameters: dict) -> dict:
     return values
 
 
-def queue_task(task_id: str, experiment_id: str, interactive: bool = True) -> None:
+def queue_task(
+    task_id: str,
+    experiment_id: str,
+    interactive: bool = True,
+    description: str | None = None,
+) -> None:
     """Queue a task on a compute provider."""
     with console.status("[bold success]Fetching task...[/bold success]", spinner="dots"):
         response = api.get(f"/experiment/{experiment_id}/task/{task_id}/get")
@@ -650,7 +659,9 @@ def queue_task(task_id: str, experiment_id: str, interactive: bool = True) -> No
     else:
         param_values = {k: (v.get("default", "") if isinstance(v, dict) else v) for k, v in parameters.items()}
 
-    payload = build_launch_payload(task, provider.get("name"), param_values, resource_overrides)
+    payload = build_launch_payload(
+        task, provider.get("name"), param_values, resource_overrides, description=description
+    )
     provider_id = provider.get("id")
 
     with console.status("[bold success]Queuing task...[/bold success]", spinner="dots"):
@@ -667,10 +678,28 @@ def queue_task(task_id: str, experiment_id: str, interactive: bool = True) -> No
 def command_task_queue(
     task_id: str = typer.Argument(..., help="Task ID to queue"),
     no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip interactive prompts, use defaults"),
+    description: str | None = typer.Option(
+        None,
+        "--description",
+        "-m",
+        help=(
+            "Markdown note describing what this run is trying to accomplish (like a commit description). "
+            "Pass '-' to read from stdin."
+        ),
+    ),
 ):
     """Queue a task on a compute provider."""
     current_experiment = require_current_experiment()
-    queue_task(task_id, experiment_id=current_experiment, interactive=not no_interactive)
+    if description == "-":
+        if sys.stdin.isatty():
+            raise typer.BadParameter('-m - reads the description from stdin; pipe content in or pass -m "...".')
+        description = sys.stdin.read()
+    queue_task(
+        task_id,
+        experiment_id=current_experiment,
+        interactive=not no_interactive,
+        description=description,
+    )
 
 
 def gallery_tasks(output_format: str = "pretty", gallery_type: str = "all", experiment_id: str = "alpha") -> list[dict]:

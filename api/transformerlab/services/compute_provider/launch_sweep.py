@@ -87,6 +87,7 @@ async def create_sweep_parent_job(
         "sweep_metric": sweep_metric,
         "lower_is_better": lower_is_better,
         "task_name": request.task_name,
+        "description": request.description,
         "subtype": request.subtype,
         "provider_id": provider.id,
         "provider_type": provider.type,
@@ -254,9 +255,9 @@ async def launch_sweep_jobs(
                             if aws_credentials_dir:
                                 env_vars["AWS_SHARED_CREDENTIALS_FILE"] = f"{aws_credentials_dir}/credentials"
                     elif STORAGE_PROVIDER == "gcp":
-                        gcp_sa_json = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON")
-                        if gcp_sa_json:
-                            gcp_setup = generate_gcp_credentials_setup(gcp_sa_json)
+                        gcp_sa_json_path = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON_PATH")
+                        if gcp_sa_json_path:
+                            gcp_setup = generate_gcp_credentials_setup(gcp_sa_json_path)
                             setup_commands.append(gcp_setup)
                     elif STORAGE_PROVIDER == "azure":
                         azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -320,6 +321,7 @@ async def launch_sweep_jobs(
                     "task_name": f"{request.task_name or 'Task'} (Sweep {i + 1}/{total_configs})"
                     if request.task_name
                     else None,
+                    "description": request.description,
                     "run": run_with_secrets,
                     "cluster_name": formatted_cluster_name,
                     "subtype": request.subtype,
