@@ -8,36 +8,6 @@ function convertSlashInUrl(url: string) {
   return url.replace(/\//g, '~~~');
 }
 
-Endpoints.Tasks = {
-  List: () => `${API_URL()}tasks/list`,
-  ListByType: (type: string) => `${API_URL()}tasks/list_by_type?type=${type}`,
-  ListByTypeInExperiment: (type: string, experiment_id: string) =>
-    `${API_URL()}tasks/list_by_type_in_experiment?type=${type}&experiment_id=${
-      experiment_id
-    }`,
-  ListBySubtypeInExperiment: (
-    experiment_id: string,
-    subtype: string,
-    remote_task?: boolean,
-  ) =>
-    `${API_URL()}tasks/list_by_subtype_in_experiment?experiment_id=${experiment_id}&subtype=${encodeURIComponent(
-      subtype,
-    )}${remote_task !== undefined ? `&remote_task=${remote_task}` : ''}`,
-  Queue: (id: string) => `${API_URL()}tasks/${id}/queue`,
-  GetByID: (id: string) => `${API_URL()}tasks/${id}/get`,
-  UpdateTask: (id: string) => `${API_URL()}tasks/${id}/update`,
-  DeleteTask: (id: string) => `${API_URL()}tasks/${id}/delete`,
-  Gallery: () => `${API_URL()}tasks/gallery`,
-  ImportFromGallery: (experimentId: string) =>
-    `${API_URL()}tasks/gallery/import`,
-  TeamGallery: () => `${API_URL()}tasks/gallery/team`,
-  ImportFromTeamGallery: (experimentId: string) =>
-    `${API_URL()}tasks/gallery/team/import`,
-  ExportToTeamGallery: () => `${API_URL()}tasks/gallery/team/export`,
-  AddToTeamGallery: () => `${API_URL()}tasks/gallery/team/add`,
-  DeleteFromTeamGallery: () => `${API_URL()}tasks/gallery/team/delete`,
-};
-
 Endpoints.Task = {
   List: (experimentId: string) =>
     `${API_URL()}experiment/${experimentId}/task/list`,
