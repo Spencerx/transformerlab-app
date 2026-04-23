@@ -7,6 +7,40 @@ from unittest.mock import MagicMock
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _isolate_lab_config_from_user_home(tmp_path, monkeypatch):
+    """Point CONFIG_DIR/CONFIG_FILE and CREDENTIALS_DIR/CREDENTIALS_FILE at a
+    per-test tmp directory so tests cannot read from — or wipe — the real
+    ``~/.lab/config.json`` / ``~/.lab/credentials`` on the developer's machine.
+
+    Applied to every test via ``autouse=True``; any test that needs the raw
+    paths can still accept the ``tmp_config_dir`` fixture explicitly.
+    """
+    fake_lab_dir = tmp_path / "_isolated_lab"
+    fake_lab_dir.mkdir(exist_ok=True)
+    fake_config_file = str(fake_lab_dir / "config.json")
+    fake_credentials_file = str(fake_lab_dir / "credentials")
+
+    import transformerlab_cli.util.config as config_mod
+    import transformerlab_cli.util.shared as shared_mod
+
+    monkeypatch.setattr(shared_mod, "CONFIG_DIR", str(fake_lab_dir))
+    monkeypatch.setattr(shared_mod, "CONFIG_FILE", fake_config_file)
+    monkeypatch.setattr(shared_mod, "CREDENTIALS_DIR", str(fake_lab_dir))
+    monkeypatch.setattr(shared_mod, "CREDENTIALS_FILE", fake_credentials_file)
+    monkeypatch.setattr(config_mod, "CONFIG_DIR", str(fake_lab_dir))
+    monkeypatch.setattr(config_mod, "CONFIG_FILE", fake_config_file)
+    monkeypatch.setattr(config_mod, "cached_config", None)
+
+    try:
+        import transformerlab_cli.util.auth as auth_mod
+
+        monkeypatch.setattr(auth_mod, "CREDENTIALS_DIR", str(fake_lab_dir), raising=False)
+        monkeypatch.setattr(auth_mod, "CREDENTIALS_FILE", fake_credentials_file, raising=False)
+    except ImportError:
+        pass
+
+
 @pytest.fixture()
 def tmp_config_dir(tmp_path):
     """Provide a temporary config directory and patch CONFIG_DIR/CONFIG_FILE."""
