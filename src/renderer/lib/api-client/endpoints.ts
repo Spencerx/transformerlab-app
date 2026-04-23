@@ -342,10 +342,17 @@ Endpoints.Experiment = {
     fileIndex: number = 0,
   ) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_eval_results?task=${task}&file_index=${fileIndex}`,
+  GetSweepResults: (experimentId: string, jobId: string) =>
+    `${API_URL()}experiment/${experimentId}/jobs/${jobId}/sweep_results`,
   GetGeneratedDataset: (experimentId: string, jobId: string) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_generated_dataset`,
   GetPlotJSON: (experimentId: string, jobId: string) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_figure_json`,
+  GetNotes: (id: string) => `${API_URL()}experiment/${id}/notes`,
+  SaveNotes: (id: string) => `${API_URL()}experiment/${id}/notes`,
+  UploadNoteAsset: (id: string) => `${API_URL()}experiment/${id}/notes/assets`,
+  GetNoteAsset: (id: string, filename: string) =>
+    `${API_URL()}experiment/${id}/notes/assets/${filename}`,
 };
 
 Endpoints.Jobs = {

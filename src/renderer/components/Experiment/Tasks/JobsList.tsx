@@ -10,6 +10,7 @@ import MenuButton from '@mui/joy/MenuButton';
 import MenuItem from '@mui/joy/MenuItem';
 import Dropdown from '@mui/joy/Dropdown';
 import Checkbox from '@mui/joy/Checkbox';
+import Tooltip from '@mui/joy/Tooltip';
 import {
   Trash2Icon,
   LineChartIcon,
@@ -22,6 +23,7 @@ import {
   MoreVerticalIcon,
   EyeOffIcon,
   EyeIcon,
+  LinkIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
 import {
@@ -29,6 +31,8 @@ import {
   isJobStopPending,
   isTerminalJobStatus,
 } from 'renderer/lib/utils';
+import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
+import { generateJobPermalink } from '../Jobs/jobDetailUtils';
 import JobProgress from './JobProgress';
 
 export interface LaunchProgressInfo {
@@ -94,6 +98,8 @@ const JobsList: React.FC<JobsListProps> = ({
   forceArtifactsButtonVisible = false,
   onStopPendingChange,
 }) => {
+  const { experimentInfo } = useExperimentInfo();
+
   const showTrackioForStatus = (status?: string): boolean => {
     return String(status || '') === 'RUNNING' || isTerminalJobStatus(status);
   };
@@ -537,6 +543,30 @@ const JobsList: React.FC<JobsListProps> = ({
                           Files
                         </Box>
                       </Button>
+                    )}
+                    {!job?.placeholder && (
+                      <Tooltip title="Copy permalink" variant="outlined">
+                        <IconButton
+                          size="sm"
+                          variant="plain"
+                          color="neutral"
+                          onClick={() => {
+                            const url =
+                              window.location.href.split('#')[0] +
+                              generateJobPermalink(
+                                experimentInfo?.name ?? '',
+                                job.id,
+                              );
+                            navigator.clipboard
+                              .writeText(url)
+                              .catch((err) =>
+                                console.error('Failed to copy permalink:', err),
+                              );
+                          }}
+                        >
+                          <LinkIcon size={14} />
+                        </IconButton>
+                      </Tooltip>
                     )}
                     {!job?.placeholder && (
                       <IconButton
