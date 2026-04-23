@@ -441,6 +441,9 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setIsSetupInProgress(false);
+      setSetupStatus(null);
+      setSetupLogTail('');
       setRunpodApiKey('');
       setRunpodApiKeyChanged(false);
       setRunpodApiBaseUrl('');

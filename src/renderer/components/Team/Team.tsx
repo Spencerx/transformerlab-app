@@ -41,6 +41,7 @@ import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import RenameTeamModal from './RenameTeamModal';
 import InviteUserModal from './InviteUserModal';
 import ProviderDetailsModal from './ProviderDetailsModal';
+import LocalProviderRefreshModal from './LocalProviderRefreshModal';
 import QuotaSettingsSection from './QuotaSettingsSection';
 import TeamSecretsSection from './TeamSecretsSection';
 import SshKeySection from './SshKeySection';
@@ -96,6 +97,12 @@ export default function UserLoginTest(): JSX.Element {
   const [uploadingLogo, setUploadingLogo] = useState<boolean>(false);
   const [teamLogos, setTeamLogos] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState<number>(0);
+  const [localSetupModalOpen, setLocalSetupModalOpen] = useState(false);
+  const [localSetupProviderName, setLocalSetupProviderName] = useState('');
+  const [localSetupStatus, setLocalSetupStatus] = useState<string | null>(null);
+  const [localSetupLogTail, setLocalSetupLogTail] = useState<string>('');
+  const [localSetupInProgressProviderId, setLocalSetupInProgressProviderId] =
+    useState<string | null>(null);
   const probePollTimeoutByProviderRef = useRef<Record<string, number>>({});
   const probePollingActiveByProviderRef = useRef<Record<string, boolean>>({});
 
@@ -707,6 +714,134 @@ export default function UserLoginTest(): JSX.Element {
     }
   }
 
+  function startLocalSetupStatusPolling(targetProviderId: string) {
+    const poll = async () => {
+      try {
+        const response = await authContext.fetchWithAuth(
+          chatAPI.Endpoints.ComputeProvider.SetupStatus(targetProviderId),
+          { method: 'GET' },
+        );
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          const detail =
+            (error &&
+              (error.detail?.message || error.detail || error.message)) ||
+            'Failed to read setup status';
+          setLocalSetupStatus(detail);
+          setLocalSetupInProgressProviderId(null);
+          addNotification({
+            type: 'danger',
+            message: detail,
+          });
+          return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        // Match ProviderDetailsModal behavior: treat only idle+done as finished.
+        if (data.status === 'idle' && data.done) {
+          setLocalSetupStatus('Local provider refresh finished.');
+          setLocalSetupInProgressProviderId(null);
+          providersMutate();
+          setLocalSetupModalOpen(false);
+          return;
+        }
+
+        const message: string =
+          data.message ||
+          data.error ||
+          (data.done
+            ? 'Local provider refresh finished.'
+            : 'Refreshing local provider setup...');
+        setLocalSetupStatus(message);
+        setLocalSetupLogTail(
+          typeof data.log_tail === 'string' ? data.log_tail : '',
+        );
+
+        if (!data.done) {
+          window.setTimeout(poll, 2000);
+        } else {
+          setLocalSetupInProgressProviderId(null);
+          addNotification({
+            type: data.error ? 'danger' : 'success',
+            message,
+          });
+          providersMutate();
+          if (!data.error) {
+            setLocalSetupModalOpen(false);
+          }
+        }
+      } catch {
+        setLocalSetupStatus('Failed to read setup status. Please try again.');
+        setLocalSetupInProgressProviderId(null);
+        addNotification({
+          type: 'danger',
+          message: 'Local provider refresh failed to report status.',
+        });
+      }
+    };
+
+    setLocalSetupInProgressProviderId(targetProviderId);
+    setLocalSetupStatus('Refreshing local provider setup...');
+    setLocalSetupLogTail('');
+    poll();
+  }
+
+  async function handleRefreshLocalProvider(
+    targetProviderId: string,
+    providerName: string,
+  ) {
+    if (localSetupInProgressProviderId) {
+      addNotification({
+        type: 'warning',
+        message:
+          'A local provider refresh is already in progress. Please wait for it to finish.',
+      });
+      return;
+    }
+
+    // eslint-disable-next-line no-alert
+    const confirmed = window.confirm(
+      `Are you sure you want to refresh "${providerName || 'Local Provider'}"? This will reinstall the base environment.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setLocalSetupProviderName(providerName);
+    setLocalSetupModalOpen(true);
+    setLocalSetupStatus('Starting local provider refresh...');
+    setLocalSetupLogTail('');
+    try {
+      const response = await authContext.fetchWithAuth(
+        `${chatAPI.Endpoints.ComputeProvider.Setup(targetProviderId)}?refresh=true`,
+        { method: 'POST' },
+      );
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        const detail =
+          (error && (error.detail?.message || error.detail || error.message)) ||
+          'Failed to start local provider refresh';
+        setLocalSetupStatus(detail);
+        addNotification({
+          type: 'danger',
+          message: detail,
+        });
+        setLocalSetupInProgressProviderId(null);
+        return;
+      }
+      startLocalSetupStatusPolling(targetProviderId);
+    } catch {
+      setLocalSetupStatus('Failed to start local provider refresh');
+      addNotification({
+        type: 'danger',
+        message: 'Failed to start local provider refresh',
+      });
+      setLocalSetupInProgressProviderId(null);
+    }
+  }
+
   useEffect(() => {
     return () => {
       const timeoutEntries = Object.entries(
@@ -1234,6 +1369,9 @@ export default function UserLoginTest(): JSX.Element {
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Type</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Enabled</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>
+                  Lifecycle
+                </th>
                 <th
                   style={{
                     width: 'auto',
@@ -1340,6 +1478,77 @@ export default function UserLoginTest(): JSX.Element {
                           </IconButton>
                         </Stack>
                       </td>
+                      <td>
+                        <Stack
+                          direction="column"
+                          gap={0.5}
+                          alignItems="flex-start"
+                        >
+                          <Tooltip
+                            title={
+                              iAmOwner
+                                ? 'Verify provider lifecycle'
+                                : 'Only admins can verify provider lifecycle'
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                size="sm"
+                                variant="outlined"
+                                disabled={
+                                  !iAmOwner ||
+                                  probeStatusMap[provider.id] === 'running'
+                                }
+                                onClick={() => {
+                                  if (
+                                    probeStatusMap[provider.id] !== 'running'
+                                  ) {
+                                    handleStorageProbe(provider.id);
+                                  }
+                                }}
+                                aria-label="Verify provider lifecycle"
+                              >
+                                {probeStatusMap[provider.id] === 'running' ? (
+                                  <CircularProgress size="sm" />
+                                ) : (
+                                  <ServerIcon size={16} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          {probeStatusMap[provider.id] === 'passed' && (
+                            <Chip color="success" size="sm" variant="soft">
+                              Storage OK
+                            </Chip>
+                          )}
+                          {(probeStatusMap[provider.id] === 'failed' ||
+                            probeStatusMap[provider.id] === 'error') && (
+                            <Chip color="danger" size="sm" variant="soft">
+                              {probeStatusMap[provider.id] === 'failed'
+                                ? 'File not found'
+                                : 'Error'}
+                            </Chip>
+                          )}
+                          {probeMessageMap[provider.id] && (
+                            <Typography
+                              level="body-xs"
+                              sx={{
+                                color:
+                                  probeStatusMap[provider.id] === 'passed'
+                                    ? 'success.600'
+                                    : probeStatusMap[provider.id] === 'running'
+                                      ? 'text.secondary'
+                                      : 'danger.600',
+                                fontFamily: 'monospace',
+                                maxWidth: '240px',
+                                wordBreak: 'break-all',
+                              }}
+                            >
+                              {probeMessageMap[provider.id]}
+                            </Typography>
+                          )}
+                        </Stack>
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         <Stack
                           direction="column"
@@ -1347,27 +1556,30 @@ export default function UserLoginTest(): JSX.Element {
                           alignItems="flex-end"
                         >
                           <Stack direction="row" gap={0.5}>
-                            <Button
-                              size="sm"
-                              variant="outlined"
-                              loading={
-                                probeStatusMap[provider.id] === 'running'
-                              }
-                              disabled={!iAmOwner}
-                              title={
-                                iAmOwner
-                                  ? 'Launches a lightweight job to validate provider lifecycle and shared storage'
-                                  : 'Only admins can run lifecycle checks'
-                              }
-                              onClick={() => {
-                                if (probeStatusMap[provider.id] !== 'running') {
-                                  handleStorageProbe(provider.id);
+                            {provider.type === 'local' && (
+                              <Button
+                                size="sm"
+                                variant="outlined"
+                                onClick={() =>
+                                  handleRefreshLocalProvider(
+                                    provider.id,
+                                    provider.name || 'Local Provider',
+                                  )
                                 }
-                              }}
-                              sx={{ minWidth: '90px', fontSize: '0.75rem' }}
-                            >
-                              Verify Provider Lifecycle
-                            </Button>
+                                loading={
+                                  localSetupInProgressProviderId === provider.id
+                                }
+                                disabled={
+                                  !iAmOwner ||
+                                  providersLoading ||
+                                  providers === undefined ||
+                                  Boolean(localSetupInProgressProviderId)
+                                }
+                                sx={{ minWidth: '70px', fontSize: '0.75rem' }}
+                              >
+                                Refresh
+                              </Button>
+                            )}
                             <Button
                               size="sm"
                               variant="outlined"
@@ -1401,37 +1613,6 @@ export default function UserLoginTest(): JSX.Element {
                               Delete
                             </Button>
                           </Stack>
-                          {probeStatusMap[provider.id] === 'passed' && (
-                            <Chip color="success" size="sm" variant="soft">
-                              Storage OK
-                            </Chip>
-                          )}
-                          {(probeStatusMap[provider.id] === 'failed' ||
-                            probeStatusMap[provider.id] === 'error') && (
-                            <Chip color="danger" size="sm" variant="soft">
-                              {probeStatusMap[provider.id] === 'failed'
-                                ? 'File not found'
-                                : 'Error'}
-                            </Chip>
-                          )}
-                          {probeMessageMap[provider.id] && (
-                            <Typography
-                              level="body-xs"
-                              sx={{
-                                color:
-                                  probeStatusMap[provider.id] === 'passed'
-                                    ? 'success.600'
-                                    : probeStatusMap[provider.id] === 'running'
-                                      ? 'text.secondary'
-                                      : 'danger.600',
-                                fontFamily: 'monospace',
-                                maxWidth: '240px',
-                                wordBreak: 'break-all',
-                              }}
-                            >
-                              {probeMessageMap[provider.id]}
-                            </Typography>
-                          )}
                         </Stack>
                       </td>
                     </tr>
@@ -1545,6 +1726,16 @@ export default function UserLoginTest(): JSX.Element {
           Array.isArray(providers) &&
           providers.some((provider: any) => provider?.type === 'local')
         }
+      />
+      <LocalProviderRefreshModal
+        open={localSetupModalOpen}
+        onClose={() => setLocalSetupModalOpen(false)}
+        providerName={localSetupProviderName}
+        setupStatus={localSetupStatus}
+        setupLogTail={localSetupLogTail}
+        isInProgress={Boolean(localSetupInProgressProviderId)}
+        titlePrefix="Refreshing"
+        description="This runs a force refresh of the local provider environment"
       />
       <Modal
         open={openSetLogoModal}
