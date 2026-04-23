@@ -1369,6 +1369,9 @@ export default function UserLoginTest(): JSX.Element {
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Type</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Enabled</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Status</th>
+                <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>
+                  Lifecycle
+                </th>
                 <th
                   style={{
                     width: 'auto',
@@ -1475,6 +1478,77 @@ export default function UserLoginTest(): JSX.Element {
                           </IconButton>
                         </Stack>
                       </td>
+                      <td>
+                        <Stack
+                          direction="column"
+                          gap={0.5}
+                          alignItems="flex-start"
+                        >
+                          <Tooltip
+                            title={
+                              iAmOwner
+                                ? 'Verify provider lifecycle and shared storage'
+                                : 'Only admins can run lifecycle checks'
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                size="sm"
+                                variant="outlined"
+                                disabled={
+                                  !iAmOwner ||
+                                  probeStatusMap[provider.id] === 'running'
+                                }
+                                onClick={() => {
+                                  if (
+                                    probeStatusMap[provider.id] !== 'running'
+                                  ) {
+                                    handleStorageProbe(provider.id);
+                                  }
+                                }}
+                                aria-label="Verify provider lifecycle"
+                              >
+                                {probeStatusMap[provider.id] === 'running' ? (
+                                  <CircularProgress size="sm" />
+                                ) : (
+                                  <ServerIcon size={16} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          {probeStatusMap[provider.id] === 'passed' && (
+                            <Chip color="success" size="sm" variant="soft">
+                              Storage OK
+                            </Chip>
+                          )}
+                          {(probeStatusMap[provider.id] === 'failed' ||
+                            probeStatusMap[provider.id] === 'error') && (
+                            <Chip color="danger" size="sm" variant="soft">
+                              {probeStatusMap[provider.id] === 'failed'
+                                ? 'File not found'
+                                : 'Error'}
+                            </Chip>
+                          )}
+                          {probeMessageMap[provider.id] && (
+                            <Typography
+                              level="body-xs"
+                              sx={{
+                                color:
+                                  probeStatusMap[provider.id] === 'passed'
+                                    ? 'success.600'
+                                    : probeStatusMap[provider.id] === 'running'
+                                      ? 'text.secondary'
+                                      : 'danger.600',
+                                fontFamily: 'monospace',
+                                maxWidth: '240px',
+                                wordBreak: 'break-all',
+                              }}
+                            >
+                              {probeMessageMap[provider.id]}
+                            </Typography>
+                          )}
+                        </Stack>
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         <Stack
                           direction="column"
@@ -1482,27 +1556,6 @@ export default function UserLoginTest(): JSX.Element {
                           alignItems="flex-end"
                         >
                           <Stack direction="row" gap={0.5}>
-                            <Button
-                              size="sm"
-                              variant="outlined"
-                              loading={
-                                probeStatusMap[provider.id] === 'running'
-                              }
-                              disabled={!iAmOwner}
-                              title={
-                                iAmOwner
-                                  ? 'Launches a lightweight job to validate provider lifecycle and shared storage'
-                                  : 'Only admins can run lifecycle checks'
-                              }
-                              onClick={() => {
-                                if (probeStatusMap[provider.id] !== 'running') {
-                                  handleStorageProbe(provider.id);
-                                }
-                              }}
-                              sx={{ minWidth: '90px', fontSize: '0.75rem' }}
-                            >
-                              Verify Provider Lifecycle
-                            </Button>
                             {provider.type === 'local' && (
                               <Button
                                 size="sm"
@@ -1560,37 +1613,6 @@ export default function UserLoginTest(): JSX.Element {
                               Delete
                             </Button>
                           </Stack>
-                          {probeStatusMap[provider.id] === 'passed' && (
-                            <Chip color="success" size="sm" variant="soft">
-                              Storage OK
-                            </Chip>
-                          )}
-                          {(probeStatusMap[provider.id] === 'failed' ||
-                            probeStatusMap[provider.id] === 'error') && (
-                            <Chip color="danger" size="sm" variant="soft">
-                              {probeStatusMap[provider.id] === 'failed'
-                                ? 'File not found'
-                                : 'Error'}
-                            </Chip>
-                          )}
-                          {probeMessageMap[provider.id] && (
-                            <Typography
-                              level="body-xs"
-                              sx={{
-                                color:
-                                  probeStatusMap[provider.id] === 'passed'
-                                    ? 'success.600'
-                                    : probeStatusMap[provider.id] === 'running'
-                                      ? 'text.secondary'
-                                      : 'danger.600',
-                                fontFamily: 'monospace',
-                                maxWidth: '240px',
-                                wordBreak: 'break-all',
-                              }}
-                            >
-                              {probeMessageMap[provider.id]}
-                            </Typography>
-                          )}
                         </Stack>
                       </td>
                     </tr>
