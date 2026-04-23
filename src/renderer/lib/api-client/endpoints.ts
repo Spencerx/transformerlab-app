@@ -167,6 +167,10 @@ Endpoints.ComputeProvider = {
     }
     return `${API_URL()}compute_provider/jobs/ensure-quota-recorded`;
   },
+  LaunchStorageProbe: (providerId: string) =>
+    `${API_URL()}compute_provider/providers/${providerId}/debug/storage-probe`,
+  CheckStorageProbe: (providerId: string, jobId: string) =>
+    `${API_URL()}compute_provider/providers/${providerId}/debug/storage-probe/${jobId}`,
 };
 
 Endpoints.SshKeys = {
@@ -189,15 +193,6 @@ Endpoints.Dataset = {
     `${API_URL()}data/preview?dataset_id=${datasetId}&split=${split}&offset=${
       offset
     }&limit=${limit}`,
-  PreviewWithTemplate: (
-    datasetId: string,
-    template: string,
-    offset: number,
-    limit: number,
-  ) =>
-    `${API_URL()}data/preview_with_template?dataset_id=${datasetId}&template=${
-      template
-    }&offset=${offset}&limit=${limit}`,
   Delete: (datasetId: string) =>
     `${API_URL()}data/delete?dataset_id=${datasetId}`,
   Create: (datasetId: string) => `${API_URL()}data/new?dataset_id=${datasetId}`,

@@ -6,16 +6,7 @@ import React, {
   useRef,
 } from 'react';
 import Sheet from '@mui/joy/Sheet';
-import {
-  Button,
-  Chip,
-  Input,
-  Stack,
-  Typography,
-  Box,
-  Skeleton,
-  Alert,
-} from '@mui/joy';
+import { Button, Stack, Typography, Box, Skeleton, Alert } from '@mui/joy';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { PlusIcon } from 'lucide-react';
@@ -33,6 +24,7 @@ import NewInteractiveTaskModal from '../Tasks/NewInteractiveTaskModal';
 import EditInteractiveTaskModal from '../Tasks/EditInteractiveTaskModal';
 import DeleteTaskConfirmModal from '../Tasks/DeleteTaskConfirmModal';
 import InteractiveJobCard from './InteractiveJobCard';
+import JobsPanel from '../Tasks/JobsPanel';
 import JobsList from '../Tasks/JobsList';
 import FileBrowserModal from '../Tasks/FileBrowserModal';
 import { API_URL } from 'renderer/lib/api-client/urls';
@@ -112,7 +104,6 @@ export default function Interactive() {
 
   // Trigger to force re-render when localStorage changes
   const [pendingIdsTrigger, setPendingIdsTrigger] = useState(0);
-  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   const {
     data: providerListData,
@@ -478,50 +469,14 @@ export default function Interactive() {
   // Completed / failed / stopped interactive jobs for the History section
   const historyJobs = useMemo(() => {
     const baseJobs = Array.isArray(jobs) ? jobs : [];
-    const completed = baseJobs.filter((job: any) => {
+    return baseJobs.filter((job: any) => {
       return (
         job.status === 'COMPLETE' ||
         job.status === 'FAILED' ||
         job.status === 'STOPPED'
       );
     });
-    if (!historySearchQuery.trim()) return completed;
-    const q = historySearchQuery.trim().toLowerCase();
-    return completed.filter((j: any) => {
-      const rawJd = j?.job_data ?? {};
-      const jd =
-        typeof rawJd === 'string'
-          ? (() => {
-              try {
-                return JSON.parse(rawJd);
-              } catch {
-                return {};
-              }
-            })()
-          : rawJd;
-      const interactiveType =
-        jd?.interactive_type ||
-        j?.interactive_type ||
-        jd?.template_config?.interactive_type;
-      const searchableFields = [
-        j?.id,
-        j?.short_id,
-        j?.status,
-        jd?.template_name,
-        jd?.cluster_name,
-        jd?.provider_name,
-        jd?.user_info?.name,
-        jd?.user_info?.email,
-        interactiveType,
-        jd?.error_msg,
-      ];
-      return searchableFields.some((f) =>
-        String(f ?? '')
-          .toLowerCase()
-          .includes(q),
-      );
-    });
-  }, [jobs, historySearchQuery]);
+  }, [jobs]);
 
   const handleDeleteTask = (taskId: string, taskName?: string) => {
     setTaskToDelete({ id: taskId, name: taskName });
@@ -1383,43 +1338,28 @@ export default function Interactive() {
           </Box>
         )}
       </Sheet>
-      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 1 }}>
-        <Typography level="title-md">History</Typography>
-        <Input
-          size="sm"
-          placeholder="Search history…"
-          value={historySearchQuery}
-          onChange={(e) => setHistorySearchQuery(e.target.value)}
-          sx={{ width: 240 }}
-        />
-        <Chip size="sm" variant="soft" color="neutral">
-          {historyJobs.length}
-        </Chip>
-      </Stack>
-      <Sheet
-        variant="soft"
-        sx={{
-          px: 1,
-          mt: 1,
-          mb: 2,
-          flex: 1,
-          maxHeight: '300px',
-          overflow: 'auto',
-        }}
-      >
-        <JobsList
-          jobs={historyJobs}
-          loading={jobsIsLoading || !experimentInfo?.id}
-          onDeleteJob={handleDeleteJob}
-          hideOutputButton
-          hideJobId
-          showInteractiveType
-          onViewFileBrowser={(jobId) => {
-            if (jobId == null || jobId === '') return;
-            setViewFileBrowserFromJob(String(jobId));
-          }}
-        />
-        {/* TODO: remove TaskTemplateList once migration is complete
+      <JobsPanel
+        title="History"
+        jobs={historyJobs}
+        loading={jobsIsLoading || !experimentInfo?.id}
+        searchPlaceholder="Search history…"
+        maxHeight="300px"
+        renderList={(filteredJobs, loading) => (
+          <JobsList
+            jobs={filteredJobs}
+            loading={loading}
+            onDeleteJob={handleDeleteJob}
+            hideOutputButton
+            hideJobId
+            showInteractiveType
+            onViewFileBrowser={(jobId) => {
+              if (jobId == null || jobId === '') return;
+              setViewFileBrowserFromJob(String(jobId));
+            }}
+          />
+        )}
+      />
+      {/* TODO: remove TaskTemplateList once migration is complete
         <TaskTemplateList
           tasksList={tasks}
           onDeleteTask={handleDeleteTask}
@@ -1430,7 +1370,6 @@ export default function Interactive() {
           interactTasks
         />
         */}
-      </Sheet>
       <DeleteTaskConfirmModal
         open={taskToDelete !== null}
         onClose={() => setTaskToDelete(null)}
