@@ -210,8 +210,9 @@ class JobDetails(Vertical):
             output_path = os.path.join(output_dir, filename)
 
             # Make the API request
+            experiment_id = get_current_experiment() or "alpha"
             try:
-                response = api.get(f"/jobs/{job_id}/artifacts/download_all", timeout=300.0)
+                response = api.get(f"/experiment/{experiment_id}/jobs/{job_id}/artifacts/download_all", timeout=300.0)
             except httpx.HTTPError as e:
                 self.notify(f"Failed to connect to server: {str(e)}", severity="error")
                 return
