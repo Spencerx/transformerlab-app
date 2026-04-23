@@ -565,6 +565,7 @@ async def launch_template_on_provider(
 
     job_data = {
         "task_name": request.task_name,
+        "description": request.description,
         "run": command_with_secrets,
         "cluster_name": formatted_cluster_name,
         "subtype": request.subtype,
