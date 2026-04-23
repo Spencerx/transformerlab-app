@@ -23,23 +23,20 @@ def _extract_error(response) -> str:
 # ──────────────────────────────────────────────
 
 @app.command("list")
-def command_dataset_list(
-    include_generated: bool = typer.Option(
-        True, "--include-generated/--no-generated", help="Include generated datasets"
-    ),
-):
-    """List all available datasets on the server."""
+def command_dataset_list():
+    """List all dataset groups on the server."""
     check_configs(output_format=cli_state.output_format)
 
+    endpoint = "/asset_versions/groups?asset_type=dataset"
     if cli_state.output_format != "json":
         with console.status("[bold success]Fetching datasets...[/bold success]", spinner="dots"):
-            response = api.get(f"/data/list?generated={str(include_generated).lower()}")
+            response = api.get(endpoint)
     else:
-        response = api.get(f"/data/list?generated={str(include_generated).lower()}")
+        response = api.get(endpoint)
 
     if response.status_code == 200:
         datasets = response.json()
-        table_columns = ["dataset_id", "location", "description", "size"]
+        table_columns = ["group_id", "group_name", "latest_version_label", "version_count", "tags"]
         render_table(data=datasets, format_type=cli_state.output_format, table_columns=table_columns, title="Datasets")
     else:
         if cli_state.output_format == "json":
@@ -55,35 +52,42 @@ def command_dataset_list(
 
 @app.command("info")
 def command_dataset_info(
-    dataset_id: str = typer.Argument(..., help="The dataset ID to inspect"),
+    group_id: str = typer.Argument(..., help="The dataset group_id or group_name to inspect"),
 ):
-    """Show detailed information about a dataset."""
+    """Show detailed information about a specific dataset group."""
     check_configs(output_format=cli_state.output_format)
 
+    endpoint = "/asset_versions/groups?asset_type=dataset"
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Fetching info for '{dataset_id}'...[/bold success]", spinner="dots"):
-            response = api.get(f"/data/info?dataset_id={dataset_id}")
+        with console.status(f"[bold success]Fetching dataset info...[/bold success]", spinner="dots"):
+            response = api.get(endpoint)
     else:
-        response = api.get(f"/data/info?dataset_id={dataset_id}")
+        response = api.get(endpoint)
 
-    if response.status_code == 200:
-        info = response.json()
-        if not info:
-            if cli_state.output_format == "json":
-                print(json.dumps({"error": "Dataset not found."}))
-            else:
-                console.print(f"[error]Error:[/error] Dataset [bold]{dataset_id}[/bold] not found.")
-            raise typer.Exit(1)
+    if response.status_code != 200:
         if cli_state.output_format == "json":
-            print(json.dumps(info, indent=2, default=str))
-        else:
-            render_object(info)
-    else:
-        if cli_state.output_format == "json":
-            print(json.dumps({"error": f"Failed to fetch dataset info. Status code: {response.status_code}"}))
+            print(json.dumps({"error": f"Failed to fetch datasets. Status code: {response.status_code}"}))
             raise typer.Exit(1)
-        console.print(f"[error]Error:[/error] Failed to fetch dataset info. {_extract_error(response)}")
+        console.print(f"[error]Error:[/error] Failed to fetch datasets. {_extract_error(response)}")
         raise typer.Exit(1)
+
+    datasets = response.json()
+    dataset = next(
+        (d for d in datasets if d.get("group_id") == group_id or d.get("group_name") == group_id),
+        None,
+    )
+
+    if dataset is None:
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": f"Dataset '{group_id}' not found."}))
+        else:
+            console.print(f"[error]Error:[/error] Dataset [bold]{group_id}[/bold] not found.")
+        raise typer.Exit(1)
+
+    if cli_state.output_format == "json":
+        print(json.dumps(dataset, indent=2, default=str))
+    else:
+        render_object(dataset)
 
 
 # ──────────────────────────────────────────────
@@ -92,44 +96,85 @@ def command_dataset_info(
 
 @app.command("delete")
 def command_dataset_delete(
-    dataset_id: str = typer.Argument(..., help="The dataset ID to delete"),
+    group_id: str = typer.Argument(..., help="The dataset group_id to delete"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ):
-    """Delete a dataset from the server."""
+    """Delete a dataset group and all its versions."""
     check_configs(output_format=cli_state.output_format)
 
     if not yes and cli_state.output_format != "json":
         confirmed = typer.confirm(
-            f"Are you sure you want to delete dataset [bold]{dataset_id}[/bold]?", default=False
+            f"Are you sure you want to delete dataset group '{group_id}' and ALL its versions?", default=False
         )
         if not confirmed:
             console.print("[warning]Aborted.[/warning]")
             raise typer.Exit(0)
 
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Deleting dataset '{dataset_id}'...[/bold success]", spinner="dots"):
-            response = api.get(f"/data/delete?dataset_id={dataset_id}")
+        with console.status(f"[bold success]Deleting dataset group '{group_id}'...[/bold success]", spinner="dots"):
+            response = api.delete(f"/asset_versions/groups/dataset/{group_id}")
     else:
-        response = api.get(f"/data/delete?dataset_id={dataset_id}")
+        response = api.delete(f"/asset_versions/groups/dataset/{group_id}")
 
     if response.status_code == 200:
         body = response.json()
-        if body.get("status") == "success":
-            if cli_state.output_format == "json":
-                print(json.dumps({"status": "success", "dataset_id": dataset_id}))
-            else:
-                console.print(f"[success]✓[/success] Dataset [bold]{dataset_id}[/bold] deleted.")
+        if cli_state.output_format == "json":
+            print(json.dumps(body))
         else:
-            if cli_state.output_format == "json":
-                print(json.dumps({"error": body.get("message", "Unknown error")}))
-            else:
-                console.print(f"[error]Error:[/error] {body.get('message', 'Unknown error')}")
-            raise typer.Exit(1)
+            count = body.get("deleted_count", "?")
+            console.print(
+                f"[success]✓[/success] Dataset group [bold]{group_id}[/bold] deleted ({count} version(s) removed)."
+            )
     else:
         if cli_state.output_format == "json":
             print(json.dumps({"error": f"Failed to delete dataset. Status code: {response.status_code}"}))
             raise typer.Exit(1)
         console.print(f"[error]Error:[/error] Failed to delete dataset. {_extract_error(response)}")
+        raise typer.Exit(1)
+
+
+# ──────────────────────────────────────────────
+# edit
+# ──────────────────────────────────────────────
+
+@app.command("edit")
+def command_dataset_edit(
+    group_id: str = typer.Argument(..., help="The dataset group_id to update"),
+    name: str = typer.Option(None, "--name", help="New display name for the dataset group"),
+    description: str = typer.Option(None, "--description", help="New description for the dataset group"),
+):
+    """Edit the name or description of a dataset group."""
+    check_configs(output_format=cli_state.output_format)
+
+    payload: dict = {}
+    if name:
+        payload["name"] = name
+    if description:
+        payload["description"] = description
+
+    if not payload:
+        console.print("[warning]Nothing to update. Provide --name and/or --description.[/warning]")
+        raise typer.Exit(0)
+
+    if cli_state.output_format != "json":
+        with console.status(
+            f"[bold success]Updating dataset group '{group_id}'...[/bold success]", spinner="dots"
+        ):
+            response = api.patch(f"/asset_versions/groups/dataset/{group_id}", json_data=payload)
+    else:
+        response = api.patch(f"/asset_versions/groups/dataset/{group_id}", json_data=payload)
+
+    if response.status_code == 200:
+        body = response.json()
+        if cli_state.output_format == "json":
+            print(json.dumps(body, indent=2, default=str))
+        else:
+            console.print(f"[success]✓[/success] Dataset group [bold]{group_id}[/bold] updated.")
+    else:
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": f"Failed to update dataset. Status code: {response.status_code}"}))
+            raise typer.Exit(1)
+        console.print(f"[error]Error:[/error] Failed to update dataset. {_extract_error(response)}")
         raise typer.Exit(1)
 
 

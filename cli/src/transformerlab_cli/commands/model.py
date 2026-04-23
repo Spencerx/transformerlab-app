@@ -23,18 +23,19 @@ def _extract_error(response) -> str:
 
 @app.command("list")
 def command_model_list():
-    """List all models installed on the server."""
+    """List all model groups on the server."""
     check_configs(output_format=cli_state.output_format)
 
+    endpoint = "/asset_versions/groups?asset_type=model"
     if cli_state.output_format != "json":
         with console.status("[bold success]Fetching models...[/bold success]", spinner="dots"):
-            response = api.get("/model/list")
+            response = api.get(endpoint)
     else:
-        response = api.get("/model/list")
+        response = api.get(endpoint)
 
     if response.status_code == 200:
         models = response.json()
-        table_columns = ["model_id", "name", "architecture", "context_size", "params_billion"]
+        table_columns = ["group_id", "group_name", "latest_version_label", "version_count", "tags"]
         render_table(data=models, format_type=cli_state.output_format, table_columns=table_columns, title="Models")
     else:
         if cli_state.output_format == "json":
@@ -50,16 +51,17 @@ def command_model_list():
 
 @app.command("info")
 def command_model_info(
-    model_id: str = typer.Argument(..., help="The model ID to inspect"),
+    group_id: str = typer.Argument(..., help="The model group_id or group_name to inspect"),
 ):
-    """Show detailed information about a specific model."""
+    """Show detailed information about a specific model group."""
     check_configs(output_format=cli_state.output_format)
 
+    endpoint = "/asset_versions/groups?asset_type=model"
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Fetching model list...[/bold success]", spinner="dots"):
-            response = api.get("/model/list")
+        with console.status(f"[bold success]Fetching model info...[/bold success]", spinner="dots"):
+            response = api.get(endpoint)
     else:
-        response = api.get("/model/list")
+        response = api.get(endpoint)
 
     if response.status_code != 200:
         if cli_state.output_format == "json":
@@ -69,13 +71,16 @@ def command_model_info(
         raise typer.Exit(1)
 
     models = response.json()
-    model = next((m for m in models if m.get("model_id") == model_id), None)
+    model = next(
+        (m for m in models if m.get("group_id") == group_id or m.get("group_name") == group_id),
+        None,
+    )
 
     if model is None:
         if cli_state.output_format == "json":
-            print(json.dumps({"error": f"Model '{model_id}' not found."}))
+            print(json.dumps({"error": f"Model '{group_id}' not found."}))
         else:
-            console.print(f"[error]Error:[/error] Model [bold]{model_id}[/bold] not found.")
+            console.print(f"[error]Error:[/error] Model [bold]{group_id}[/bold] not found.")
         raise typer.Exit(1)
 
     if cli_state.output_format == "json":
@@ -90,44 +95,35 @@ def command_model_info(
 
 @app.command("delete")
 def command_model_delete(
-    model_id: str = typer.Argument(..., help="The model ID to delete"),
-    from_cache: bool = typer.Option(
-        False, "--from-cache", help="Also delete the model from the HuggingFace local cache"
-    ),
+    group_id: str = typer.Argument(..., help="The model group_id to delete"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ):
-    """Delete a model from the server."""
+    """Delete a model group and all its versions."""
     check_configs(output_format=cli_state.output_format)
 
     if not yes and cli_state.output_format != "json":
         confirmed = typer.confirm(
-            f"Are you sure you want to delete model '{model_id}'?", default=False
+            f"Are you sure you want to delete model group '{group_id}' and ALL its versions?", default=False
         )
         if not confirmed:
             console.print("[warning]Aborted.[/warning]")
             raise typer.Exit(0)
 
-    params = f"?model_id={model_id}&delete_from_cache={str(from_cache).lower()}"
-
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Deleting model '{model_id}'...[/bold success]", spinner="dots"):
-            response = api.get(f"/model/delete{params}")
+        with console.status(f"[bold success]Deleting model group '{group_id}'...[/bold success]", spinner="dots"):
+            response = api.delete(f"/asset_versions/groups/model/{group_id}")
     else:
-        response = api.get(f"/model/delete{params}")
+        response = api.delete(f"/asset_versions/groups/model/{group_id}")
 
     if response.status_code == 200:
         body = response.json()
-        if body.get("message") in ("model deleted", "OK"):
-            if cli_state.output_format == "json":
-                print(json.dumps({"status": "success", "model_id": model_id}))
-            else:
-                console.print(f"[success]✓[/success] Model [bold]{model_id}[/bold] deleted.")
+        if cli_state.output_format == "json":
+            print(json.dumps(body))
         else:
-            if cli_state.output_format == "json":
-                print(json.dumps({"error": body.get("message", "Unknown error")}))
-            else:
-                console.print(f"[error]Error:[/error] {body.get('message', 'Unknown error')}")
-            raise typer.Exit(1)
+            count = body.get("deleted_count", "?")
+            console.print(
+                f"[success]✓[/success] Model group [bold]{group_id}[/bold] deleted ({count} version(s) removed)."
+            )
     else:
         if cli_state.output_format == "json":
             print(json.dumps({"error": f"Failed to delete model. Status code: {response.status_code}"}))
@@ -137,40 +133,88 @@ def command_model_delete(
 
 
 # ──────────────────────────────────────────────
-# create  (register a new blank model entry)
+# edit
+# ──────────────────────────────────────────────
+
+@app.command("edit")
+def command_model_edit(
+    group_id: str = typer.Argument(..., help="The model group_id to update"),
+    name: str = typer.Option(None, "--name", help="New display name for the model group"),
+    description: str = typer.Option(None, "--description", help="New description for the model group"),
+):
+    """Edit the name or description of a model group."""
+    check_configs(output_format=cli_state.output_format)
+
+    payload: dict = {}
+    if name:
+        payload["name"] = name
+    if description:
+        payload["description"] = description
+
+    if not payload:
+        console.print("[warning]Nothing to update. Provide --name and/or --description.[/warning]")
+        raise typer.Exit(0)
+
+    if cli_state.output_format != "json":
+        with console.status(f"[bold success]Updating model group '{group_id}'...[/bold success]", spinner="dots"):
+            response = api.patch(f"/asset_versions/groups/model/{group_id}", json_data=payload)
+    else:
+        response = api.patch(f"/asset_versions/groups/model/{group_id}", json_data=payload)
+
+    if response.status_code == 200:
+        body = response.json()
+        if cli_state.output_format == "json":
+            print(json.dumps(body, indent=2, default=str))
+        else:
+            console.print(f"[success]✓[/success] Model group [bold]{group_id}[/bold] updated.")
+    else:
+        if cli_state.output_format == "json":
+            print(json.dumps({"error": f"Failed to update model. Status code: {response.status_code}"}))
+            raise typer.Exit(1)
+        console.print(f"[error]Error:[/error] Failed to update model. {_extract_error(response)}")
+        raise typer.Exit(1)
+
+
+# ──────────────────────────────────────────────
+# create  (register a new model group + first version)
 # ──────────────────────────────────────────────
 
 @app.command("create")
 def command_model_create(
-    model_id: str = typer.Argument(..., help="Unique model ID (e.g. 'my-org/my-model')"),
-    name: str = typer.Option(None, "--name", help="Human-readable name for the model"),
+    asset_id: str = typer.Argument(..., help="The underlying asset/model ID (e.g. a HuggingFace model ID)"),
+    group_name: str = typer.Option(..., "--name", help="Display name for the new model group"),
+    version_label: str = typer.Option("v1", "--version", help="Version label (default: v1)"),
+    description: str = typer.Option(None, "--description", help="Optional description"),
+    tag: str = typer.Option("latest", "--tag", help="Tag to apply to this version (default: latest)"),
 ):
-    """Create a new (blank) model entry on the server."""
+    """Create a new model group and register its first version."""
     check_configs(output_format=cli_state.output_format)
 
-    if not name:
-        name = model_id
-
-    params = f"?id={model_id}&name={name}"
+    payload = {
+        "asset_type": "model",
+        "group_name": group_name,
+        "asset_id": asset_id,
+        "version_label": version_label,
+        "tag": tag,
+    }
+    if description:
+        payload["description"] = description
 
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Creating model '{model_id}'...[/bold success]", spinner="dots"):
-            response = api.get(f"/model/create{params}")
+        with console.status(f"[bold success]Creating model group '{group_name}'...[/bold success]", spinner="dots"):
+            response = api.post_json("/asset_versions/versions", json_data=payload)
     else:
-        response = api.get(f"/model/create{params}")
+        response = api.post_json("/asset_versions/versions", json_data=payload)
 
     if response.status_code == 200:
         body = response.json()
-        if body.get("status") == "error":
-            if cli_state.output_format == "json":
-                print(json.dumps({"error": body.get("message", "Unknown error")}))
-            else:
-                console.print(f"[error]Error:[/error] {body.get('message', 'Unknown error')}")
-            raise typer.Exit(1)
         if cli_state.output_format == "json":
-            print(json.dumps({"status": "success", "model_id": model_id, "name": name}))
+            print(json.dumps(body, indent=2, default=str))
         else:
-            console.print(f"[success]✓[/success] Model [bold]{model_id}[/bold] created.")
+            console.print(
+                f"[success]✓[/success] Model group [bold]{group_name}[/bold] created "
+                f"(group_id: {body.get('group_id', '?')}, version: {version_label})."
+            )
     else:
         if cli_state.output_format == "json":
             print(json.dumps({"error": f"Failed to create model. Status code: {response.status_code}"}))
