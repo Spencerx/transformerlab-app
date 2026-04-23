@@ -1487,8 +1487,8 @@ export default function UserLoginTest(): JSX.Element {
                           <Tooltip
                             title={
                               iAmOwner
-                                ? 'Verify provider lifecycle and shared storage'
-                                : 'Only admins can run lifecycle checks'
+                                ? 'Verify provider lifecycle'
+                                : 'Only admins can verify provider lifecycle'
                             }
                           >
                             <span>
