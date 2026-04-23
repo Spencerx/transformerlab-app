@@ -718,14 +718,15 @@ export default function UserLoginTest(): JSX.Element {
     const poll = async () => {
       try {
         const response = await authContext.fetchWithAuth(
-          `${chatAPI.Endpoints.ComputeProvider.Setup(targetProviderId)}/status`,
+          chatAPI.Endpoints.ComputeProvider.SetupStatus(targetProviderId),
           { method: 'GET' },
         );
 
         if (!response.ok) {
           const error = await response.json().catch(() => ({}));
           const detail =
-            (error && (error.detail?.message || error.detail || error.message)) ||
+            (error &&
+              (error.detail?.message || error.detail || error.message)) ||
             'Failed to read setup status';
           setLocalSetupStatus(detail);
           setLocalSetupInProgressProviderId(null);
@@ -736,15 +737,12 @@ export default function UserLoginTest(): JSX.Element {
           return;
         }
 
-        const data = await response.json();
-        if (!data.in_progress && !data.done && !data.error) {
-          const completionMessage = 'Local provider refresh finished.';
-          setLocalSetupStatus(completionMessage);
+        const data = await response.json().catch(() => ({}));
+
+        // Match ProviderDetailsModal behavior: treat only idle+done as finished.
+        if (data.status === 'idle' && data.done) {
+          setLocalSetupStatus('Local provider refresh finished.');
           setLocalSetupInProgressProviderId(null);
-          addNotification({
-            type: 'success',
-            message: completionMessage,
-          });
           providersMutate();
           setLocalSetupModalOpen(false);
           return;
