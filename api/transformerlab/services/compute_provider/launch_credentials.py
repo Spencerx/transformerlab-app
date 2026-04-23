@@ -66,15 +66,19 @@ def generate_aws_credentials_setup(
     return setup_script
 
 
-def generate_gcp_credentials_setup(service_account_json: str, credentials_path: Optional[str] = None) -> str:
-    target_path = credentials_path or "~/.config/gcloud/application_default_credentials.json"
-    encoded = base64.b64encode(service_account_json.encode()).decode()
+def generate_gcp_credentials_setup(sa_json_path: str) -> str:
+    """Read service account JSON from *sa_json_path* and emit a setup script that writes
+    it to the standard ADC location so GCP client libraries pick it up automatically."""
+    sa_json_path = os.path.expanduser(sa_json_path)
+    with open(sa_json_path, "r", encoding="utf-8") as f:
+        encoded = base64.b64encode(f.read().encode()).decode()
+    adc_path = "~/.config/gcloud/application_default_credentials.json"
     setup_script = (
         "echo 'Setting up GCP service account credentials...'; "
-        f"mkdir -p $(dirname {target_path}); "
-        f"echo '{encoded}' | base64 -d > {target_path}; "
-        f"chmod 600 {target_path}; "
-        f"export GOOGLE_APPLICATION_CREDENTIALS={target_path}; "
+        "mkdir -p ~/.config/gcloud; "
+        f"echo '{encoded}' | base64 -d > {adc_path}; "
+        f"chmod 600 {adc_path}; "
+        f"export GOOGLE_APPLICATION_CREDENTIALS={adc_path}; "
         "echo 'GCP credentials configured successfully'"
     )
     return setup_script
