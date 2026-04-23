@@ -58,7 +58,7 @@ def command_model_info(
 
     endpoint = "/asset_versions/groups?asset_type=model"
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Fetching model info...[/bold success]", spinner="dots"):
+        with console.status("[bold success]Fetching model info...[/bold success]", spinner="dots"):
             response = api.get(endpoint)
     else:
         response = api.get(endpoint)

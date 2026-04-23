@@ -59,7 +59,7 @@ def command_dataset_info(
 
     endpoint = "/asset_versions/groups?asset_type=dataset"
     if cli_state.output_format != "json":
-        with console.status(f"[bold success]Fetching dataset info...[/bold success]", spinner="dots"):
+        with console.status("[bold success]Fetching dataset info...[/bold success]", spinner="dots"):
             response = api.get(endpoint)
     else:
         response = api.get(endpoint)
