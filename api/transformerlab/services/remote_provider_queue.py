@@ -3,7 +3,7 @@ import json as _json
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel
@@ -98,11 +98,7 @@ async def _poll_pending_remote_entries() -> list[JobQueue]:
 async def _mark_entry_dispatched(entry_id: str) -> None:
     """Transition a job_queue row from PENDING to DISPATCHED."""
     async with async_session() as session:
-        stmt = (
-            update(JobQueue)
-            .where(JobQueue.id == entry_id)
-            .values(status="DISPATCHED", updated_at=datetime.now(timezone.utc))
-        )
+        stmt = update(JobQueue).where(JobQueue.id == entry_id).values(status="DISPATCHED", updated_at=datetime.utcnow())
         await session.execute(stmt)
         await session.commit()
 
@@ -110,11 +106,7 @@ async def _mark_entry_dispatched(entry_id: str) -> None:
 async def _mark_entry_failed(entry_id: str) -> None:
     """Transition a job_queue row to FAILED (could not reconstruct work item)."""
     async with async_session() as session:
-        stmt = (
-            update(JobQueue)
-            .where(JobQueue.id == entry_id)
-            .values(status="FAILED", updated_at=datetime.now(timezone.utc))
-        )
+        stmt = update(JobQueue).where(JobQueue.id == entry_id).values(status="FAILED", updated_at=datetime.utcnow())
         await session.execute(stmt)
         await session.commit()
 
