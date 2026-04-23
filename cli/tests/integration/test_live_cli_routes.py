@@ -343,19 +343,24 @@ def test_cli_job_and_artifact_routes_live_server(live_context: dict[str, str]) -
             "GET /experiment/{id}/jobs/{job_id}/tunnel_info",
         )
         _assert_status_in(
-            client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts", headers=headers),
+            client.get(f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/artifacts", headers=headers),
             {200, 400, 404},
-            "GET /jobs/{job_id}/artifacts",
+            "GET /experiment/{id}/jobs/{job_id}/artifacts",
         )
         _assert_status_in(
-            client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifact/does-not-exist.txt?task=download", headers=headers),
+            client.get(
+                f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/artifact/does-not-exist.txt?task=download",
+                headers=headers,
+            ),
             {400, 404, 405},
-            "GET /jobs/{job_id}/artifact/{filename}",
+            "GET /experiment/{id}/jobs/{job_id}/artifact/{filename}",
         )
         _assert_status_in(
-            client.get(f"{BASE_URL}/jobs/{fake_job_id}/artifacts/download_all", headers=headers),
+            client.get(
+                f"{BASE_URL}/experiment/{experiment_id}/jobs/{fake_job_id}/artifacts/download_all", headers=headers
+            ),
             {400, 404},
-            "GET /jobs/{job_id}/artifacts/download_all",
+            "GET /experiment/{id}/jobs/{job_id}/artifacts/download_all",
         )
         _assert_status_in(
             client.post(
