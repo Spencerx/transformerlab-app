@@ -22,6 +22,7 @@ def _extract_error(response) -> str:
 # list
 # ──────────────────────────────────────────────
 
+
 @app.command("list")
 def command_dataset_list():
     """List all dataset groups on the server."""
@@ -49,6 +50,7 @@ def command_dataset_list():
 # ──────────────────────────────────────────────
 # info
 # ──────────────────────────────────────────────
+
 
 @app.command("info")
 def command_dataset_info(
@@ -94,6 +96,7 @@ def command_dataset_info(
 # delete
 # ──────────────────────────────────────────────
 
+
 @app.command("delete")
 def command_dataset_delete(
     group_id: str = typer.Argument(..., help="The dataset group_id to delete"),
@@ -137,6 +140,7 @@ def command_dataset_delete(
 # edit
 # ──────────────────────────────────────────────
 
+
 @app.command("edit")
 def command_dataset_edit(
     group_id: str = typer.Argument(..., help="The dataset group_id to update"),
@@ -157,9 +161,7 @@ def command_dataset_edit(
         raise typer.Exit(0)
 
     if cli_state.output_format != "json":
-        with console.status(
-            f"[bold success]Updating dataset group '{group_id}'...[/bold success]", spinner="dots"
-        ):
+        with console.status(f"[bold success]Updating dataset group '{group_id}'...[/bold success]", spinner="dots"):
             response = api.patch(f"/asset_versions/groups/dataset/{group_id}", json_data=payload)
     else:
         response = api.patch(f"/asset_versions/groups/dataset/{group_id}", json_data=payload)
@@ -182,6 +184,7 @@ def command_dataset_edit(
 # upload
 # ──────────────────────────────────────────────
 
+
 @app.command("upload")
 def command_dataset_upload(
     dataset_id: str = typer.Argument(..., help="The dataset ID (will be created if it does not exist)"),
@@ -202,9 +205,7 @@ def command_dataset_upload(
 
     # ── Step 1: ensure the dataset exists on the server ──
     if cli_state.output_format != "json":
-        with console.status(
-            f"[bold success]Ensuring dataset '{dataset_id}' exists...[/bold success]", spinner="dots"
-        ):
+        with console.status(f"[bold success]Ensuring dataset '{dataset_id}' exists...[/bold success]", spinner="dots"):
             check_response = api.get(f"/data/info?dataset_id={dataset_id}")
     else:
         check_response = api.get(f"/data/info?dataset_id={dataset_id}")
@@ -216,9 +217,7 @@ def command_dataset_upload(
     else:
         # Create a new dataset
         if cli_state.output_format != "json":
-            with console.status(
-                f"[bold success]Creating dataset '{dataset_id}'...[/bold success]", spinner="dots"
-            ):
+            with console.status(f"[bold success]Creating dataset '{dataset_id}'...[/bold success]", spinner="dots"):
                 create_response = api.get(f"/data/new?dataset_id={dataset_id}")
         else:
             create_response = api.get(f"/data/new?dataset_id={dataset_id}")
@@ -245,9 +244,7 @@ def command_dataset_upload(
             upload_files.append(("files", (filename, fh, "application/octet-stream")))
 
         if cli_state.output_format != "json":
-            with console.status(
-                f"[bold success]Uploading {len(files)} file(s)...[/bold success]", spinner="dots"
-            ):
+            with console.status(f"[bold success]Uploading {len(files)} file(s)...[/bold success]", spinner="dots"):
                 response = api.post(
                     f"/data/fileupload?dataset_id={dataset_id}",
                     files=upload_files,
@@ -283,6 +280,7 @@ def command_dataset_upload(
 # ──────────────────────────────────────────────
 # download (from HuggingFace Hub)
 # ──────────────────────────────────────────────
+
 
 @app.command("download")
 def command_dataset_download(

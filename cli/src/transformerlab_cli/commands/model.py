@@ -21,6 +21,7 @@ def _extract_error(response) -> str:
 # list
 # ──────────────────────────────────────────────
 
+
 @app.command("list")
 def command_model_list():
     """List all model groups on the server."""
@@ -48,6 +49,7 @@ def command_model_list():
 # ──────────────────────────────────────────────
 # info
 # ──────────────────────────────────────────────
+
 
 @app.command("info")
 def command_model_info(
@@ -93,6 +95,7 @@ def command_model_info(
 # delete
 # ──────────────────────────────────────────────
 
+
 @app.command("delete")
 def command_model_delete(
     group_id: str = typer.Argument(..., help="The model group_id to delete"),
@@ -136,6 +139,7 @@ def command_model_delete(
 # edit
 # ──────────────────────────────────────────────
 
+
 @app.command("edit")
 def command_model_edit(
     group_id: str = typer.Argument(..., help="The model group_id to update"),
@@ -178,6 +182,7 @@ def command_model_edit(
 # ──────────────────────────────────────────────
 # create  (register a new model group + first version)
 # ──────────────────────────────────────────────
+
 
 @app.command("create")
 def command_model_create(
