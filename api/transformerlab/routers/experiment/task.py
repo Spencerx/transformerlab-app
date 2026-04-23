@@ -1701,6 +1701,7 @@ async def import_task_from_team_gallery(
 
 @router.post("/gallery/team/export", summary="Export an existing task to the team gallery")
 async def export_task_to_team_gallery(
+    experimentId: str,
     request: ExportTaskToTeamGalleryRequest,
     user_and_team=Depends(get_user_and_team),
 ):
@@ -1708,7 +1709,7 @@ async def export_task_to_team_gallery(
     Export a task into the team-specific gallery stored in workspace_dir.
     Tasks store all fields directly (not nested in config).
     """
-    task = await task_service.task_get_by_id(request.task_id, experiment_id=request.experiment_id)
+    task = await task_service.task_get_by_id(request.task_id, experiment_id=experimentId)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -1924,6 +1925,7 @@ async def add_task_to_team_gallery(
 
 @router.post("/gallery/team/delete", summary="Delete a task from the team gallery")
 async def delete_team_task_from_gallery(
+    experimentId: str,
     request: DeleteTeamTaskFromGalleryRequest,
     user_and_team=Depends(get_user_and_team),
 ):
