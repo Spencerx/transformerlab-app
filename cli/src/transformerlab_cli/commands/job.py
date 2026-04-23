@@ -371,13 +371,14 @@ def info_job(job_id: str, experiment_id: str):
         console.print(f"[error]Error:[/error] Job with ID {job_id} not found.")
 
 
-def list_artifacts(job_id: str, output_format: str = "pretty") -> list[dict]:
+def list_artifacts(job_id: str, experiment_id: str, output_format: str = "pretty") -> list[dict]:
     """List artifacts for a job by ID. Returns list of artifact dicts."""
+    artifacts_url = f"/experiment/{experiment_id}/jobs/{job_id}/artifacts"
     if output_format != "json":
         with console.status(f"[bold success]Fetching artifacts for job {job_id}...[/bold success]", spinner="dots"):
-            response = api.get(f"/jobs/{job_id}/artifacts")
+            response = api.get(artifacts_url)
     else:
-        response = api.get(f"/jobs/{job_id}/artifacts")
+        response = api.get(artifacts_url)
 
     if response.status_code != 200:
         if output_format == "json":
@@ -410,7 +411,7 @@ def list_artifacts(job_id: str, output_format: str = "pretty") -> list[dict]:
     return artifacts
 
 
-def download_artifacts(job_id: str, output_dir: str = None) -> None:
+def download_artifacts(job_id: str, experiment_id: str, output_dir: str | None = None) -> None:
     """Download all artifacts for a job as a zip file."""
     if output_dir is None:
         output_dir = os.getcwd()
@@ -426,9 +427,10 @@ def download_artifacts(job_id: str, output_dir: str = None) -> None:
     if os.path.exists(output_path):
         console.print(f"[warning]Warning:[/warning] File {output_path} already exists. It will be overwritten.")
 
+    download_all_url = f"/experiment/{experiment_id}/jobs/{job_id}/artifacts/download_all"
     try:
         with console.status(f"[bold success]Downloading artifacts for job {job_id}...[/bold success]", spinner="dots"):
-            response = api.get(f"/jobs/{job_id}/artifacts/download_all", timeout=300.0)
+            response = api.get(download_all_url, timeout=300.0)
 
         if response.status_code == 200:
             # Get filename from Content-Disposition header if available
@@ -485,7 +487,8 @@ def command_job_artifacts(
 ):
     """List artifacts for a job."""
     check_configs(output_format=cli_state.output_format)
-    list_artifacts(job_id, output_format=cli_state.output_format)
+    current_experiment = require_current_experiment()
+    list_artifacts(job_id, current_experiment, output_format=cli_state.output_format)
 
 
 @app.command("download")
@@ -502,14 +505,15 @@ def command_job_download(
 ):
     """Download artifacts for a job. Use --file to download specific files."""
     check_configs(output_format=cli_state.output_format)
+    current_experiment = require_current_experiment()
     out = os.path.abspath(output_dir) if output_dir else os.getcwd()
     output_format = cli_state.output_format
 
     if not file:
-        download_artifacts(job_id, output_dir)
+        download_artifacts(job_id, current_experiment, output_dir)
         return
 
-    raw_resp = api.get(f"/jobs/{job_id}/artifacts")
+    raw_resp = api.get(f"/experiment/{current_experiment}/jobs/{job_id}/artifacts")
     if raw_resp.status_code != 200:
         if output_format == "json":
             print(json.dumps({"error": f"Failed to fetch artifacts. Status code: {raw_resp.status_code}"}))
@@ -532,7 +536,7 @@ def command_job_download(
     for filename in matched:
         if output_format != "json":
             console.print(f"Downloading [cyan]{filename}[/cyan]...")
-        path = download_single_artifact(job_id, filename, out)
+        path = download_single_artifact(job_id, current_experiment, filename, out)
         if path:
             downloaded.append({"filename": filename, "path": path})
         elif output_format != "json":
@@ -544,17 +548,18 @@ def command_job_download(
         console.print(f"[green]✓[/green] Downloaded {len(downloaded)}/{len(matched)} file(s) to {out}")
 
 
-def download_single_artifact(job_id: str, filename: str, output_dir: str) -> str | None:
+def download_single_artifact(job_id: str, experiment_id: str, filename: str, output_dir: str) -> str | None:
     """Download a single artifact by filename. Returns local path or None on failure."""
     output_path = os.path.join(output_dir, filename)
+    base_url = f"/experiment/{experiment_id}/jobs/{job_id}"
     try:
-        response = api.get(f"/jobs/{job_id}/artifact/{filename}?task=download", timeout=300.0)
+        response = api.get(f"{base_url}/artifact/{filename}?task=download", timeout=300.0)
         if response.status_code == 200:
             with open(output_path, "wb") as f:
                 f.write(response.content)
             return output_path
         if response.status_code in (404, 405):
-            zip_response = api.get(f"/jobs/{job_id}/artifacts/download_all", timeout=300.0)
+            zip_response = api.get(f"{base_url}/artifacts/download_all", timeout=300.0)
             if zip_response.status_code == 200:
                 with zipfile.ZipFile(io.BytesIO(zip_response.content)) as zf:
                     names = zf.namelist()

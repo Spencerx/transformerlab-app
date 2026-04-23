@@ -50,3 +50,35 @@ def test_logout_success(_mock_delete):
     """Test successful logout."""
     result = runner.invoke(app, ["logout"])
     assert result.exit_code == 0
+
+
+@patch("transformerlab_cli.commands.logout.delete_api_key", return_value=True)
+def test_logout_clears_user_and_team_keys_but_not_server(_mock_delete):
+    """Regression: logout must only clear session-scoped keys, keep server.
+
+    And, via the autouse isolation fixture, must never touch the real
+    ~/.lab/config.json on the developer's machine.
+    """
+    import json
+
+    from transformerlab_cli.util.shared import CONFIG_FILE
+
+    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+        f.write(
+            json.dumps(
+                {
+                    "server": "http://localhost:8338",
+                    "team_id": "abc-123",
+                    "team_name": "Team Name",
+                    "user_email": "user@example.com",
+                    "current_experiment": "alpha",
+                }
+            )
+        )
+
+    result = runner.invoke(app, ["logout"])
+    assert result.exit_code == 0
+
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        data = json.loads(f.read())
+    assert data == {"server": "http://localhost:8338"}, data

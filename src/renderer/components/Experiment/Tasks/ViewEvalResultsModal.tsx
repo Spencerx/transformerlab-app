@@ -44,15 +44,13 @@ function formatScore(score: unknown): number | string {
   return String(score);
 }
 
-const ViewEvalResultsModal = ({
-  open,
-  onClose,
+export function EvalResultsBody({
   jobId,
+  enabled,
 }: {
-  open: boolean;
-  onClose: () => void;
-  jobId: number | string | null;
-}) => {
+  jobId: string;
+  enabled: boolean;
+}) {
   const { experimentInfo } = useExperimentInfo();
   const [selectedFileIndex, setSelectedFileIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'table' | 'chart'>('table');
@@ -66,8 +64,8 @@ const ViewEvalResultsModal = ({
     isError: jobError,
     isLoading: isLoadingJob,
   } = useSWR(
-    open && jobId && experimentInfo?.id
-      ? chatAPI.Endpoints.Jobs.Get(experimentInfo.id, String(jobId))
+    enabled && experimentInfo?.id
+      ? chatAPI.Endpoints.Jobs.Get(experimentInfo.id, jobId)
       : null,
     fetcher,
   );
@@ -81,11 +79,11 @@ const ViewEvalResultsModal = ({
 
   // Reset selected file index and view mode when modal opens or files change
   useEffect(() => {
-    if (open && evalResultsFiles.length > 0) {
+    if (enabled && evalResultsFiles.length > 0) {
       setSelectedFileIndex(0);
       setViewMode('table');
     }
-  }, [open, evalResultsFiles.length]);
+  }, [enabled, evalResultsFiles.length]);
 
   // Fetch the selected eval results file
   const {
@@ -93,15 +91,14 @@ const ViewEvalResultsModal = ({
     isError: reportError,
     isLoading: isLoadingReport,
   } = useSWR(
-    open &&
-      jobId &&
+    enabled &&
       experimentInfo?.id &&
       evalResultsFiles.length > 0 &&
       selectedFileIndex >= 0 &&
       selectedFileIndex < evalResultsFiles.length
       ? chatAPI.Endpoints.Experiment.GetEvalResults(
           experimentInfo.id,
-          String(jobId),
+          jobId,
           'view',
           selectedFileIndex,
         )
@@ -140,13 +137,13 @@ const ViewEvalResultsModal = ({
   }
 
   const handleDownload = async () => {
-    if (!experimentInfo?.id || !jobId) return;
+    if (!experimentInfo?.id) return;
 
     try {
       const response = await chatAPI.authenticatedFetch(
         chatAPI.Endpoints.Experiment.GetEvalResults(
           experimentInfo.id,
-          String(jobId),
+          jobId,
           'download',
           selectedFileIndex,
         ),
@@ -175,12 +172,15 @@ const ViewEvalResultsModal = ({
     return filename;
   };
 
-  const effectiveValueCols =
-    chartValueCols.length > 0
-      ? chartValueCols
-      : scoreColumnIndex >= 0
-        ? [scoreColumnIndex]
-        : [];
+  const effectiveValueCols = useMemo(() => {
+    if (chartValueCols.length > 0) {
+      return chartValueCols;
+    }
+    if (scoreColumnIndex >= 0) {
+      return [scoreColumnIndex];
+    }
+    return [];
+  }, [chartValueCols, scoreColumnIndex]);
 
   const chartMetrics: ChartMetric[] = useMemo(() => {
     const { header, body } = report;
@@ -394,66 +394,86 @@ const ViewEvalResultsModal = ({
   };
 
   return (
+    <>
+      <Stack spacing={2} sx={{ mb: 2 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <Typography level="h4">
+            Evaluation Results from Job: {jobId}
+          </Typography>
+          <Button onClick={handleDownload} variant="outlined">
+            Download Report
+          </Button>
+        </Box>
+        {evalResultsFiles.length > 1 && (
+          <FormControl>
+            <FormLabel>Select Evaluation Results File</FormLabel>
+            <Select
+              value={selectedFileIndex}
+              onChange={(_, value) => {
+                if (value !== null) {
+                  setSelectedFileIndex(value as number);
+                }
+              }}
+            >
+              {evalResultsFiles.map((filePath: string, index: number) => (
+                <Option key={getFileName(filePath, index)} value={index}>
+                  {getFileName(filePath, index)}
+                </Option>
+              ))}
+            </Select>
+          </FormControl>
+        )}
+        <Box sx={{ display: 'flex', gap: 0 }}>
+          <Button
+            variant={viewMode === 'table' ? 'soft' : 'outlined'}
+            onClick={() => setViewMode('table')}
+            sx={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+          >
+            <TableIcon size={18} style={{ marginRight: 6 }} />
+            Table
+          </Button>
+          <Button
+            variant={viewMode === 'chart' ? 'soft' : 'outlined'}
+            onClick={() => setViewMode('chart')}
+            sx={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
+          >
+            <BarChart3 size={18} style={{ marginRight: 6 }} />
+            Chart
+          </Button>
+        </Box>
+      </Stack>
+      {renderBody()}
+    </>
+  );
+}
+
+function ViewEvalResultsModal({
+  open,
+  onClose,
+  jobId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  jobId: number | string | null;
+}) {
+  if (!jobId) {
+    return null;
+  }
+
+  return (
     <Modal open={open} onClose={onClose}>
       <ModalDialog sx={{ width: '90vw', height: '90vh', pt: 5 }}>
         <ModalClose />
-        <Stack spacing={2} sx={{ mb: 2 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <Typography level="h4">
-              Evaluation Results from Job: {jobId}
-            </Typography>
-            <Button onClick={handleDownload} variant="outlined">
-              Download Report
-            </Button>
-          </Box>
-          {evalResultsFiles.length > 1 && (
-            <FormControl>
-              <FormLabel>Select Evaluation Results File</FormLabel>
-              <Select
-                value={selectedFileIndex}
-                onChange={(_, value) => {
-                  if (value !== null) {
-                    setSelectedFileIndex(value as number);
-                  }
-                }}
-              >
-                {evalResultsFiles.map((filePath: string, index: number) => (
-                  <Option key={getFileName(filePath, index)} value={index}>
-                    {getFileName(filePath, index)}
-                  </Option>
-                ))}
-              </Select>
-            </FormControl>
-          )}
-          <Box sx={{ display: 'flex', gap: 0 }}>
-            <Button
-              variant={viewMode === 'table' ? 'soft' : 'outlined'}
-              onClick={() => setViewMode('table')}
-              sx={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-            >
-              <TableIcon size={18} style={{ marginRight: 6 }} />
-              Table
-            </Button>
-            <Button
-              variant={viewMode === 'chart' ? 'soft' : 'outlined'}
-              onClick={() => setViewMode('chart')}
-              sx={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}
-            >
-              <BarChart3 size={18} style={{ marginRight: 6 }} />
-              Chart
-            </Button>
-          </Box>
-        </Stack>
-        {renderBody()}
+        <EvalResultsBody jobId={String(jobId)} enabled={open} />
       </ModalDialog>
     </Modal>
   );
-};
+}
 
 export default ViewEvalResultsModal;

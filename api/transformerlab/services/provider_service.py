@@ -10,6 +10,7 @@ from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from transformerlab.db.session import async_session
 from transformerlab.compute_providers.base import ComputeProvider
 from transformerlab.compute_providers.config import ComputeProviderConfig, create_compute_provider
 from transformerlab.compute_providers.local import _check_amd_gpu, _check_nvidia_gpu
@@ -430,9 +431,18 @@ async def initialize_team_local_provider(
             # via conda, so detection here gives the correct result on machines where CUDA
             # was not yet installed when the provider was first created.
             post_setup_accelerators = await asyncio.to_thread(detect_local_supported_accelerators)
-            post_setup_config = dict(provider.config or {})
-            post_setup_config["supported_accelerators"] = post_setup_accelerators
-            await update_team_provider(session, provider, config=post_setup_config)
+            async with async_session() as background_session:
+                fresh_provider = await get_provider_by_id(background_session, provider.id)
+                if fresh_provider is None:
+                    logger.warning(
+                        "Skipping post-setup local provider update because provider no longer exists: %s",
+                        provider.id,
+                    )
+                    return
+
+                post_setup_config = dict(fresh_provider.config or {})
+                post_setup_config["supported_accelerators"] = post_setup_accelerators
+                await update_team_provider(background_session, fresh_provider, config=post_setup_config)
         except Exception:
             # Best-effort bootstrap: do not fail startup if setup fails.
             logger.warning("Background local provider setup failed", exc_info=True)

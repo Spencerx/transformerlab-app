@@ -210,6 +210,8 @@ async def update_provider_for_team(
         # Defensive guard: never persist masked placeholders sent by a client.
         if new_config.get("api_token") == "***":
             new_config.pop("api_token", None)
+        if new_config.get("api_key") == "***":
+            new_config.pop("api_key", None)
         update_config = {**existing_config, **new_config}
 
     update_disabled = provider_data.disabled if provider_data.disabled is not None else None
