@@ -61,7 +61,6 @@ const DEFAULT_CONFIGS = {
 }`,
   dstack: `{
   "server_url": "<Your dstack server URL e.g. http://0.0.0.0:3000>",
-  "api_token": "<Your dstack API token>",
   "dstack_project": "<Your dstack project name e.g. main>"
 }`,
   local: `{}`,
