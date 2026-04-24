@@ -13,6 +13,6 @@ setup: |
     $SUDO apt-get update && $SUDO apt-get install -y code
   fi
 run: |
-  python ~/interactive-vscode/run.py
+  python interactive-vscode/run.py
 envs:
   PYTHONUNBUFFERED: "1"

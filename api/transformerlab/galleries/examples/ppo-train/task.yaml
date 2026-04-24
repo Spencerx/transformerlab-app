@@ -4,7 +4,7 @@ github_repo_dir: ppo-train
 resources:
   accelerators: "RTX3090:1"
 setup: "uv pip install trl==0.26.2 peft trackio kernels accelerate transformers==4.57.3 datasets torch"
-run: "python ~/ppo-train/train.py"
+run: "python ppo-train/train.py"
 envs:
   PYTHONUNBUFFERED: "1"
   HF_TOKEN: "{{secret._HF_TOKEN}}"

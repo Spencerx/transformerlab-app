@@ -179,6 +179,7 @@ Endpoints.Dataset = {
 
 Endpoints.Models = {
   LocalList: () => `${API_URL()}model/list`,
+  RegistryVersionList: () => `${API_URL()}model/registry_versions`,
   ModelGroups: () => `${API_URL()}model/model_groups_list`,
   GetPeftsForModel: () => `${API_URL()}model/pefts`,
   DeletePeft: (modelId: string, peft: string) =>
