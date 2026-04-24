@@ -187,6 +187,17 @@ def _fetch_all_jobs(experiment_id: str) -> list[dict]:
         return []
 
 
+def _format_score(score: dict) -> str:
+    """Format a score dict into a compact string for the table view."""
+    if not score or not isinstance(score, dict):
+        return ""
+    parts = [f"{k}={v}" for k, v in score.items() if v is not None]
+    text = ", ".join(parts)
+    if len(text) > 30:
+        text = text[:27] + "…"
+    return text
+
+
 def _render_jobs(jobs) -> Table:
     """Make a new table."""
     # Create a table to display job details
@@ -197,6 +208,7 @@ def _render_jobs(jobs) -> Table:
     table.add_column("Status", style="yellow")
     table.add_column("Progress", justify="right", style="blue")
     table.add_column("Completion Status", style="red")
+    table.add_column("Score", style="dim", max_width=32)
 
     for job in jobs:
         job_data = job.get("job_data", {})
@@ -207,6 +219,7 @@ def _render_jobs(jobs) -> Table:
             job.get("status", "N/A"),
             f"{job.get('progress', 0)}%",
             job_data.get("completion_status", "N/A"),
+            _format_score(job_data.get("score", {})),
         )
 
     return table
@@ -300,7 +313,7 @@ def _render_job(job) -> None:
     console.print(panel)
 
 
-def list_jobs(experiment_id: str, running_only: bool = False):
+def list_jobs(experiment_id: str, running_only: bool = False, sort_by: str | None = None):
     """List all jobs for a specific experiment."""
     output_format = cli_state.output_format
     jobs = []
@@ -312,6 +325,20 @@ def list_jobs(experiment_id: str, running_only: bool = False):
 
     if running_only:
         jobs = [j for j in jobs if j.get("status") in ACTIVE_JOB_STATUSES]
+
+    if sort_by:
+        # Sort by a score key (e.g. "eval/loss"). Jobs without the key go to the end.
+        def _sort_key(job):
+            score = job.get("job_data", {}).get("score", {})
+            val = score.get(sort_by) if isinstance(score, dict) else None
+            if val is None:
+                return (1, 0.0)  # push to end
+            try:
+                return (0, float(val))
+            except (ValueError, TypeError):
+                return (1, 0.0)
+
+        jobs = sorted(jobs, key=_sort_key)
 
     if output_format == "json":
         print(json.dumps(jobs))
@@ -737,10 +764,13 @@ def command_job_list(
     running: bool = typer.Option(
         False, "--running", help="Show only active jobs (WAITING, LAUNCHING, RUNNING, INTERACTIVE)"
     ),
+    sort_by: str = typer.Option(
+        None, "--sort-by", help="Sort jobs by a score metric key (e.g. 'eval/loss'). Ascending order."
+    ),
 ):
     """List all jobs."""
     current_experiment = require_current_experiment()
-    list_jobs(current_experiment, running_only=running)
+    list_jobs(current_experiment, running_only=running, sort_by=sort_by)
 
 
 @app.command("info")
