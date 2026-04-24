@@ -56,9 +56,9 @@ class TaskService:
         tasks = await self.task_service.list_all()
         return [_normalize_legacy_command(t) or t for t in tasks]
 
-    async def task_get_by_id(self, task_id: str) -> Optional[Dict[str, Any]]:
+    async def task_get_by_id(self, task_id: str, experiment_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """Get a specific task by ID"""
-        task = await self.task_service.get_by_id(task_id)
+        task = await self.task_service.get_by_id(task_id, experiment_id=experiment_id)
         return _normalize_legacy_command(task)
 
     async def task_get_by_type(self, task_type: str) -> List[Dict[str, Any]]:
@@ -89,23 +89,30 @@ class TaskService:
         task_id = str(uuid.uuid4())
 
         try:
-            task = await self.task_service.create(task_id)
+            experiment_id = task_data.get("experiment_id")
+            task = await self.task_service.create(task_id, experiment_id=experiment_id)
             # Store all fields directly (not nested)
             await task.set_metadata(**task_data)
             return task_id
         except FileExistsError:
             # If task already exists, generate a new ID
             task_id = str(uuid.uuid4())
-            task = await self.task_service.create(task_id)
+            experiment_id = task_data.get("experiment_id")
+            task = await self.task_service.create(task_id, experiment_id=experiment_id)
             await task.set_metadata(**task_data)
             return task_id
 
-    async def update_task(self, task_id: str, new_task_data: Dict[str, Any]) -> bool:
+    async def update_task(
+        self,
+        task_id: str,
+        new_task_data: Dict[str, Any],
+        experiment_id: Optional[str] = None,
+    ) -> bool:
         """Update an existing task. Preserves existing file_mounts when the update
         would clear them (e.g. edit form or YAML save that omits file_mounts).
         """
         try:
-            task = await self.task_service.get(str(task_id))
+            task = await self.task_service.get(str(task_id), experiment_id=experiment_id)
             existing = await task.get_metadata()
 
             # Update only the fields that are provided
@@ -126,16 +133,45 @@ class TaskService:
                 await task.set_metadata(**update_data)
             return True
         except FileNotFoundError:
+            if experiment_id is not None:
+                try:
+                    task = await self.task_service.get(str(task_id))
+                    existing = await task.get_metadata()
+                    update_data = {}
+                    for key, value in new_task_data.items():
+                        if value is None:
+                            continue
+                        if key == "file_mounts":
+                            would_clear = (
+                                value is None or value is False or (isinstance(value, dict) and len(value) == 0)
+                            )
+                            if would_clear:
+                                existing_mounts = existing.get("file_mounts")
+                                if existing_mounts is True or (
+                                    isinstance(existing_mounts, dict) and len(existing_mounts) > 0
+                                ):
+                                    continue
+                        update_data[key] = value
+                    if update_data:
+                        await task.set_metadata(**update_data)
+                    return True
+                except FileNotFoundError:
+                    return False
             return False
 
-    async def update_task_from_yaml(self, task_id: str, task_data: Dict[str, Any]) -> bool:
+    async def update_task_from_yaml(
+        self,
+        task_id: str,
+        task_data: Dict[str, Any],
+        experiment_id: Optional[str] = None,
+    ) -> bool:
         """Update task metadata from parsed task.yaml so it matches the YAML exactly.
         Keeps only protected (system) keys from existing metadata, then applies
         task_data; any other key not in task_data is removed (so removing a
         field in the editor actually removes it).
         """
         try:
-            task = await self.task_service.get(str(task_id))
+            task = await self.task_service.get(str(task_id), experiment_id=experiment_id)
             data = await task.get_json_data()
 
             # Start from existing protected keys only; then apply parsed YAML
@@ -152,34 +188,66 @@ class TaskService:
             await task._set_json_data(out)
             return True
         except FileNotFoundError:
+            if experiment_id is not None:
+                try:
+                    task = await self.task_service.get(str(task_id))
+                    data = await task.get_json_data()
+                    out = {k: data[k] for k in _PROTECTED_METADATA_KEYS if k in data}
+                    out.update(task_data)
+                    if "file_mounts" not in task_data:
+                        existing_mounts = data.get("file_mounts")
+                        if existing_mounts is True or (isinstance(existing_mounts, dict) and len(existing_mounts) > 0):
+                            out["file_mounts"] = existing_mounts
+                    out["updated_at"] = datetime.utcnow().isoformat()
+                    await task._set_json_data(out)
+                    return True
+                except FileNotFoundError:
+                    return False
             return False
 
-    async def delete_task(self, task_id: str) -> bool:
+    async def delete_task(self, task_id: str, experiment_id: Optional[str] = None) -> bool:
         """Delete a task"""
         try:
-            task = await self.task_service.get(str(task_id))
+            task = await self.task_service.get(str(task_id), experiment_id=experiment_id)
             await task.delete()
             return True
         except FileNotFoundError:
+            if experiment_id is not None:
+                try:
+                    task = await self.task_service.get(str(task_id))
+                    await task.delete()
+                    return True
+                except FileNotFoundError:
+                    return False
             return False
 
     async def task_delete_all(self) -> None:
         """Delete all tasks"""
         await self.task_service.delete_all()
 
-    async def get_task_dir(self, task_id: str) -> str:
-        task = await self.task_service.get(str(task_id))
-        return await task.get_dir()
+    async def get_task_dir(self, task_id: str, experiment_id: Optional[str] = None) -> str:
+        try:
+            task = await self.task_service.get(str(task_id), experiment_id=experiment_id)
+            return await task.get_dir()
+        except FileNotFoundError:
+            if experiment_id is not None:
+                task = await self.task_service.get(str(task_id))
+                return await task.get_dir()
+            task = await self.task_service.get_by_id(str(task_id))
+            if task and task.get("experiment_id"):
+                scoped_task = await self.task_service.get(str(task_id), experiment_id=task.get("experiment_id"))
+                return await scoped_task.get_dir()
+            raise
 
-    async def write_task_yaml(self, task_id: str, content: str) -> None:
-        task_dir = await self.get_task_dir(task_id)
+    async def write_task_yaml(self, task_id: str, content: str, experiment_id: Optional[str] = None) -> None:
+        task_dir = await self.get_task_dir(task_id, experiment_id=experiment_id)
         await storage.makedirs(task_dir, exist_ok=True)
         yaml_path = storage.join(task_dir, "task.yaml")
         async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
             await f.write(content)
 
-    async def read_task_yaml(self, task_id: str) -> str:
-        task_dir = await self.get_task_dir(task_id)
+    async def read_task_yaml(self, task_id: str, experiment_id: Optional[str] = None) -> str:
+        task_dir = await self.get_task_dir(task_id, experiment_id=experiment_id)
         yaml_path = storage.join(task_dir, "task.yaml")
         if not await storage.exists(yaml_path):
             raise HTTPException(status_code=404, detail="task.yaml not found for this task")
@@ -201,7 +269,7 @@ class TaskService:
         }
         await resolve_provider(task_data, user_and_team, session)
         task_id = await self.add_task(task_data)
-        await self.write_task_yaml(task_id, DEFAULT_TASK_YAML)
+        await self.write_task_yaml(task_id, DEFAULT_TASK_YAML, experiment_id=experiment_id)
         return task_id
 
     async def create_task_from_github(
@@ -241,7 +309,7 @@ class TaskService:
         if "name" in task_data:
             task_data["name"] = secure_filename(task_data["name"])
         task_id = await self.add_task(task_data)
-        await self.write_task_yaml(task_id, task_yaml_content)
+        await self.write_task_yaml(task_id, task_yaml_content, experiment_id=experiment_id)
         return task_id
 
     async def create_task_from_directory_zip(
@@ -281,7 +349,7 @@ class TaskService:
             if "name" in task_data:
                 task_data["name"] = secure_filename(task_data["name"])
             task_id = await self.add_task(task_data)
-            task_dir = await self.get_task_dir(task_id)
+            task_dir = await self.get_task_dir(task_id, experiment_id=experiment_id)
             await storage.makedirs(task_dir, exist_ok=True)
             await storage.copy_dir(task_root, task_dir)
             await self.update_task(task_id, {"file_mounts": True})
