@@ -138,6 +138,65 @@ def test_job_list_json_no_spinner_text(_mock_check, _mock_get_config, _mock_api)
 
 
 # ---------------------------------------------------------------------------
+# Info command tests
+# ---------------------------------------------------------------------------
+
+
+def _info_api_get(jobs, files):
+    """Build a fake api.get that routes /jobs/list → jobs and /files → {'files': files}."""
+
+    def _get(path, *args, **kwargs):
+        if path.endswith("/files"):
+            return _mock_api_response({"files": files})
+        return _mock_api_response(jobs)
+
+    return _get
+
+
+@patch(
+    "transformerlab_cli.commands.job.api.get",
+    side_effect=_info_api_get(SAMPLE_JOBS, [{"name": "out.log", "is_dir": False, "size": 42}]),
+)
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_job_info_json_output(_mock_require, _mock_api):
+    """job info --format json emits the job dict with a files key."""
+    result = runner.invoke(app, ["--format", "json", "job", "info", "1"])
+    assert result.exit_code == 0
+    data = json.loads(result.output.strip())
+    assert data["id"] == 1
+    assert data["status"] == "RUNNING"
+    assert data["files"] == [{"name": "out.log", "is_dir": False, "size": 42}]
+
+
+@patch(
+    "transformerlab_cli.commands.job.api.get",
+    side_effect=_info_api_get(SAMPLE_JOBS, []),
+)
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_job_info_json_not_found(_mock_require, _mock_api):
+    """job info --format json emits an error object when the job is missing."""
+    result = runner.invoke(app, ["--format", "json", "job", "info", "999"])
+    assert result.exit_code == 0
+    data = json.loads(result.output.strip())
+    assert "error" in data
+    assert "999" in data["error"]
+
+
+@patch(
+    "transformerlab_cli.commands.job.api.get",
+    side_effect=_info_api_get(SAMPLE_JOBS, []),
+)
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_job_info_pretty_still_works(_mock_require, _mock_api):
+    """Pretty `job info` still renders the panel and does not regress."""
+    result = runner.invoke(app, ["job", "info", "1"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.output)
+    assert "Job Details for ID 1" in out
+    assert "RUNNING" in out
+
+
+# ---------------------------------------------------------------------------
 # Log command tests
 # ---------------------------------------------------------------------------
 

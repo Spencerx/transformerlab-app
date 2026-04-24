@@ -322,38 +322,50 @@ def list_jobs(experiment_id: str, running_only: bool = False):
 
 def info_job(job_id: str, experiment_id: str):
     """Get details of a specific job."""
-    jobs = []
-    with console.status("[bold success]Fetching jobs[/bold success]", spinner="dots"):
+    output_format = cli_state.output_format
+    if output_format == "json":
         jobs = _fetch_all_jobs(experiment_id)
+    else:
+        with console.status("[bold success]Fetching jobs[/bold success]", spinner="dots"):
+            jobs = _fetch_all_jobs(experiment_id)
 
     # filter the job with the given job_id
     job = next((job for job in jobs if str(job.get("id")) == job_id), None)
-    if job:
-        console.print(f"[bold success]Job Details for ID {job_id}:[/bold success]")
-        _render_job(job)
-
-        # Fetch and display job files
-        with console.status("[bold success]Fetching job files[/bold success]", spinner="dots"):
-            files = _fetch_job_files(experiment_id, job_id)
-        if files:
-            file_table = Table(title="Files", show_header=True, header_style="bold")
-            file_table.add_column("Name")
-            file_table.add_column("Type", width=6)
-            file_table.add_column("Size", justify="right")
-            for f in files:
-                name = f.get("name", "")
-                is_dir = f.get("is_dir", False)
-                size = f.get("size", 0)
-                file_table.add_row(
-                    name,
-                    "dir" if is_dir else "file",
-                    "" if is_dir else _format_size(size),
-                )
-            console.print(file_table)
-        else:
-            console.print("[dim]No files found in job directory.[/dim]")
-    else:
+    if not job:
+        if output_format == "json":
+            print(json.dumps({"error": f"Job with ID {job_id} not found."}))
+            return
         console.print(f"[error]Error:[/error] Job with ID {job_id} not found.")
+        return
+
+    if output_format == "json":
+        files = _fetch_job_files(experiment_id, job_id)
+        print(json.dumps({**job, "files": files}))
+        return
+
+    console.print(f"[bold success]Job Details for ID {job_id}:[/bold success]")
+    _render_job(job)
+
+    # Fetch and display job files
+    with console.status("[bold success]Fetching job files[/bold success]", spinner="dots"):
+        files = _fetch_job_files(experiment_id, job_id)
+    if files:
+        file_table = Table(title="Files", show_header=True, header_style="bold")
+        file_table.add_column("Name")
+        file_table.add_column("Type", width=6)
+        file_table.add_column("Size", justify="right")
+        for f in files:
+            name = f.get("name", "")
+            is_dir = f.get("is_dir", False)
+            size = f.get("size", 0)
+            file_table.add_row(
+                name,
+                "dir" if is_dir else "file",
+                "" if is_dir else _format_size(size),
+            )
+        console.print(file_table)
+    else:
+        console.print("[dim]No files found in job directory.[/dim]")
 
 
 def list_artifacts(job_id: str, experiment_id: str, output_format: str = "pretty") -> list[dict]:
