@@ -16,14 +16,26 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
+DEFAULT_ADMIN_EMAIL_ENV = "TRANSFORMERLAB_DEFAULT_ADMIN_EMAIL"
+DEFAULT_ADMIN_EMAIL_FALLBACK = "admin@example.com"
+
+
+def _get_default_admin_email() -> str:
+    configured = os.getenv(DEFAULT_ADMIN_EMAIL_ENV, "").strip()
+    if not configured:
+        return DEFAULT_ADMIN_EMAIL_FALLBACK
+    return configured
 
 
 async def seed_default_admin_user():
-    """Create a default admin user with credentials admin@example.com / admin123 if one doesn't exist."""
+    """Create a default admin user with configurable email and password admin123 if one doesn't exist."""
     try:
+        admin_email = _get_default_admin_email()
+        # Backward compatibility: avoid creating a second admin if env changes after initial seed.
+        candidate_admin_emails = {admin_email, DEFAULT_ADMIN_EMAIL_FALLBACK}
         async with AsyncSessionLocal() as session:
             # Check if admin user already exists
-            stmt = select(User).where(User.email == "admin@example.com")
+            stmt = select(User).where(User.email.in_(candidate_admin_emails))
             result = await session.execute(stmt)
             existing_admin = result.unique().scalar_one_or_none()
 
@@ -75,7 +87,7 @@ async def seed_default_admin_user():
 
             # Create admin user using UserCreate schema
             user_create = UserCreate(
-                email="admin@example.com",
+                email=admin_email,
                 password="admin123",
                 is_active=True,
                 is_superuser=True,
@@ -127,7 +139,7 @@ async def seed_default_admin_user():
             await migrate_workspace_to_org(team_id)
 
             print(
-                f"✅ Created and verified admin user admin@example.com (id={admin_user_id}, is_verified={admin_user.is_verified})"
+                f"✅ Created and verified admin user {admin_email} (id={admin_user_id}, is_verified={admin_user.is_verified})"
             )
     except Exception as e:
         print(f"⚠️  Error in seed_default_admin_user: {e}")

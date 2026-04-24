@@ -198,7 +198,16 @@ def check_configs(output_format: str = "pretty") -> None:
             console.print(
                 "[warning]Warning:[/warning] The following configuration keys are missing: " + ", ".join(missing_keys)
             )
-            console.print("Use the 'lab config' command to set them.")
+            login_keys = {"team_id", "user_email"}
+            missing_login_keys = [key for key in missing_keys if key in login_keys]
+            missing_other_keys = [key for key in missing_keys if key not in login_keys]
+
+            if missing_login_keys:
+                console.print(
+                    "Missing authentication context (" + ", ".join(missing_login_keys) + "). Please run 'lab login'."
+                )
+            if missing_other_keys:
+                console.print("Use the 'lab config set <key> <value>' command to set: " + ", ".join(missing_other_keys))
         raise typer.Exit(1)
 
     set_base_url(config.get("server"))

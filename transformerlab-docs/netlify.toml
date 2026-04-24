@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = "build"
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- transformerlab-docs/"
+
+[[plugins]]
+  package = "./src/netlify/plugins/fetch-install-script"
+
+[build.environment]
+  APP_GITHUB_REPO = "transformerlab/transformerlab-app"
+  NODE_VERSION = "18"
+
+# Optional: Configure build hooks that can receive parameters
+[template.environment]
+  APP_VERSION = "Set automatically by build hook"
+
+
+[[redirects]]
+  from = "https://transformerlab.ai/install.sh"
+  to = "https://transformerlab.ai/install.sh"
+  status = 200
+
+[[redirects]]
+  from = "https://transformerlab.ai/*"
+  to = "https://lab.cloud/:splat"
+  status = 301
+  force = true

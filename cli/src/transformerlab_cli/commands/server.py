@@ -231,16 +231,20 @@ def _prompt_storage(existing: dict[str, str]) -> dict[str, str]:
     return env
 
 
-def _prompt_admin() -> dict[str, str]:
-    """Display admin account info. The API seeds a hardcoded admin on first startup."""
+def _prompt_admin(existing: dict[str, str]) -> dict[str, str]:
+    """Prompt for the default admin email used during first API startup."""
     console.print("\n[bold header]3. Admin Account[/bold header]")
+    default_email = existing.get("TLAB_DEFAULT_ADMIN_EMAIL", "admin@example.com")
+    admin_email = typer.prompt("Default admin email", default=default_email).strip()
+    if not admin_email:
+        admin_email = "admin@example.com"
     console.print(
         "[dim]A default admin account is created automatically on first startup:[/dim]"
-        "\n  Email:    [bold]admin@example.com[/bold]"
+        f"\n  Email:    [bold]{admin_email}[/bold]"
         "\n  Password: [bold]admin123[/bold]"
         "\n[warning]Change the default password immediately after first login![/warning]"
     )
-    return {}
+    return {"TLAB_DEFAULT_ADMIN_EMAIL": admin_email}
 
 
 def _prompt_compute(existing: dict[str, str]) -> dict[str, str]:
@@ -508,6 +512,7 @@ _ENV_SECTIONS: list[tuple[str, list[str]]] = [
     (
         "Authentication",
         [
+            "TLAB_DEFAULT_ADMIN_EMAIL",
             "EMAIL_AUTH_ENABLED",
             "GOOGLE_OAUTH_ENABLED",
             "GOOGLE_OAUTH_CLIENT_ID",
@@ -592,11 +597,12 @@ def _write_env_file(path: str, env_vars: dict[str, str]) -> None:
 def _print_next_steps(env_vars: dict[str, str]) -> None:
     """Print post-install guidance."""
     frontend_url = env_vars.get("FRONTEND_URL", "http://localhost:8338")
+    admin_email = env_vars.get("TLAB_DEFAULT_ADMIN_EMAIL", "admin@example.com")
     console.print("\n[bold header]Next Steps[/bold header]")
     console.print("  1. Start the server:")
     console.print("     [bold]cd ~/.transformerlab/src && ./run.sh[/bold]")
     console.print(f"  2. Open {frontend_url} in your browser")
-    console.print("  3. Log in with [bold]admin@example.com[/bold] / [bold]admin123[/bold]")
+    console.print(f"  3. Log in with [bold]{admin_email}[/bold] / [bold]admin123[/bold]")
     console.print("     [warning]Change the default password immediately![/warning]")
 
 
@@ -748,7 +754,7 @@ def _install_interactive(dry_run: bool) -> None:
         provider=env_vars.get("TFL_STORAGE_PROVIDER", "unknown"),
     )
 
-    env_vars.update(_prompt_admin())
+    env_vars.update(_prompt_admin(existing))
 
     env_vars.update(_prompt_compute(existing))
     if env_vars.get("DEFAULT_COMPUTE_PROVIDER"):

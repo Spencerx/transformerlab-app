@@ -98,7 +98,7 @@ def generate_github_clone_setup(
 
         setup_script = (
             f"TEMP_CLONE_DIR={clone_dir}; "
-            f"CURRENT_DIR=$HOME; "
+            f"CURRENT_DIR=$PWD; "
             f"mkdir -p $TEMP_CLONE_DIR; "
             f"cd $TEMP_CLONE_DIR; "
             f"git init -q; "
