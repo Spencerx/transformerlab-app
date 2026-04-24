@@ -50,6 +50,13 @@ from fastapi.responses import PlainTextResponse, JSONResponse
 router = APIRouter(prefix="/task", tags=["task"])
 
 
+_TASK_RESERVED_FILENAMES = {"index.json", "task.yaml", "task.yml"}
+
+
+def _is_reserved_task_filename(path: str) -> bool:
+    return os.path.basename(path).lower() in _TASK_RESERVED_FILENAMES
+
+
 def process_env_parameters_to_env_vars(config: dict) -> dict:
     """
     Process env_parameters from config/task.json and convert them to env_vars.
@@ -366,6 +373,8 @@ async def task_update_file(experimentId: str, task_id: str, file_path: str, requ
     safe_rel = posixpath.normpath(file_path).lstrip("/")
     if safe_rel.startswith("..") or "/.." in safe_rel:
         raise HTTPException(status_code=400, detail="Invalid file path")
+    if _is_reserved_task_filename(safe_rel):
+        raise HTTPException(status_code=400, detail=f"{os.path.basename(safe_rel)} cannot be updated via this endpoint")
 
     target = storage.join(task_dir, safe_rel)
     target_parent = os.path.dirname(target)
@@ -445,6 +454,8 @@ async def task_upload_file(
         safe_name = secure_filename(filename)
         if not safe_name:
             raise HTTPException(status_code=400, detail="Invalid filename")
+        if _is_reserved_task_filename(safe_name):
+            raise HTTPException(status_code=400, detail=f"{safe_name} cannot be uploaded")
         target = storage.join(task_dir, safe_name)
         await storage.copy_file(assembled_path, target)
         await delete_upload(upload_id)
@@ -456,6 +467,8 @@ async def task_upload_file(
                 continue
             safe_name = secure_filename(original_name)
             if not safe_name:
+                continue
+            if _is_reserved_task_filename(safe_name):
                 continue
             target = storage.join(task_dir, safe_name)
             content = await uploaded.read()
