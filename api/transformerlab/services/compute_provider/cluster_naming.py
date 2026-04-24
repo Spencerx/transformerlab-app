@@ -5,8 +5,8 @@ from typing import Optional
 
 # Cap cluster names to 41 characters to stay withing the limit of
 # the strictest provider (dstack).
-# This means capping the basename portion to 25 characters to leave room for a
-# ``-job-<short_id>`` suffix (13 chars).
+# This means capping the basename portion to 28 characters (use 25 to be safe)
+# to leave room for a ``-job-<short_id>`` suffix (13 chars).
 _MAX_BASENAME_LENGTH = 25
 
 
