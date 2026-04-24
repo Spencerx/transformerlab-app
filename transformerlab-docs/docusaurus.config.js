@@ -80,7 +80,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/transformerlab/transformerlab-docs/tree/main/',
+            'https://github.com/transformerlab/transformerlab-app/tree/main/transformerlab-docs',
         },
         blog: {
           showReadingTime: true,
@@ -89,7 +89,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/transformerlab/transformerlab-docs/tree/main/',
+            'https://github.com/transformerlab/transformerlab-app/tree/main/transformerlab-docs',
         },
         theme: {
           customCss: [
@@ -130,7 +130,7 @@ const config = {
         routeBasePath: 'for-teams',
         sidebarPath: require.resolve('./sidebars.js'),
         editUrl:
-          'https://github.com/transformerlab/transformerlab-docs/tree/main/',
+          'https://github.com/transformerlab/transformerlab-app/tree/main/transformerlab-docs',
       },
     ],
   ],
