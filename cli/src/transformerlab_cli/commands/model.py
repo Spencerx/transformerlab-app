@@ -188,18 +188,16 @@ def command_model_edit(
 def command_model_create(
     asset_id: str = typer.Argument(..., help="The underlying asset/model ID (e.g. a HuggingFace model ID)"),
     group_name: str = typer.Option(..., "--name", help="Display name for the new model group"),
-    version_label: str = typer.Option("v1", "--version", help="Version label (default: v1)"),
     description: str = typer.Option(None, "--description", help="Optional description"),
     tag: str = typer.Option("latest", "--tag", help="Tag to apply to this version (default: latest)"),
 ):
-    """Create a new model group and register its first version."""
+    """Create a new model group and register its first version (version label is auto-generated)."""
     check_configs(output_format=cli_state.output_format)
 
     payload = {
         "asset_type": "model",
         "group_name": group_name,
         "asset_id": asset_id,
-        "version_label": version_label,
         "tag": tag,
     }
     if description:

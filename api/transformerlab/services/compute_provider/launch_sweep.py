@@ -87,6 +87,7 @@ async def create_sweep_parent_job(
         "sweep_metric": sweep_metric,
         "lower_is_better": lower_is_better,
         "task_name": request.task_name,
+        "description": request.description,
         "subtype": request.subtype,
         "provider_id": provider.id,
         "provider_type": provider.type,
@@ -277,11 +278,17 @@ async def launch_sweep_jobs(
                             if azure_sas:
                                 env_vars["AZURE_STORAGE_SAS_TOKEN"] = azure_sas
 
-                if request.file_mounts is True and request.task_id:
-                    setup_commands.append(COPY_FILE_MOUNTS_SETUP)
-
                 if provider.type == ProviderType.RUNPOD.value:
                     setup_commands.append("curl -LsSf https://astral.sh/uv/install.sh | sh")
+
+                if provider.type != ProviderType.LOCAL.value:
+                    setup_commands.append("pip install -q transformerlab")
+
+                    if request.enable_profiling_torch:
+                        setup_commands.append("pip install -q torch")
+
+                if request.file_mounts is True and request.task_id:
+                    setup_commands.append(COPY_FILE_MOUNTS_SETUP)
 
                 if request.github_repo_url:
                     workspace_dir = await get_workspace_dir()
@@ -320,6 +327,7 @@ async def launch_sweep_jobs(
                     "task_name": f"{request.task_name or 'Task'} (Sweep {i + 1}/{total_configs})"
                     if request.task_name
                     else None,
+                    "description": request.description,
                     "run": run_with_secrets,
                     "cluster_name": formatted_cluster_name,
                     "subtype": request.subtype,

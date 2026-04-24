@@ -11,6 +11,7 @@ from transformerlab.shared import shared
 from transformerlab.routers.experiment import (
     documents,
     jobs,
+    notes,
     task as task_router,
 )
 from transformerlab.routers.auth import get_user_and_team
@@ -37,6 +38,12 @@ router.include_router(
     router=task_router.router,
     prefix="/{experimentId}",
     tags=["task"],
+    dependencies=[Depends(require_permission("experiment", "read", id_param="experimentId"))],
+)
+router.include_router(
+    router=notes.router,
+    prefix="/{experimentId}",
+    tags=["notes"],
     dependencies=[Depends(require_permission("experiment", "read", id_param="experimentId"))],
 )
 
