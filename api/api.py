@@ -50,6 +50,7 @@ from transformerlab.routers import (  # noqa: E402
     asset_versions,
     trackio,
     permissions,
+    upload,
 )
 from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 
@@ -123,8 +124,10 @@ async def lifespan(app: FastAPI):
         # One-time migration: legacy workspace/jobs -> workspace/experiments/<exp_id>/jobs
         # Runs in the background so it doesn't delay the API startup.
         from transformerlab.services.migrate_jobs_to_experiment_dirs import start_jobs_migration_worker
+        from transformerlab.services.migrate_tasks_to_experiment_dirs import start_tasks_migration_worker
 
         await start_jobs_migration_worker()
+        await start_tasks_migration_worker()
 
         # Start background sweep status updater after all startup steps succeed.
         await start_sweep_status_worker()
@@ -147,16 +150,24 @@ async def lifespan(app: FastAPI):
         )
 
         await start_remote_job_queue_worker()
+
+        # Sweep abandoned chunked-upload staging dirs older than 24 h
+        from transformerlab.services.upload_service import sweep_expired_uploads
+
+        swept = await asyncio.to_thread(sweep_expired_uploads)
+        print(f"✅ Upload staging sweep: removed {swept} expired upload(s)")
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
     if is_leader():
         from transformerlab.services.migrate_jobs_to_experiment_dirs import stop_jobs_migration_worker
+        from transformerlab.services.migrate_tasks_to_experiment_dirs import stop_tasks_migration_worker
 
         await stop_sweep_status_worker()
         await stop_remote_job_status_worker()
         await stop_notification_worker()
         await stop_remote_job_queue_worker()
+        await stop_tasks_migration_worker()
         await stop_jobs_migration_worker()
     from transformerlab.services.process_registry import get_registry
 
@@ -315,6 +326,7 @@ app.include_router(ssh_keys.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(asset_versions.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(trackio.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(permissions.router, dependencies=[Depends(get_user_and_team)])
+app.include_router(upload.router, dependencies=[Depends(get_user_and_team)])
 
 
 # @app.get("/")

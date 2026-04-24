@@ -11,6 +11,7 @@ import {
   Typography,
   Box,
   CircularProgress,
+  LinearProgress,
   Select,
   Option,
 } from '@mui/joy';
@@ -20,12 +21,14 @@ import { IoCloudUploadOutline } from 'renderer/components/Icons';
 import * as chatAPI from '../../lib/transformerlab-api-sdk';
 
 import { fetcher, authenticatedFetch } from '../../lib/transformerlab-api-sdk';
+import { chunkedUpload, deleteUpload } from '../../lib/chunkedUpload';
 
 export default function DatasetDetailsModal({ open, setOpen }) {
   const [newDatasetName, setNewDatasetName] = useState('');
   const [datasetType, setDatasetType] = useState('text');
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [dropzoneActive, setDropzoneActive] = useState(false);
 
   const swrKey = open ? chatAPI.Endpoints.Dataset.LocalList(false) : null;
@@ -38,24 +41,62 @@ export default function DatasetDetailsModal({ open, setOpen }) {
     mutate();
   };
 
-  const uploadFiles = async (formData) => {
+  const uploadFiles = async (formData: FormData) => {
     setUploading(true);
-    const response = await authenticatedFetch(
+    setUploadProgress(0);
+    const createResp = await authenticatedFetch(
       chatAPI.Endpoints.Dataset.Create(newDatasetName),
     );
-    const data = await response.json();
-    if (data.status === 'error') {
-      alert(data.message);
-    } else {
-      await authenticatedFetch(
-        chatAPI.Endpoints.Dataset.FileUpload(newDatasetName),
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
+    const createData = await createResp.json();
+    if (createData.status === 'error') {
+      alert(createData.message);
+      setUploading(false);
+      return;
     }
+
+    const fileEntries = Array.from(formData.entries()).filter(
+      ([, v]) => v instanceof File,
+    ) as [string, File][];
+
+    for (let i = 0; i < fileEntries.length; i++) {
+      const [, file] = fileEntries[i];
+      const baseProgress = (i / fileEntries.length) * 100;
+      let upload_id: string | null = null;
+      try {
+        const result = await chunkedUpload({
+          file,
+          filename: file.name,
+          onProgress: (pct) =>
+            setUploadProgress(
+              Math.round(baseProgress + pct / fileEntries.length),
+            ),
+        });
+        upload_id = result.upload_id;
+        const resp = await authenticatedFetch(
+          chatAPI.Endpoints.Dataset.FileUpload(newDatasetName) +
+            `&upload_id=${upload_id}`,
+          { method: 'POST' },
+        );
+        if (!resp.ok) {
+          alert(`Failed to upload ${file.name}`);
+          setUploading(false);
+          return;
+        }
+      } catch (e) {
+        alert(
+          `Upload error for ${file.name}: ${e instanceof Error ? e.message : e}`,
+        );
+        setUploading(false);
+        return;
+      } finally {
+        if (upload_id) {
+          await deleteUpload(upload_id).catch(() => {});
+        }
+      }
+    }
+
     setUploading(false);
+    setUploadProgress(0);
     handleClose();
   };
 
@@ -483,6 +524,7 @@ export default function DatasetDetailsModal({ open, setOpen }) {
                 </Button>
               </>
             )}
+            {uploading && <LinearProgress determinate value={uploadProgress} />}
           </Box>
         </ModalDialog>
       </Modal>

@@ -1,5 +1,7 @@
 """Sub-router for compute provider launch logic, including sweep dispatch."""
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from transformerlab.shared.models.user_model import get_async_session
@@ -22,13 +24,14 @@ router = APIRouter(prefix="/launch", tags=["launch"])
 async def upload_task_file_for_provider(
     provider_id: str,
     task_id: str,
-    file: UploadFile = File(...),
+    upload_id: Optional[str] = None,
+    file: Optional[UploadFile] = File(None),
     user_and_team=Depends(get_user_and_team),
     session: AsyncSession = Depends(get_async_session),
 ):
     """Upload a single file for a provider-backed task."""
     team_id = user_and_team["team_id"]
-    return await upload_task_file_service(session, team_id, provider_id, task_id, file)
+    return await upload_task_file_service(session, team_id, provider_id, task_id, file, upload_id)
 
 
 @router.post("/")
