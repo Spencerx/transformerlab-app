@@ -208,6 +208,16 @@ def test_task_logs_json(_mock_require, _mock_fetch):
     assert "sdk line" in data["logs"]
 
 
+@patch("transformerlab_cli.commands.job.api.get", return_value=_mock_logs_response("sdk line"))
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_task_logs_hits_task_logs_endpoint(_mock_require, mock_get):
+    """`fetch_task_logs` must hit the one-shot /task_logs endpoint, not the SSE /stream_output."""
+    result = runner.invoke(app, ["job", "task-logs", "42"])
+    assert result.exit_code == 0
+    called_url = mock_get.call_args.args[0] if mock_get.call_args.args else mock_get.call_args.kwargs.get("url", "")
+    assert called_url.endswith("/jobs/42/task_logs"), f"expected /task_logs endpoint, got: {called_url}"
+
+
 @patch("transformerlab_cli.commands.job.fetch_task_logs", return_value=_mock_error_response(404))
 @patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
 def test_task_logs_error(_mock_require, _mock_fetch):
