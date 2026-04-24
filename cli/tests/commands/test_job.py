@@ -13,14 +13,23 @@ SAMPLE_JOBS = [
         "experiment_id": "exp1",
         "status": "RUNNING",
         "progress": 50,
-        "job_data": {"task_name": "train", "completion_status": "N/A"},
+        "job_data": {
+            "task_name": "train",
+            "completion_status": "N/A",
+            "start_time": "2026-04-24 10:00:00",
+        },
     },
     {
         "id": 2,
         "experiment_id": "exp1",
         "status": "COMPLETE",
         "progress": 100,
-        "job_data": {"task_name": "eval", "completion_status": "SUCCESS"},
+        "job_data": {
+            "task_name": "eval",
+            "completion_status": "SUCCESS",
+            "start_time": "2026-04-24 10:00:00",
+            "end_time": "2026-04-24 10:05:30",
+        },
     },
     {
         "id": 3,
@@ -34,7 +43,12 @@ SAMPLE_JOBS = [
         "experiment_id": "exp1",
         "status": "FAILED",
         "progress": 0,
-        "job_data": {"task_name": "export", "completion_status": "FAILED"},
+        "job_data": {
+            "task_name": "export",
+            "completion_status": "FAILED",
+            "start_time": "2026-04-24 08:00:00",
+            "end_time": "2026-04-24 09:30:00",
+        },
     },
     {
         "id": 5,
@@ -135,6 +149,35 @@ def test_job_list_json_no_spinner_text(_mock_check, _mock_get_config, _mock_api)
     result = runner.invoke(app, ["--format", "json", "job", "list"])
     assert result.exit_code == 0
     json.loads(result.output.strip())
+
+
+@patch("transformerlab_cli.commands.job.api.get", return_value=_mock_api_response(SAMPLE_JOBS))
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+@patch("transformerlab_cli.commands.job.check_configs")
+def test_job_list_shows_duration(_mock_check, _mock_require, _mock_api):
+    """Test that job list table shows duration for jobs with start/end times."""
+    result = runner.invoke(app, ["job", "list"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.output)
+    assert "Duration" in out
+    # Job 2: 5m 30s
+    assert "5m 30s" in out
+    # Job 4: 1h 30m
+    assert "1h 30m" in out
+
+
+def test_compute_duration_helper():
+    """Test the _compute_duration helper with various inputs."""
+    from transformerlab_cli.commands.job import _compute_duration
+
+    # Completed job
+    assert _compute_duration({"start_time": "2026-01-01 10:00:00", "end_time": "2026-01-01 10:00:45"}) == "45s"
+    assert _compute_duration({"start_time": "2026-01-01 10:00:00", "end_time": "2026-01-01 10:05:30"}) == "5m 30s"
+    assert _compute_duration({"start_time": "2026-01-01 10:00:00", "end_time": "2026-01-01 12:15:00"}) == "2h 15m"
+    # No start_time
+    assert _compute_duration({}) == ""
+    # Bad format
+    assert _compute_duration({"start_time": "invalid"}) == ""
 
 
 # ---------------------------------------------------------------------------
