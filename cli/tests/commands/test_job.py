@@ -283,12 +283,8 @@ def test_job_publish_dataset_success(_mock_require, mock_post):
             "existing",
             "--group",
             "base-dataset",
-            "--asset-name",
-            "my-dataset-v2",
             "--tag",
             "production",
-            "--version-label",
-            "v2",
             "--description",
             "new run",
         ],
@@ -299,9 +295,7 @@ def test_job_publish_dataset_success(_mock_require, mock_post):
     assert "/experiment/exp1/jobs/42/datasets/my%20dataset/save_to_registry?" in called_endpoint
     assert "mode=existing" in called_endpoint
     assert "target_name=base-dataset" in called_endpoint
-    assert "asset_name=my-dataset-v2" in called_endpoint
     assert "tag=production" in called_endpoint
-    assert "version_label=v2" in called_endpoint
     assert "description=new+run" in called_endpoint
 
 
@@ -338,10 +332,11 @@ def test_job_publish_model_interactive_prompts(_mock_require, mock_post):
     mock_resp.json.return_value = {"status": "started"}
     mock_post.return_value = mock_resp
 
+    # Prompts in order: mode (default=new), tag, description
     result = runner.invoke(
         app,
         ["job", "publish", "model", "10", "adapterA"],
-        input="\n\nproduction\nv9\nPromoted build\n",
+        input="\nproduction\nPromoted build\n",
     )
 
     assert result.exit_code == 0
@@ -349,7 +344,6 @@ def test_job_publish_model_interactive_prompts(_mock_require, mock_post):
     assert "/experiment/exp1/jobs/10/models/adapterA/save_to_registry?" in called_endpoint
     assert "mode=new" in called_endpoint
     assert "tag=production" in called_endpoint
-    assert "version_label=v9" in called_endpoint
     assert "description=Promoted+build" in called_endpoint
 
 
@@ -372,7 +366,7 @@ def test_job_publish_model_interactive_selects_model_from_job(_mock_require, moc
     result = runner.invoke(
         app,
         ["job", "publish", "model", "10"],
-        input="2\n\n\nlatest\nv1\n\n",
+        input="2\n\nlatest\n\n",
     )
 
     assert result.exit_code == 0

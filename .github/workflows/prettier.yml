@@ -2,9 +2,9 @@ name: Prettier Check
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install prettier
+      - name: Install dependencies
         run: npm install -g prettier
 
       - name: Check Prettier formatting
