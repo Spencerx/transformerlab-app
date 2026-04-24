@@ -10,6 +10,7 @@ import MenuButton from '@mui/joy/MenuButton';
 import MenuItem from '@mui/joy/MenuItem';
 import Dropdown from '@mui/joy/Dropdown';
 import Checkbox from '@mui/joy/Checkbox';
+import Tooltip from '@mui/joy/Tooltip';
 import {
   Trash2Icon,
   LineChartIcon,
@@ -22,6 +23,7 @@ import {
   MoreVerticalIcon,
   EyeOffIcon,
   EyeIcon,
+  LinkIcon,
 } from 'lucide-react';
 import { Typography } from '@mui/joy';
 import {
@@ -29,6 +31,8 @@ import {
   isJobStopPending,
   isTerminalJobStatus,
 } from 'renderer/lib/utils';
+import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
+import { generateJobPermalink } from '../Jobs/jobDetailUtils';
 import JobProgress from './JobProgress';
 
 export interface LaunchProgressInfo {
@@ -61,6 +65,8 @@ interface JobsListProps {
   onToggleHidden?: (jobId: string, currentValue: boolean) => void;
   hideJobId?: boolean;
   showInteractiveType?: boolean;
+  showFilesButton?: boolean;
+  forceArtifactsButtonVisible?: boolean;
   onStopPendingChange?: (jobId: string, stopPending: boolean) => void;
 }
 
@@ -88,8 +94,12 @@ const JobsList: React.FC<JobsListProps> = ({
   onToggleHidden,
   hideJobId = false,
   showInteractiveType = false,
+  showFilesButton = true,
+  forceArtifactsButtonVisible = false,
   onStopPendingChange,
 }) => {
+  const { experimentInfo } = useExperimentInfo();
+
   const showTrackioForStatus = (status?: string): boolean => {
     return String(status || '') === 'RUNNING' || isTerminalJobStatus(status);
   };
@@ -396,31 +406,33 @@ const JobsList: React.FC<JobsListProps> = ({
                           </Box>
                         </Button>
                       )}
-                    {(job?.job_data?.artifacts ||
+                    {(forceArtifactsButtonVisible ||
+                      job?.job_data?.artifacts ||
                       job?.job_data?.artifacts_dir ||
                       job?.job_data?.generated_datasets ||
                       job?.job_data?.models ||
-                      job?.job_data?.has_profiling) && (
-                      <Button
-                        size="sm"
-                        variant="plain"
-                        onClick={() => onViewAllArtifacts?.(String(job?.id))}
-                        disabled={stopPending}
-                        startDecorator={<ArchiveIcon />}
-                      >
-                        <Box
-                          sx={{
-                            display: {
-                              xs: 'none',
-                              sm: 'none',
-                              md: 'inline-flex',
-                            },
-                          }}
+                      job?.job_data?.has_profiling) &&
+                      !job?.placeholder && (
+                        <Button
+                          size="sm"
+                          variant="plain"
+                          onClick={() => onViewAllArtifacts?.(String(job?.id))}
+                          disabled={stopPending}
+                          startDecorator={<ArchiveIcon />}
                         >
-                          Artifacts
-                        </Box>
-                      </Button>
-                    )}
+                          <Box
+                            sx={{
+                              display: {
+                                xs: 'none',
+                                sm: 'none',
+                                md: 'inline-flex',
+                              },
+                            }}
+                          >
+                            Artifacts
+                          </Box>
+                        </Button>
+                      )}
                     {(job?.type === 'SWEEP' || job?.job_data?.sweep_parent) &&
                       job?.status === 'COMPLETE' && (
                         <Button
@@ -511,7 +523,7 @@ const JobsList: React.FC<JobsListProps> = ({
                         </Box>
                       </Button>
                     )}
-                    {!job?.placeholder && (
+                    {showFilesButton && !job?.placeholder && (
                       <Button
                         size="sm"
                         variant="plain"
@@ -531,6 +543,30 @@ const JobsList: React.FC<JobsListProps> = ({
                           Files
                         </Box>
                       </Button>
+                    )}
+                    {!job?.placeholder && (
+                      <Tooltip title="Copy permalink" variant="outlined">
+                        <IconButton
+                          size="sm"
+                          variant="plain"
+                          color="neutral"
+                          onClick={() => {
+                            const url =
+                              window.location.href.split('#')[0] +
+                              generateJobPermalink(
+                                experimentInfo?.name ?? '',
+                                job.id,
+                              );
+                            navigator.clipboard
+                              .writeText(url)
+                              .catch((err) =>
+                                console.error('Failed to copy permalink:', err),
+                              );
+                          }}
+                        >
+                          <LinkIcon size={14} />
+                        </IconButton>
+                      </Tooltip>
                     )}
                     {!job?.placeholder && (
                       <IconButton

@@ -13,6 +13,7 @@ import './styles.css';
 
 import AnnouncementBanner from './components/Shared/AnnouncementBanner';
 import InsecurePasswordBanner from './components/Shared/InsecurePasswordBanner';
+import StartupWizard from './components/Shared/StartupWizard';
 import VersionUpdateBanner from './components/Shared/VersionUpdateBanner';
 import { NotificationProvider } from './components/Shared/NotificationSystem';
 import { ExperimentInfoProvider } from './lib/ExperimentInfoContext';
@@ -49,11 +50,25 @@ function AppContent({
   const isInitialUserLoad =
     authContext.userIsLoading && !authContext.user && !authContext.userError;
 
+  useEffect(() => {
+    if (authContext.isAuthenticated) {
+      const redirect = localStorage.getItem('redirectAfterLogin');
+      if (redirect) {
+        localStorage.removeItem('redirectAfterLogin');
+        window.location.hash = redirect;
+      }
+    }
+  }, [authContext.isAuthenticated]);
+
   if (authContext.initializing || isInitialUserLoad) {
     return <FullPageLoader />;
   }
 
   if (!authContext?.isAuthenticated) {
+    const currentHash = window.location.hash;
+    if (currentHash && currentHash !== '#/' && currentHash !== '#') {
+      localStorage.setItem('redirectAfterLogin', currentHash);
+    }
     return <LoginPage />;
   }
 
@@ -68,6 +83,7 @@ function AppContent({
       }}
     >
       <InsecurePasswordBanner />
+      <StartupWizard />
       <Box
         component="main"
         className="MainContent"

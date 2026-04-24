@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import shlex
 import time
 from typing import Any, Optional
 
@@ -37,6 +38,7 @@ from transformerlab.services.task_service import task_service
 from transformerlab.shared import galleries
 from transformerlab.shared.github_utils import generate_github_clone_setup, read_github_pat_from_workspace
 from transformerlab.shared.interactive_gallery_utils import find_interactive_gallery_entry, resolve_interactive_command
+from transformerlab.shared.disk_space_utils import parse_disk_space_gb
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
@@ -229,9 +231,9 @@ async def launch_template_on_provider(
                 if aws_credentials_dir:
                     env_vars["AWS_SHARED_CREDENTIALS_FILE"] = f"{aws_credentials_dir}/credentials"
         elif STORAGE_PROVIDER == "gcp":
-            gcp_sa_json = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON")
-            if gcp_sa_json:
-                gcp_setup = generate_gcp_credentials_setup(gcp_sa_json)
+            gcp_sa_json_path = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON_PATH")
+            if gcp_sa_json_path:
+                gcp_setup = generate_gcp_credentials_setup(gcp_sa_json_path)
                 setup_commands.append(gcp_setup)
         elif STORAGE_PROVIDER == "azure":
             azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -252,8 +254,6 @@ async def launch_template_on_provider(
                 if azure_sas:
                     env_vars["AZURE_STORAGE_SAS_TOKEN"] = azure_sas
 
-    if request.file_mounts is True and request.task_id:
-        setup_commands.append(COPY_FILE_MOUNTS_SETUP)
     # Ensure transformerlab SDK is available on remote machines for live_status tracking and other helpers.
     # This runs after AWS credentials are configured so we have access to any remote storage if needed.
     if provider.type != ProviderType.LOCAL.value:
@@ -262,6 +262,8 @@ async def launch_template_on_provider(
         # Install torch as well if torch profiler is enabled
         if request.enable_profiling_torch:
             setup_commands.append("pip install -q torch")
+    if request.file_mounts is True and request.task_id:
+        setup_commands.append(COPY_FILE_MOUNTS_SETUP)
     # For RunPod providers, ensure uv is available and configured to use the
     # system Python. This allows user commands to invoke `uv` directly.
     if provider.type == ProviderType.RUNPOD.value:
@@ -563,6 +565,7 @@ async def launch_template_on_provider(
 
     job_data = {
         "task_name": request.task_name,
+        "description": request.description,
         "run": command_with_secrets,
         "cluster_name": formatted_cluster_name,
         "subtype": request.subtype,
@@ -603,12 +606,7 @@ async def launch_template_on_provider(
         job_id, {k: v for k, v in job_data.items() if v is not None}, request.experiment_id
     )
 
-    disk_size = None
-    if request.disk_space:
-        try:
-            disk_size = int(request.disk_space)
-        except (TypeError, ValueError):
-            disk_size = None
+    disk_size = parse_disk_space_gb(request.disk_space)
 
     # When file_mounts is True we use lab.copy_file_mounts() in setup; do not send to provider
     file_mounts_for_provider = request.file_mounts if isinstance(request.file_mounts, dict) else {}
@@ -659,7 +657,8 @@ async def launch_template_on_provider(
     #   - sets job_data.live_status="started" when execution begins
     #   - sets job_data.live_status="finished" on success
     #   - sets job_data.live_status="crashed" on failure
-    wrapped_run = f"tfl-remote-trap -- {command_with_hooks}"
+    # Pass the complete command as one quoted payload so shell operators remain intact.
+    wrapped_run = f"tfl-remote-trap -- {shlex.quote(command_with_hooks)}"
 
     # For dstack fleet-based runs, do not pass explicit resource requirements.
     # The provider will schedule by fleet and build resources accordingly.

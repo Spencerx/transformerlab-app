@@ -1,0 +1,639 @@
+[
+  {
+    "title": "HF Training with Evals",
+    "description": "A task to train a language model using the TRL library on a specified dataset with evaluation done using the EleutherAI Harness.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/trl-training-evals",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "huggingface"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "PPO Trainer with TRL",
+    "description": "A task to train a language model using the PPO algorithm from the TRL library on a specified dataset.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/ppo-train",
+    "metadata": {
+      "category": "rlhf",
+      "modality": "text",
+      "framework": [
+        "huggingface"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "AutoTrain SFT Training",
+    "description": "SFT training task using Hugging Face AutoTrain. Requires a Hugging Face token in HF_TOKEN env var for model access.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/autotrain-sft",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "huggingface"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Unsloth LLM Fine-tuning",
+    "description": "LLM training task using Unsloth FastLanguageModel with LoRA fine-tuning. Requires a Hugging Face token in HF_TOKEN env var for model access.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/unsloth-llm-train",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "unsloth"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Unsloth GRPO Training Task",
+    "description": "A GRPO trainer based on the unsloth grpo training notebooks for training models with reasoning capabilities.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/unsloth-grpo-train",
+    "metadata": {
+      "category": "training",
+      "modality": "text",
+      "framework": [
+        "unsloth"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Unsloth Text-to-Speech Training Task",
+    "description": "A Text-to-Speech (TTS) trainer based on the unsloth audio training notebooks.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/unsloth-text-to-speech-train",
+    "metadata": {
+      "category": "training",
+      "modality": "audio",
+      "framework": [
+        "unsloth"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Diffusion LoRA Trainer",
+    "description": "A LoRA trainer for Stable Diffusion models. Trains on images with captions and generates sample images before and after training.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/diffusion-train",
+    "metadata": {
+      "category": "training",
+      "modality": "image",
+      "framework": [
+        "diffusers"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Embedding Model Trainer",
+    "description": "A trainer for embedding models using Sentence Transformers. Supports various dataset types and loss functions for training high-quality embeddings.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/embedding-model-train",
+    "metadata": {
+      "category": "training",
+      "modality": "embedding",
+      "framework": [
+        "sentence-transformers"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "GPT-OSS Trainer",
+    "description": "A trainer for GPT-OSS models using HuggingFace SFTTrainer with optional LoRA fine-tuning.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/gpt-oss",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "huggingface"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "NanoChat Trainer",
+    "description": "A complete NanoChat training task that runs the full speedrun pipeline including tokenizer training, base model pretraining, midtraining and supervised finetuning on GSM8K.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/nanochat",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "nanochat"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "LoRA Multi-GPU Trainer",
+    "description": "A multi-GPU LoRA fine-tuning trainer for LLMs supporting Llama2, Qwen, Gemma, and other causal LMs with 4-bit quantization and accelerate multi-GPU support.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/lora-trainer-multi-gpu",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "lora"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "GRPO Multi-GPU Trainer",
+    "description": "A GRPO trainer using multi-GPU setup trained with TRL and Accelerate for distributed training across multiple GPUs.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/grpo-multi-gpu-train",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "trl"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "MLX LoRA Train Task",
+    "description": "A LoRA fine-tuning trainer for LLMs using MLX with multi-GPU support.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/mlx_lora_train",
+    "metadata": {
+      "category": "finetuning",
+      "modality": "text",
+      "framework": [
+        "mlx"
+      ]
+    },
+    "supportedAccelerators": {
+      "AppleSilicon": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      }
+    }
+  },
+  {
+    "title": "MNIST JAX Train Task",
+    "description": "A task to train a neural network on the MNIST dataset using JAX and Flax.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/mnist-jax-train",
+    "metadata": {
+      "category": "training",
+      "modality": "other",
+      "framework": [
+        "jax",
+        "flax"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "MNIST Train Task",
+    "description": "A task to train a neural network on the MNIST dataset using PyTorch.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/mnist-train",
+    "metadata": {
+      "category": "training",
+      "modality": "other",
+      "framework": []
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "YOLO Object Detection Train Task Example",
+    "description": "A sample YOLO object detection train task that runs a YOLO object detection train script on COCO8 dataset for 10 epochs",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/yolo-train-task",
+    "metadata": {
+      "category": "training",
+      "modality": "vision",
+      "framework": [
+        "yolo"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Evaluation Task Example",
+    "description": "A sample evaluation task that runs an evaluation script and creates reports.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/demo-eval-task",
+    "metadata": {
+      "category": "eval",
+      "modality": "text",
+      "framework": [
+        "huggingface"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AppleSilicon": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "cpu": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      }
+    }
+  },
+  {
+    "title": "Basic Evaluation Metrics",
+    "description": "Evaluating outputs of LLMs using basic defined metrics including regex patterns, word counts, and custom Python code.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/basic-evals-metrics",
+    "metadata": {
+      "category": "eval",
+      "modality": "text",
+      "framework": [
+        ""
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "EleutherAI LM Evaluation Harness",
+    "description": "EleutherAI LM Evaluation Harness for evaluating language models on various benchmarks.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/eleutherai-lm-evaluation-harness",
+    "metadata": {
+      "category": "eval",
+      "modality": "text",
+      "framework": [
+        "eleutherai"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Objective Metrics Evaluation",
+    "description": "Evaluating outputs of LLMs using objective metrics powered by DeepEval Framework. Supports metrics like Rouge, BLEU, Exact Match, Quasi Exact Match, Quasi Contains, and BERT Score.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/objective-eval",
+    "metadata": {
+      "category": "eval",
+      "modality": "text",
+      "framework": [
+        "deepeval"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Video Generation with Wan2.1",
+    "description": "A video generation task using the Wan2.1-T2V model. Generates videos from text prompts using the Wan pipeline from Diffusers. Requires HF_TOKEN environment variable for model access.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/video-diffusion",
+    "metadata": {
+      "category": "generation",
+      "modality": "video",
+      "framework": [
+        "diffusers"
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "A100:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Multinode Example Task",
+    "description": "A sample multinode task that just prints out node IPs on each node (2 node config).",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/multinode-example",
+    "metadata": {
+      "category": "training"
+    }
+  },
+  {
+    "title": "Batch Image Generation using FLUX2",
+    "description": "A task to generate images in batch using the FLUX2 model.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/batch-image-gen-flux",
+    "metadata": {
+      "category": "generation",
+      "modality": "vision",
+      "framework": [
+        ""
+      ]
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "accelerators": "RTX3090:1"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "accelerators": "7900XTX:1"
+        }
+      }
+    }
+  },
+  {
+    "title": "Sample Task Example",
+    "description": "A sample PyTorch training task that clones a repository and runs training script",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/sample-task",
+    "metadata": {
+      "category": "other",
+      "modality": "other",
+      "framework": []
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AppleSilicon": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "cpu": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      }
+    }
+  },
+  {
+    "title": "Dataset Generation Task Example",
+    "description": "A sample dataset generation task that runs a dataset generation script and creates a dataset.",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/demo-generate-task",
+    "metadata": {
+      "category": "dataset-generation",
+      "modality": "other",
+      "framework": []
+    },
+    "supportedAccelerators": {
+      "NVIDIA": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AMD": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "AppleSilicon": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      },
+      "cpu": {
+        "resources": {
+          "cpus": "2",
+          "memory": "4"
+        }
+      }
+    }
+  }
+]

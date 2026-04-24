@@ -26,6 +26,7 @@ from transformerlab.services.compute_provider.trackio_launch import (
     resolve_trackio_project_name,
 )
 from transformerlab.services.provider_service import get_team_provider, get_provider_instance
+from transformerlab.shared.disk_space_utils import parse_disk_space_gb
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.github_utils import read_github_pat_from_workspace, generate_github_clone_setup
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
@@ -86,6 +87,7 @@ async def create_sweep_parent_job(
         "sweep_metric": sweep_metric,
         "lower_is_better": lower_is_better,
         "task_name": request.task_name,
+        "description": request.description,
         "subtype": request.subtype,
         "provider_id": provider.id,
         "provider_type": provider.type,
@@ -253,9 +255,9 @@ async def launch_sweep_jobs(
                             if aws_credentials_dir:
                                 env_vars["AWS_SHARED_CREDENTIALS_FILE"] = f"{aws_credentials_dir}/credentials"
                     elif STORAGE_PROVIDER == "gcp":
-                        gcp_sa_json = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON")
-                        if gcp_sa_json:
-                            gcp_setup = generate_gcp_credentials_setup(gcp_sa_json)
+                        gcp_sa_json_path = os.getenv("TFL_GCP_SERVICE_ACCOUNT_JSON_PATH")
+                        if gcp_sa_json_path:
+                            gcp_setup = generate_gcp_credentials_setup(gcp_sa_json_path)
                             setup_commands.append(gcp_setup)
                     elif STORAGE_PROVIDER == "azure":
                         azure_connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -276,11 +278,17 @@ async def launch_sweep_jobs(
                             if azure_sas:
                                 env_vars["AZURE_STORAGE_SAS_TOKEN"] = azure_sas
 
-                if request.file_mounts is True and request.task_id:
-                    setup_commands.append(COPY_FILE_MOUNTS_SETUP)
-
                 if provider.type == ProviderType.RUNPOD.value:
                     setup_commands.append("curl -LsSf https://astral.sh/uv/install.sh | sh")
+
+                if provider.type != ProviderType.LOCAL.value:
+                    setup_commands.append("pip install -q transformerlab")
+
+                    if request.enable_profiling_torch:
+                        setup_commands.append("pip install -q torch")
+
+                if request.file_mounts is True and request.task_id:
+                    setup_commands.append(COPY_FILE_MOUNTS_SETUP)
 
                 if request.github_repo_url:
                     workspace_dir = await get_workspace_dir()
@@ -319,6 +327,7 @@ async def launch_sweep_jobs(
                     "task_name": f"{request.task_name or 'Task'} (Sweep {i + 1}/{total_configs})"
                     if request.task_name
                     else None,
+                    "description": request.description,
                     "run": run_with_secrets,
                     "cluster_name": formatted_cluster_name,
                     "subtype": request.subtype,
@@ -350,12 +359,7 @@ async def launch_sweep_jobs(
                         child_job_id, child_job_updates, request.experiment_id
                     )
 
-                disk_size = None
-                if request.disk_space:
-                    try:
-                        disk_size = int(request.disk_space)
-                    except (TypeError, ValueError):
-                        disk_size = None
+                disk_size = parse_disk_space_gb(request.disk_space)
 
                 file_mounts_for_provider = request.file_mounts if isinstance(request.file_mounts, dict) else {}
 

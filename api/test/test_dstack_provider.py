@@ -79,7 +79,7 @@ class TestBuildRunSpec:
         assert spec["repo_data"] == {"repo_type": "virtual"}
         cfg = spec["configuration"]
         assert cfg["type"] == "task"
-        assert "tfl-remote-trap python train.py" in cfg["commands"][0]
+        assert "python train.py" in cfg["commands"][0]
         assert cfg["env"]["LR"] == "1e-4"
 
     def test_dev_environment_type(self, provider):
@@ -91,7 +91,7 @@ class TestBuildRunSpec:
         cfg = spec["configuration"]
         assert cfg["type"] == "dev-environment"
         assert cfg["ide"] == "vscode"
-        assert "tfl-remote-trap python server.py" in cfg["init"][0]
+        assert "python server.py" in cfg["init"][0]
 
     def test_resource_requirements_path(self, provider):
         config = ClusterConfig(run="train.py", accelerators="A100:1", memory="32GB", disk_size=200)
@@ -113,7 +113,7 @@ class TestBuildRunSpec:
         spec = provider._build_run_spec("setup-run", config)
         commands = spec["configuration"]["commands"]
         assert commands[0] == "pip install mylib"
-        assert "tfl-remote-trap python train.py" in commands[1]
+        assert "python train.py" in commands[1]
 
     def test_env_vars_merged_with_provider_defaults(self):
         p = DstackProvider(

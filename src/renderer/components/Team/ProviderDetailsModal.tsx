@@ -57,12 +57,10 @@ const DEFAULT_CONFIGS = {
   "ssh_port": 22
 }`,
   runpod: `{
-  "api_key": "<Your Runpod API key>",
   "api_base_url": "https://rest.runpod.io/v1"
 }`,
   dstack: `{
   "server_url": "<Your dstack server URL e.g. http://0.0.0.0:3000>",
-  "api_token": "<Your dstack API token>",
   "dstack_project": "<Your dstack project name e.g. main>"
 }`,
   local: `{}`,
@@ -124,6 +122,11 @@ export default function ProviderDetailsModal({
   const [dstackApiToken, setDstackApiToken] = useState('');
   const [dstackApiTokenChanged, setDstackApiTokenChanged] = useState(false);
   const [dstackProjectName, setDstackProjectName] = useState('');
+
+  // RunPod-specific form fields
+  const [runpodApiKey, setRunpodApiKey] = useState('');
+  const [runpodApiKeyChanged, setRunpodApiKeyChanged] = useState(false);
+  const [runpodApiBaseUrl, setRunpodApiBaseUrl] = useState('');
 
   const { fetchWithAuth } = useAuth();
   const { data: providerData, isLoading: providerDataLoading } = useAPI(
@@ -289,6 +292,38 @@ export default function ProviderDetailsModal({
     providerId,
   ]);
 
+  const parseRunpodConfig = (configObj: any) => {
+    if (configObj && typeof configObj === 'object') {
+      setRunpodApiKey(
+        configObj.api_key === '***' ? '' : configObj.api_key || '',
+      );
+      setRunpodApiKeyChanged(false);
+      setRunpodApiBaseUrl(configObj.api_base_url || '');
+      if (configObj.supported_accelerators) {
+        setSupportedAccelerators(configObj.supported_accelerators);
+      }
+    }
+  };
+
+  const buildRunpodConfig = useCallback(() => {
+    const configObj: any = {
+      api_base_url: runpodApiBaseUrl || 'https://rest.runpod.io/v1',
+    };
+    if (!providerId || runpodApiKeyChanged) {
+      configObj.api_key = runpodApiKey;
+    }
+    if (supportedAccelerators && supportedAccelerators.length > 0) {
+      configObj.supported_accelerators = supportedAccelerators;
+    }
+    return configObj;
+  }, [
+    runpodApiKey,
+    runpodApiKeyChanged,
+    runpodApiBaseUrl,
+    supportedAccelerators,
+    providerId,
+  ]);
+
   // if a providerId is passed then we are editing an existing provider
   // Otherwise we are creating a new provider
   useEffect(() => {
@@ -335,6 +370,9 @@ export default function ProviderDetailsModal({
       if (providerData.type === 'dstack') {
         parseDstackConfig(rawConfigObj);
       }
+      if (providerData.type === 'runpod') {
+        parseRunpodConfig(rawConfigObj);
+      }
       setConfig(JSON.stringify(rawConfigObj, null, 2));
     } else if (!providerId) {
       // Reset form when in "add" mode (no providerId)
@@ -366,6 +404,9 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setRunpodApiKey('');
+      setRunpodApiKeyChanged(false);
+      setRunpodApiBaseUrl('');
     }
   }, [providerId, providerData]);
 
@@ -400,6 +441,12 @@ export default function ProviderDetailsModal({
       setDstackApiToken('');
       setDstackApiTokenChanged(false);
       setDstackProjectName('');
+      setIsSetupInProgress(false);
+      setSetupStatus(null);
+      setSetupLogTail('');
+      setRunpodApiKey('');
+      setRunpodApiKeyChanged(false);
+      setRunpodApiBaseUrl('');
     }
   }, [open]);
 
@@ -475,6 +522,14 @@ export default function ProviderDetailsModal({
           // Ignore parse errors
         }
       }
+      if (type === 'runpod') {
+        try {
+          const configObj = JSON.parse(defaultConfig);
+          parseRunpodConfig(configObj);
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
     }
   }, [type, providerId]);
 
@@ -494,11 +549,16 @@ export default function ProviderDetailsModal({
         const configObj = buildDstackConfig();
         setConfig(JSON.stringify(configObj, null, 2));
       }
+      if (type === 'runpod') {
+        const configObj = buildRunpodConfig();
+        setConfig(JSON.stringify(configObj, null, 2));
+      }
     }
   }, [
     buildSlurmConfig,
     buildSkypilotConfig,
     buildDstackConfig,
+    buildRunpodConfig,
     type,
     providerId,
   ]);
@@ -628,6 +688,8 @@ export default function ProviderDetailsModal({
         parsedConfig = buildSkypilotConfig();
       } else if (type === 'dstack') {
         parsedConfig = buildDstackConfig();
+      } else if (type === 'runpod') {
+        parsedConfig = buildRunpodConfig();
       } else if (type === 'local') {
         // Local providers are configured via supported accelerators only
         parsedConfig = {};
@@ -784,9 +846,9 @@ export default function ProviderDetailsModal({
                   <Option value="skypilot">Skypilot</Option>
                   <Option value="slurm">SLURM</Option>
                   <Option value="runpod">Runpod</Option>
-                  <Option value="dstack">dstack (beta) </Option>
+                  <Option value="dstack">dstack</Option>
                   {!hasLocalProvider && !providerId && (
-                    <Option value="local">Local (beta)</Option>
+                    <Option value="local">Local</Option>
                   )}
                 </Select>
                 {providerId && (
@@ -1140,10 +1202,50 @@ export default function ProviderDetailsModal({
                 </>
               )}
 
+              {type === 'runpod' && (
+                <>
+                  <FormControl sx={{ mt: 2 }}>
+                    <FormLabel>RunPod API Key *</FormLabel>
+                    <Input
+                      value={runpodApiKey}
+                      onChange={(event) => {
+                        setRunpodApiKeyChanged(true);
+                        setRunpodApiKey(event.currentTarget.value);
+                      }}
+                      placeholder={
+                        providerId
+                          ? 'Leave blank to keep existing key'
+                          : 'Your RunPod API key'
+                      }
+                      type="password"
+                      fullWidth
+                    />
+                  </FormControl>
+                  <FormControl sx={{ mt: 1 }}>
+                    <FormLabel>API Base URL</FormLabel>
+                    <Input
+                      value={runpodApiBaseUrl}
+                      onChange={(event) =>
+                        setRunpodApiBaseUrl(event.currentTarget.value)
+                      }
+                      placeholder="https://rest.runpod.io/v1"
+                      fullWidth
+                    />
+                    <Typography
+                      level="body-sm"
+                      sx={{ mt: 0.5, color: 'text.tertiary' }}
+                    >
+                      Leave blank to use the default RunPod API endpoint.
+                    </Typography>
+                  </FormControl>
+                </>
+              )}
+
               {/* Generic JSON config for non-structured providers or advanced editing */}
               {type !== 'slurm' &&
                 type !== 'skypilot' &&
                 type !== 'dstack' &&
+                type !== 'runpod' &&
                 type !== 'local' && (
                   <FormControl sx={{ mt: 1 }}>
                     <FormLabel>Configuration</FormLabel>
@@ -1158,49 +1260,6 @@ export default function ProviderDetailsModal({
                       minRows={5}
                       maxRows={10}
                     />
-                  </FormControl>
-                )}
-
-              {/* Show JSON for SLURM or SkyPilot providers in edit mode for advanced users */}
-              {(type === 'slurm' || type === 'skypilot' || type === 'dstack') &&
-                providerId && (
-                  <FormControl sx={{ mt: 1 }}>
-                    <FormLabel>Advanced: Raw Configuration (JSON)</FormLabel>
-                    <Textarea
-                      value={
-                        typeof config === 'string'
-                          ? config
-                          : JSON.stringify(config)
-                      }
-                      onChange={(event) => {
-                        setConfig(event.currentTarget.value);
-                        // Try to parse and update form fields
-                        try {
-                          const configObj = JSON.parse(
-                            event.currentTarget.value,
-                          );
-                          if (type === 'slurm') {
-                            parseSlurmConfig(configObj);
-                          } else if (type === 'skypilot') {
-                            parseSkypilotConfig(configObj);
-                          } else if (type === 'dstack') {
-                            parseDstackConfig(configObj);
-                          }
-                        } catch (e) {
-                          // Ignore parse errors
-                        }
-                      }}
-                      placeholder="JSON sent to provider"
-                      minRows={3}
-                      maxRows={5}
-                    />
-                    <Typography
-                      level="body-sm"
-                      sx={{ mt: 0.5, color: 'text.tertiary' }}
-                    >
-                      Edit JSON directly for advanced configuration. Changes
-                      will sync to form fields above.
-                    </Typography>
                   </FormControl>
                 )}
             </>
