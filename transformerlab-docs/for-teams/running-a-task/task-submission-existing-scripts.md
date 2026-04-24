@@ -74,7 +74,6 @@ lab.init()
 
 - **When your script is launched from a task via a provider**, Transformer Lab sends some information which is used by `lab.init()` to detect this and connect to the job which launched the provider.
 - **When you run the same script manually** (no job environment), you can:
-
   - Let it fall back to the default experiment, or
   - Pass an explicit `experiment_id`:
 
@@ -137,7 +136,6 @@ With the lab facade in place, you can wire your script into tasks as follows:
    - Any resource requirements (`resources`).
    - Optional `parameters` and `sweeps`.
 3. Register the task:
-
    - Via GUI (drag‑and‑drop a folder with `task.yaml`), or
    - Via CLI:
 
@@ -146,7 +144,6 @@ With the lab facade in place, you can wire your script into tasks as follows:
      ```
 
 4. Queue the task:
-
    - From the GUI, using the **Queue** action in the **Tasks** tab for your experiment.
    - From the CLI:
 

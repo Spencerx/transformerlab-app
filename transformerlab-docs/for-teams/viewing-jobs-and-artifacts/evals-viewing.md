@@ -8,12 +8,10 @@ This guide assumes you’ve already run a task that produced evaluation results.
 ## Where to Find Evaluation Results
 
 1. **Open your experiment**
-
    - Go to the experiment where you ran your evaluation task.
    - Open the `Tasks` tab.
 
 2. **Go to the Runs list**
-
    - Scroll down to the **Runs** section.
    - You’ll see a table of your jobs (runs).
 
@@ -94,7 +92,6 @@ If there is **no** column named `score`, you’ll see a note like:
 In that case:
 
 1. **Category (x-axis / metric name)**
-
    - Choose the column to use as the **x-axis labels**.
    - Examples: `metric_name`, `test_case_id`, `dataset_split`.
 
@@ -128,13 +125,11 @@ This helps you quickly compare metrics or scores across test cases, datasets, or
 Inside the chart area, you have several controls:
 
 - **Chart type selector**:
-
   - **Bar** (default): shows bars per metric/category.
   - **Line**: great for trends across ordered categories.
   - **Radar**: good for comparing multiple metrics in a “spider” chart.
 
 - **Swap Axes** (for Bar and Line charts):
-
   - Flips which dimension is on the x-axis:
     - Normal: x-axis = category (for example, metric), series = value columns.
     - Swapped: x-axis = series (value columns), lines/bars per category.
@@ -177,17 +172,14 @@ Notes:
 ## Troubleshooting
 
 - **“No evaluation results found”**
-
   - The job didn’t produce eval result files.
   - Check that your task or evaluator is configured to write eval results.
 
 - **“Invalid data format”**
-
   - The server returned data that doesn’t look like a table with `header` and `body`.
   - This usually means the eval output isn’t in the expected structure; check the job’s raw output or logs.
 
 - **Chart view shows “No data to chart”**
-
   - Make sure:
     - You’ve selected a **Category** column.
     - You’ve chosen at least one **Value column** that is numeric.
