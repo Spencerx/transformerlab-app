@@ -58,16 +58,6 @@ export default function ModelsSection({
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [saveDialogModel, setSaveDialogModel] = useState<string | null>(null);
   const [saveTaskJobId, setSaveTaskJobId] = useState<string | null>(null);
-  const [assetNameError, setAssetNameError] = useState<string | null>(null);
-
-  // Fetch existing models in the registry for "Add to existing" option
-  const { data: registryModels } = useSWR(
-    open || renderContentOnly ? chatAPI.Endpoints.Models.LocalList() : null,
-    fetcher,
-  );
-  const existingModelNames: string[] = Array.isArray(registryModels)
-    ? registryModels.map((m: { model_id: string }) => m.model_id)
-    : [];
 
   // Poll the background save-to-registry job when one is active
   const { data: saveTaskData } = useSWR(
@@ -123,25 +113,19 @@ export default function ModelsSection({
     setSavingModel(modelName);
     setSaveError(null);
     setSaveSuccess(null);
-    setAssetNameError(null);
 
     try {
       const url = getAPIFullPath('jobs', ['saveModelToRegistry'], {
         experimentId: experimentInfo?.id,
         jobId: jobId.toString(),
         modelName,
-        targetName: info.groupId || info.groupName,
-        assetName: info.assetName,
+        targetName: info.groupName,
         mode: info.mode,
         tag: info.tag,
-        versionLabel: info.versionLabel,
         description: info.description,
-        groupName: info.groupName,
       });
 
-      const response = await fetchWithAuth(url, {
-        method: 'POST',
-      });
+      const response = await fetchWithAuth(url, { method: 'POST' });
 
       if (!response.ok) {
         let errorMessage = 'Failed to save model to registry';
@@ -149,14 +133,7 @@ export default function ModelsSection({
           const errorData = await response.json();
           errorMessage = errorData.detail || errorMessage;
         } catch (e) {
-          // If response is not JSON, use status text
           errorMessage = `${response.status}: ${response.statusText}`;
-        }
-        // If it's a 409 conflict (name already exists), show inline on the asset name field
-        if (response.status === 409) {
-          setAssetNameError(errorMessage);
-          setSavingModel(null);
-          return;
         }
         throw new Error(errorMessage);
       }
@@ -289,14 +266,11 @@ export default function ModelsSection({
       open={saveDialogModel !== null}
       onClose={() => {
         setSaveDialogModel(null);
-        setAssetNameError(null);
       }}
       sourceName={saveDialogModel || ''}
       type="model"
-      existingNames={existingModelNames}
       saving={savingModel !== null}
       jobId={jobId ?? undefined}
-      assetNameError={assetNameError}
       onSave={(info) => {
         if (saveDialogModel) {
           handleSaveToRegistry(saveDialogModel, info);

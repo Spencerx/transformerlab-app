@@ -278,11 +278,17 @@ async def launch_sweep_jobs(
                             if azure_sas:
                                 env_vars["AZURE_STORAGE_SAS_TOKEN"] = azure_sas
 
-                if request.file_mounts is True and request.task_id:
-                    setup_commands.append(COPY_FILE_MOUNTS_SETUP)
-
                 if provider.type == ProviderType.RUNPOD.value:
                     setup_commands.append("curl -LsSf https://astral.sh/uv/install.sh | sh")
+
+                if provider.type != ProviderType.LOCAL.value:
+                    setup_commands.append("pip install -q transformerlab")
+
+                    if request.enable_profiling_torch:
+                        setup_commands.append("pip install -q torch")
+
+                if request.file_mounts is True and request.task_id:
+                    setup_commands.append(COPY_FILE_MOUNTS_SETUP)
 
                 if request.github_repo_url:
                     workspace_dir = await get_workspace_dir()
