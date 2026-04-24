@@ -89,6 +89,10 @@ def mask_sensitive_config(config: Dict[str, Any], provider_type: str) -> Dict[st
     if "api_token" in masked and masked["api_token"]:
         masked["api_token"] = "***"
 
+    # Mask RunPod API key.
+    if "api_key" in masked and masked["api_key"]:
+        masked["api_key"] = "***"
+
     # Mask any other sensitive fields
     if "password" in masked:
         masked["password"] = "***"
@@ -108,6 +112,11 @@ class ProviderTemplateLaunchRequest(BaseModel):
     task_name: Optional[str] = Field(None, description="Friendly task name")
     cluster_name: Optional[str] = Field(None, description="Base cluster name, suffix is appended automatically")
     run: str = Field(..., description="Run command to execute on the cluster")
+    description: Optional[str] = Field(
+        None,
+        max_length=8000,
+        description="Free-form markdown describing what this run is trying to accomplish (like a commit description).",
+    )
     subtype: Optional[str] = Field(None, description="Optional subtype for filtering")
     interactive_type: Optional[str] = Field(None, description="Interactive task type (e.g. vscode)")
     interactive_gallery_id: Optional[str] = Field(

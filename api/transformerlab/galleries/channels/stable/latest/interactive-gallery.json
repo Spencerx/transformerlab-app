@@ -4,8 +4,8 @@
     "interactive_type": "vscode",
     "name": "VS Code",
     "description": "Remote VS Code development environment via tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-vscode",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-vscode",
     "env_parameters": [],
     "icon": "https://lab.cloud/img/icons/vscode.png",
     "supported_accelerators": [
@@ -46,8 +46,8 @@
     "interactive_type": "jupyter",
     "name": "Jupyter Notebook",
     "description": "Jupyter Lab notebook environment via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-jupyter",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-jupyter",
     "env_parameters": [
       {
         "field_name": "ngrok Auth Token",
@@ -98,8 +98,8 @@
     "interactive_type": "vllm",
     "name": "vLLM Server",
     "description": "vLLM OpenAI-compatible API server via ngrok tunnel (plus Open WebUI)",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-vllm",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-vllm",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -191,8 +191,8 @@
     "interactive_type": "ollama",
     "name": "Ollama + Open WebUI",
     "description": "Ollama model server with Open WebUI chat interface via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-ollama-openwebui",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-ollama-openwebui",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -268,8 +268,8 @@
     "id": "ollama_gradio",
     "name": "Ollama + Gradio",
     "description": "Ollama model server with Gradio chat UI via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "inference-ollama-gradio-chat",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/inference-ollama-gradio-chat",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -323,8 +323,8 @@
     "id": "comfy_ui",
     "name": "ComfyUI",
     "description": "ComfyUI server via ngrok tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-comfyui",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-comfyui",
     "env_parameters": [
       {
         "field_name": "ngrok Auth Token",
@@ -374,8 +374,8 @@
     "interactive_type": "ssh",
     "name": "SSH",
     "description": "SSH access via ngrok TCP tunnel",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "interactive-ssh",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/interactive-ssh",
     "env_parameters": [
       {
         "field_name": "ngrok Auth Token",
@@ -442,8 +442,8 @@
     "id": "mlx_gradio",
     "name": "MLX LM + Gradio",
     "description": "MLX LM inference server with Gradio chat UI for Apple Silicon",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "inference-mlx-gradio-chat",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/inference-mlx-gradio-chat",
     "env_parameters": [
       {
         "field_name": "Model Name",
@@ -494,8 +494,8 @@
     "id": "mlx_audio_tts",
     "name": "MLX Audio TTS + Gradio",
     "description": "Text-to-Speech using MLX Audio with Gradio UI for Apple Silicon",
-    "github_repo_url": "https://github.com/transformerlab/transformerlab-examples",
-    "github_repo_dir": "inference-mlx-audio-tts",
+    "github_repo_url": "https://github.com/transformerlab/transformerlab-app",
+    "github_repo_dir": "api/transformerlab/galleries/examples/inference-mlx-audio-tts",
     "env_parameters": [
       {
         "field_name": "Model Name",

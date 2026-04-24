@@ -56,22 +56,34 @@ uv run src/transformerlab_cli/main.py
 
 ### Build Locally
 
-```bash
-uv tool install .
-```
 
-or rebuild with:
+#### Option A — Global install (simple)
 
 ```bash
 uv tool install . --force --reinstall
 ```
 
-Adds a `lab` command to your terminal.
+This installs `lab` into `~/.local/bin/` so it's available from any shell.
+
+#### Option B — Editable install into an active venv (recommended for iterative dev)
+
+```bash
+# Activate the venv you want lab installed into, e.g.
+source ~/.transformerlab/envs/general-uv/bin/activate
+
+# From the cli/ directory:
+uv pip install -e .
+```
+
+`lab` will live at `<venv>/bin/lab` and only resolve while that venv is active. Code changes take effect without reinstalling.
+
+> ⚠️ **Gotcha:** if a `cli/.venv` directory exists, `uv pip install` targets it instead of your active `$VIRTUAL_ENV`, and `which lab` will come up empty. Either delete it (`rm -rf cli/.venv`) or force the target explicitly: `uv pip install -e . --python "$VIRTUAL_ENV/bin/python"`.
 
 ### Debug the Job Monitor
 
+Install editable into your active venv (see Option B above), then:
+
 ```bash
-pip install -e .
 uv run textual run --dev src/transformerlab_cli/commands/job_monitor/job_monitor.py
 ```
 

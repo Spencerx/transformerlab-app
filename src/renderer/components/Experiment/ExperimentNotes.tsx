@@ -1,94 +1,112 @@
-/* eslint-disable jsx-a11y/anchor-is-valid */
-import { useRef, useEffect, useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import MDEditor from '@uiw/react-md-editor';
 
 import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
+import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
+import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
+import { authenticatedFetch } from 'renderer/lib/api-client/functions';
+import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext.js';
 
 import Sheet from '@mui/joy/Sheet';
+import Box from '@mui/joy/Box';
+import Button from '@mui/joy/Button';
+import Chip from '@mui/joy/Chip';
+import Typography from '@mui/joy/Typography';
 
-import { Editor } from '@monaco-editor/react';
-
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-// import monakai from 'monaco-themes/themes/Monokai Bright.json';
-
-import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
-import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
-import { authenticatedFetch } from 'renderer/lib/api-client/functions';
-import { PencilIcon, TypeOutline } from 'lucide-react';
-import { Box, Button, Typography } from '@mui/joy';
-import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext.js';
-import { setTheme, getMonacoEditorOptions } from 'renderer/lib/monacoConfig';
-
-export default function ExperimentNotes({}) {
-  const editorRef = useRef(null);
-  const [isEditing, setIsEditing] = useState(false);
+export default function ExperimentNotes() {
   const { experimentInfo } = useExperimentInfo();
+  const [value, setValue] = useState<string>('');
+  const [isDirty, setIsDirty] = useState(false);
+  const isDirtyRef = useRef(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Fetch the experiment markdown
-  const { data, error, isLoading, mutate } = useSWR(
-    chatAPI.Endpoints.Experiment.GetFile(experimentId(), 'readme.md'),
+  const experimentId: string = experimentInfo?.id ?? '';
+
+  const { data, mutate } = useSWR(
+    experimentId ? chatAPI.Endpoints.Experiment.GetNotes(experimentId) : null,
     fetcher,
   );
 
   useEffect(() => {
-    if (data) {
-      if (editorRef?.current && typeof data === 'string') {
-        editorRef?.current?.setValue(data);
-      }
+    if (data !== undefined && !isDirtyRef.current) {
+      setValue(typeof data === 'string' ? data : '');
     }
   }, [data]);
 
-  function handleEditorDidMount(editor, monaco) {
-    editorRef.current = editor;
-    if (editorRef?.current && typeof data === 'string') {
-      editorRef?.current?.setValue(data);
-    }
-    setTheme(editor, monaco);
-  }
+  const transformImageSrc = useCallback(
+    (src: string | undefined): string => {
+      if (!src) return '';
+      if (src.startsWith('notes/assets/')) {
+        const filename = src.slice('notes/assets/'.length);
+        return chatAPI.Endpoints.Experiment.GetNoteAsset(
+          experimentId,
+          filename,
+        );
+      }
+      return src;
+    },
+    [experimentId],
+  );
 
-  function saveValue() {
-    let value = editorRef?.current?.getValue();
-
-    // A blank string will cause the save to fail, so we replace it with a space
-    if (value === '') {
-      value = ' ';
-    }
-
-    // Use authenticatedFetch to post the value to the server with proper authentication
-    // Note: Backend expects JSON body, so we send the string as JSON
-    authenticatedFetch(
-      chatAPI.Endpoints.Experiment.SaveFile(experimentInfo.id, 'readme.md'),
-      {
-        method: 'POST',
-        body: JSON.stringify(value),
-        headers: {
-          'Content-Type': 'application/json',
+  async function saveNotes() {
+    setIsSaving(true);
+    try {
+      const response = await authenticatedFetch(
+        chatAPI.Endpoints.Experiment.SaveNotes(experimentId),
+        {
+          method: 'POST',
+          body: JSON.stringify(value || ' '),
+          headers: { 'Content-Type': 'application/json' },
         },
-      },
-    )
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        mutate();
-        setIsEditing(false);
-        return true;
-      })
-      .catch((error) => {
-        console.error('Error saving the file:', error);
-      });
-  }
-
-  function experimentId() {
-    if (experimentInfo) {
-      return experimentInfo.id;
+      );
+      if (!response.ok)
+        throw new Error(`HTTP error! status: ${response.status}`);
+      await mutate();
+      setIsDirty(false);
+      isDirtyRef.current = false;
+    } catch (err) {
+      console.error('Error saving notes:', err);
+    } finally {
+      setIsSaving(false);
     }
-    return '';
   }
 
-  if (!experimentInfo || !experimentInfo.id) {
-    return '';
+  async function uploadImage(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const response = await authenticatedFetch(
+        chatAPI.Endpoints.Experiment.UploadNoteAsset(experimentId),
+        { method: 'POST', body: formData },
+      );
+      if (!response.ok) return;
+      const { path } = await response.json();
+      const filename = (path as string).replace('notes/assets/', '');
+      const insert = `\n![${filename}](${path})\n`;
+      setValue((prev) => prev + insert);
+      setIsDirty(true);
+      isDirtyRef.current = true;
+    } catch (err) {
+      console.error('Error uploading image:', err);
+    }
   }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = Array.from(e.clipboardData.items);
+    const imageItem = items.find((item) => item.type.startsWith('image/'));
+    if (!imageItem) return;
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (!file) return;
+    const ext = file.type.split('/')[1] || 'png';
+    const namedFile = new File([file], `pasted-${Date.now()}.${ext}`, {
+      type: file.type,
+    });
+    uploadImage(namedFile);
+  }
+
+  if (!experimentInfo?.id) return null;
 
   return (
     <Sheet
@@ -97,120 +115,84 @@ export default function ExperimentNotes({}) {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        mb: 3,
+        p: 2,
       }}
     >
-      <Typography level="h3">Experiment Notes</Typography>
-      {!isEditing && (
-        <Sheet
-          color="neutral"
-          variant="soft"
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            mt: 1,
-            height: '100%',
-            px: 3,
-            overflow: 'auto',
-          }}
-          className="editableSheet"
-        >
-          {!data && (
-            <Typography mt={3}>Write experiment notes here...</Typography>
-          )}
-          <Box display="flex" sx={{ width: '100%' }}>
-            <Markdown
-              remarkPlugins={[remarkGfm]}
-              className="editableSheetContent"
-            >
-              {data}
-            </Markdown>
-          </Box>
-        </Sheet>
-      )}
-      {isEditing && (
-        <Sheet
-          sx={{
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            overflow: 'hidden',
-          }}
-        >
-          <Typography mt={3}>
-            Use{' '}
-            <a
-              href="https://github.github.com/gfm/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              GitHub Flavored Markdown
-            </a>
-          </Typography>
-          <Sheet
-            color="neutral"
-            sx={{
-              p: 3,
-              display: 'flex',
-              backgroundColor: '#ddd',
-              height: '100%',
-            }}
-          >
-            <Editor
-              defaultLanguage="markdown"
-              theme="my-theme"
-              height="100%"
-              options={getMonacoEditorOptions({
-                fontSize: 18,
-                cursorStyle: 'block',
-                wordWrap: 'on',
-              })}
-              onMount={handleEditorDidMount}
-            />
-          </Sheet>
-        </Sheet>
-      )}
       <Box
         display="flex"
-        flexDirection="row"
-        gap={1}
+        justifyContent="space-between"
+        alignItems="center"
+        mb={1}
+      >
+        <Typography level="h3">Experiment Notes</Typography>
+        <Box display="flex" gap={1} alignItems="center">
+          {isDirty && (
+            <Chip color="warning" size="sm">
+              Unsaved changes
+            </Chip>
+          )}
+          <Button
+            size="sm"
+            variant="outlined"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Upload Image
+          </Button>
+          <Button
+            size="sm"
+            color="success"
+            onClick={saveNotes}
+            loading={isSaving}
+            disabled={!isDirty}
+          >
+            Save
+          </Button>
+        </Box>
+      </Box>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".png,.jpg,.jpeg,.gif,.svg"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) uploadImage(file);
+          e.target.value = '';
+        }}
+      />
+
+      <Box
+        data-color-mode="dark"
+        onPaste={handlePaste}
         sx={{
-          width: '100%',
-          justifyContent: 'flex-end',
-          alignContent: 'center',
-          mt: 1,
+          flex: 1,
+          overflow: 'hidden',
+          '& .w-md-editor': { height: '100% !important' },
         }}
       >
-        {isEditing ? (
-          <>
-            <Button
-              onClick={() => {
-                saveValue();
-              }}
-              color="success"
-            >
-              Save
-            </Button>
-            <Button
-              variant="plain"
-              color="danger"
-              onClick={() => setIsEditing(false)}
-            >
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button
-            onClick={() => {
-              setIsEditing(true);
-            }}
-            color="primary"
-            variant="solid"
-            startDecorator={<PencilIcon size="18px" />}
-          >
-            Edit
-          </Button>
-        )}
+        <MDEditor
+          value={value}
+          onChange={(val) => {
+            setValue(val ?? '');
+            setIsDirty(true);
+            isDirtyRef.current = true;
+          }}
+          preview="live"
+          height="100%"
+          previewOptions={{
+            components: {
+              img: ({
+                src,
+                alt,
+                ...props
+              }: React.ImgHTMLAttributes<HTMLImageElement>) => (
+                // eslint-disable-next-line jsx-a11y/alt-text
+                <img src={transformImageSrc(src)} alt={alt} {...props} />
+              ),
+            },
+          }}
+        />
       </Box>
     </Sheet>
   );
