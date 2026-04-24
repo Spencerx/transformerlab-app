@@ -1151,21 +1151,17 @@ async def import_task_from_gallery(
         # Invalidate cached task lists for this experiment (best-effort).
         await cache.invalidate(f"tasks:{experimentId}")
 
-        # Store task.yaml in the task directory for GitHub-sourced interactive tasks
+        # Store task.yaml in the task directory for GitHub-sourced interactive tasks.
+        # Use task_service.write_task_yaml so the file lands in the experiment-scoped
+        # path that task_list_files reads from (workspace/experiments/{exp_id}/tasks/{id}).
         if github_repo_url and source_yaml_data:
-            task_template = TaskTemplate(secure_filename(str(task_id)))
-            task_dir_path = await task_template.get_dir()
-            await storage.makedirs(task_dir_path, exist_ok=True)
-            yaml_path = storage.join(task_dir_path, "task.yaml")
-            async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
-                await f.write(task_yaml_content)
+            await task_service.write_task_yaml(task_id, task_yaml_content, experiment_id=experimentId)
 
         # Copy local_task_dir files into the task directory (inside a subdirectory
         # matching the source directory name, mirroring what github_repo_dir does
         # at clone time) and mark file_mounts so the runner copies them at launch.
         if local_task_dir and os.path.isdir(local_task_dir):
-            task_template = TaskTemplate(secure_filename(str(task_id)))
-            task_dir_path = await task_template.get_dir()
+            task_dir_path = await task_service.get_task_dir(task_id, experiment_id=experimentId)
             await storage.makedirs(task_dir_path, exist_ok=True)
             dest_subdir = storage.join(task_dir_path, os.path.basename(local_task_dir.rstrip("/")))
             await storage.copy_dir(local_task_dir, dest_subdir)
