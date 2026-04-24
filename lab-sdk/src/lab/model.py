@@ -44,14 +44,20 @@ class Model(BaseLabResource):
         return newobj
 
     async def get_dir(self):
-        """Abstract method on BaseLabResource"""
-        model_id_safe = secure_filename(str(self.id))
-        # Always use job-specific directory
+        """Return the directory for this model.
+
+        Handles both flat ids ('my-model') and grouped ids ('MyFineTune/v1').
+        """
         if self.job_id:
             models_dir = await get_job_models_dir(self.job_id)
+            model_id_safe = secure_filename(str(self.id))
+            return storage.join(models_dir, model_id_safe)
         else:
             models_dir = await get_models_dir()
-        return storage.join(models_dir, model_id_safe)
+            # Handle grouped ids like "MyFineTune/v1"
+            parts = str(self.id).split("/")
+            safe_parts = [secure_filename(p) for p in parts]
+            return storage.join(models_dir, *safe_parts)
 
     def _default_json(self):
         # Default metadata modeled after API model table fields
@@ -89,7 +95,12 @@ class Model(BaseLabResource):
 
     @staticmethod
     async def list_all():
-        """List all models in the filesystem, similar to dataset service"""
+        """List all models in the filesystem.
+
+        Handles two layouts:
+        - Flat: /models/<model_id>/index.json  (downloaded or grandfathered)
+        - Grouped: /models/<group>/<vN>/index.json  (registry-published)
+        """
         results = []
         models_dir = await get_models_dir()
         if not await storage.isdir(models_dir):
@@ -101,13 +112,34 @@ class Model(BaseLabResource):
         for full in entries:
             if not await storage.isdir(full):
                 continue
-            # Attempt to read index.json (or latest snapshot)
-            try:
-                entry = full.rstrip("/").split("/")[-1]
-                model = Model(entry)
-                results.append(await model.get_metadata())
-            except Exception:
-                continue
+            entry = full.rstrip("/").split("/")[-1]
+            # Check if this is a flat model (has index.json at root)
+            index_path = storage.join(full, "index.json")
+            if await storage.exists(index_path):
+                try:
+                    model = Model(entry)
+                    results.append(await model.get_metadata())
+                except Exception:
+                    continue
+            else:
+                # Might be a group folder — check subdirectories for index.json
+                try:
+                    sub_entries = await storage.ls(full, detail=False)
+                except Exception:
+                    continue
+                for sub_full in sub_entries:
+                    if not await storage.isdir(sub_full):
+                        continue
+                    sub_index = storage.join(sub_full, "index.json")
+                    if await storage.exists(sub_index):
+                        try:
+                            version_name = sub_full.rstrip("/").split("/")[-1]
+                            # Use relative path as model id: group/vN
+                            model_id = f"{entry}/{version_name}"
+                            model = Model(model_id)
+                            results.append(await model.get_metadata())
+                        except Exception:
+                            continue
         return results
 
     async def import_model(self, model_name, model_path):
