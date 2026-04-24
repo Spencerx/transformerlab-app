@@ -63,7 +63,7 @@ def post(path: str, data: dict = None, files: dict = None, timeout: float = 60.0
     return response
 
 
-def post_json(path: str, json_data: dict = None, timeout: float = 60.0) -> httpx.Response:
+def post_json(path: str, json_data: dict = None, timeout: float | None = 60.0) -> httpx.Response:
     """
     Makes a POST HTTP request with JSON body.
 
@@ -105,6 +105,37 @@ def post_text(path: str, text: str, timeout: float = 60.0) -> httpx.Response:
             url=f"{BASE_URL()}{path}",
             headers=headers,
             content=text,
+        )
+    return response
+
+
+def put(
+    path: str,
+    content: bytes = None,
+    headers: dict = None,
+    timeout: float = 300.0,
+) -> httpx.Response:
+    """
+    Makes a PUT HTTP request with raw bytes body.
+
+    Args:
+        path (str): The API path to send the request to.
+        content (bytes, optional): Raw bytes to send as the request body.
+        headers (dict, optional): Additional headers to merge into the request.
+        timeout (float): Request timeout in seconds. Default is 300.0.
+
+    Returns:
+        httpx.Response: The response object from the HTTP request.
+    """
+    merged_headers = _request_headers()
+    if headers:
+        merged_headers.update(headers)
+    with httpx.Client(timeout=timeout) as client:
+        response = client.request(
+            method="PUT",
+            url=f"{BASE_URL()}{path}",
+            headers=merged_headers,
+            content=content,
         )
     return response
 
