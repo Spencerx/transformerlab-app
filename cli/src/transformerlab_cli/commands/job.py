@@ -580,7 +580,7 @@ def fetch_logs(experiment_id: str, job_id: str):
 
 def fetch_task_logs(experiment_id: str, job_id: str):
     """Fetch task (Lab SDK) output for a job."""
-    return api.get(f"/experiment/{experiment_id}/jobs/{job_id}/stream_output", timeout=15.0)
+    return api.get(f"/experiment/{experiment_id}/jobs/{job_id}/task_logs", timeout=15.0)
 
 
 def fetch_request_logs(experiment_id: str, job_id: str):
