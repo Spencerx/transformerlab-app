@@ -6,6 +6,18 @@ from datetime import datetime
 from transformerlab.shared.models.models import ProviderType, AcceleratorType
 
 
+class ProviderResourceGroup(BaseModel):
+    """Schema for provider resource group configuration."""
+
+    id: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=100)
+    cpus: Optional[str] = None
+    memory: Optional[str] = None
+    disk_space: Optional[str] = None
+    accelerators: Optional[str] = None
+    num_nodes: Optional[int] = None
+
+
 class ProviderConfigBase(BaseModel):
     """Base schema for provider configuration."""
 
@@ -34,6 +46,7 @@ class ProviderConfigBase(BaseModel):
 
     # Accelerators supported by this provider
     supported_accelerators: Optional[List[AcceleratorType]] = Field(default=None)
+    resource_groups: Optional[List[ProviderResourceGroup]] = Field(default=None)
 
     # Additional provider-specific config
     extra_config: Dict[str, Any] = Field(default_factory=dict)
@@ -112,6 +125,11 @@ class ProviderTemplateLaunchRequest(BaseModel):
     task_name: Optional[str] = Field(None, description="Friendly task name")
     cluster_name: Optional[str] = Field(None, description="Base cluster name, suffix is appended automatically")
     run: str = Field(..., description="Run command to execute on the cluster")
+    description: Optional[str] = Field(
+        None,
+        max_length=8000,
+        description="Free-form markdown describing what this run is trying to accomplish (like a commit description).",
+    )
     subtype: Optional[str] = Field(None, description="Optional subtype for filtering")
     interactive_type: Optional[str] = Field(None, description="Interactive task type (e.g. vscode)")
     interactive_gallery_id: Optional[str] = Field(

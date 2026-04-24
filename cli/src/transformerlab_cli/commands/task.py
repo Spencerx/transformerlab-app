@@ -1,6 +1,8 @@
-import io
 import json
+import math
 import os
+import tempfile
+import sys
 import zipfile
 from pathlib import Path
 
@@ -8,6 +10,7 @@ import httpx
 import typer
 import yaml
 from rich.panel import Panel
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn
 from rich.syntax import Syntax
 
 import transformerlab_cli.util.api as api
@@ -139,20 +142,83 @@ def add_task_from_directory(
         console.print("[warning]Cancelled.[/warning]")
         raise typer.Exit(0)
 
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(task_dir):
-            for name in files:
-                file_path = os.path.join(root, name)
-                arcname = os.path.relpath(file_path, task_dir)
-                zf.write(file_path, arcname)
-    zip_buffer.seek(0)
+    CHUNK_SIZE = 64 * 1024 * 1024  # 64 MB
 
-    with console.status("[bold success]Creating task...[/bold success]", spinner="dots"):
-        response = api.post(
-            f"/experiment/{experiment_id}/task/create",
-            files={"directory_zip": ("task.zip", zip_buffer, "application/zip")},
+    tmp_zip = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+    tmp_zip_path = tmp_zip.name
+    tmp_zip.close()
+
+    try:
+        with zipfile.ZipFile(tmp_zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, _dirs, files in os.walk(task_dir):
+                for name in files:
+                    file_path = os.path.join(root, name)
+                    arcname = os.path.relpath(file_path, task_dir)
+                    zf.write(file_path, arcname)
+
+        zip_size = os.path.getsize(tmp_zip_path)
+        total_chunks = math.ceil(zip_size / CHUNK_SIZE)
+
+        with console.status("[bold success]Initialising upload...[/bold success]", spinner="dots"):
+            init_resp = api.post_json(
+                "/upload/init",
+                json_data={"filename": "task.zip", "total_size": zip_size},
+            )
+        if init_resp.status_code != 200:
+            console.print(f"[error]Error:[/error] Upload init failed ({init_resp.status_code})")
+            raise typer.Exit(1)
+
+        upload_id = init_resp.json()["upload_id"]
+
+        # Check for already-received chunks (resumability)
+        status_resp = api.get(f"/upload/{upload_id}/status")
+        already_received: set[int] = set(
+            status_resp.json().get("received", []) if status_resp.status_code == 200 else []
         )
+
+        with open(tmp_zip_path, "rb") as zip_fh:
+            with Progress(
+                TextColumn("[bold success]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                console=console,
+            ) as progress:
+                upload_task = progress.add_task("Uploading", total=total_chunks)
+                progress.advance(upload_task, len(already_received))
+                for i in range(total_chunks):
+                    if i in already_received:
+                        continue
+                    start = i * CHUNK_SIZE
+                    zip_fh.seek(start)
+                    chunk_data = zip_fh.read(CHUNK_SIZE)
+                    chunk_resp = api.put(
+                        f"/upload/{upload_id}/chunk?chunk_index={i}",
+                        content=chunk_data,
+                        headers={"Content-Type": "application/octet-stream"},
+                    )
+                    if chunk_resp.status_code != 200:
+                        console.print(f"[error]Error:[/error] Chunk {i} failed ({chunk_resp.status_code})")
+                        raise typer.Exit(1)
+                    progress.advance(upload_task)
+
+        with console.status("[bold success]Assembling upload...[/bold success]", spinner="dots"):
+            complete_resp = api.post_json(
+                f"/upload/{upload_id}/complete",
+                json_data={"total_chunks": total_chunks},
+                timeout=None,
+            )
+        if complete_resp.status_code != 200:
+            console.print(f"[error]Error:[/error] Upload complete failed ({complete_resp.status_code})")
+            raise typer.Exit(1)
+
+        with console.status("[bold success]Creating task...[/bold success]", spinner="dots"):
+            response = api.post_json(
+                f"/experiment/{experiment_id}/task/create?upload_id={upload_id}",
+                json_data={},
+                timeout=None,
+            )
+    finally:
+        os.unlink(tmp_zip_path)
 
     if response.status_code == 200:
         result = response.json()
@@ -449,6 +515,7 @@ def build_launch_payload(
     provider_name: str,
     param_values: dict | None = None,
     resource_overrides: dict | None = None,
+    description: str | None = None,
 ) -> dict:
     """Build the payload for launching a task on a provider."""
     cfg = task.get("config") or {}
@@ -467,6 +534,7 @@ def build_launch_payload(
         "experiment_id": task.get("experiment_id"),
         "task_id": task.get("id"),
         "task_name": task.get("name"),
+        "description": description,
         "run": task.get("run"),
         "setup": task.get("setup"),
         "cpus": pick("cpus"),
@@ -611,7 +679,12 @@ def _prompt_parameters(parameters: dict) -> dict:
     return values
 
 
-def queue_task(task_id: str, experiment_id: str, interactive: bool = True) -> None:
+def queue_task(
+    task_id: str,
+    experiment_id: str,
+    interactive: bool = True,
+    description: str | None = None,
+) -> None:
     """Queue a task on a compute provider."""
     with console.status("[bold success]Fetching task...[/bold success]", spinner="dots"):
         response = api.get(f"/experiment/{experiment_id}/task/{task_id}/get")
@@ -651,7 +724,9 @@ def queue_task(task_id: str, experiment_id: str, interactive: bool = True) -> No
     else:
         param_values = {k: (v.get("default", "") if isinstance(v, dict) else v) for k, v in parameters.items()}
 
-    payload = build_launch_payload(task, provider.get("name"), param_values, resource_overrides)
+    payload = build_launch_payload(
+        task, provider.get("name"), param_values, resource_overrides, description=description
+    )
     provider_id = provider.get("id")
 
     with console.status("[bold success]Queuing task...[/bold success]", spinner="dots"):
@@ -668,10 +743,28 @@ def queue_task(task_id: str, experiment_id: str, interactive: bool = True) -> No
 def command_task_queue(
     task_id: str = typer.Argument(..., help="Task ID to queue"),
     no_interactive: bool = typer.Option(False, "--no-interactive", help="Skip interactive prompts, use defaults"),
+    description: str | None = typer.Option(
+        None,
+        "--description",
+        "-m",
+        help=(
+            "Markdown note describing what this run is trying to accomplish (like a commit description). "
+            "Pass '-' to read from stdin."
+        ),
+    ),
 ):
     """Queue a task on a compute provider."""
     current_experiment = require_current_experiment()
-    queue_task(task_id, experiment_id=current_experiment, interactive=not no_interactive)
+    if description == "-":
+        if sys.stdin.isatty():
+            raise typer.BadParameter('-m - reads the description from stdin; pipe content in or pass -m "...".')
+        description = sys.stdin.read()
+    queue_task(
+        task_id,
+        experiment_id=current_experiment,
+        interactive=not no_interactive,
+        description=description,
+    )
 
 
 def gallery_tasks(output_format: str = "pretty", gallery_type: str = "all", experiment_id: str = "alpha") -> list[dict]:

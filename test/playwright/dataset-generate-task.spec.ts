@@ -39,7 +39,6 @@ test.describe('Dataset Generation Task', () => {
     const uniqueSuffix = Math.random().toString(36).slice(2, 8);
     const taskName = `${TASK_NAME_PREFIX}_${uniqueSuffix}`;
     const registryDatasetName = `${taskName}-registry-dataset`;
-    const registryVersionName = `${taskName}-v1`;
     const taskYaml = `name: ${taskName}
 github_repo_url: https://github.com/transformerlab/transformerlab-examples
 github_repo_dir: demo-generate-task
@@ -150,9 +149,6 @@ run: "python ~/demo-generate-task/fake_generate.py"
     await publishDialog
       .getByRole('textbox', { name: 'Name', exact: true })
       .fill(registryDatasetName);
-    await publishDialog
-      .getByRole('textbox', { name: 'Version Name', exact: true })
-      .fill(registryVersionName);
     const publishButton = publishDialog.getByRole('button', {
       name: /Publish as/i,
     });

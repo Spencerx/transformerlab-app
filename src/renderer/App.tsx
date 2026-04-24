@@ -13,6 +13,7 @@ import './styles.css';
 
 import AnnouncementBanner from './components/Shared/AnnouncementBanner';
 import InsecurePasswordBanner from './components/Shared/InsecurePasswordBanner';
+import StartupWizard from './components/Shared/StartupWizard';
 import VersionUpdateBanner from './components/Shared/VersionUpdateBanner';
 import { NotificationProvider } from './components/Shared/NotificationSystem';
 import { ExperimentInfoProvider } from './lib/ExperimentInfoContext';
@@ -82,6 +83,7 @@ function AppContent({
       }}
     >
       <InsecurePasswordBanner />
+      <StartupWizard />
       <Box
         component="main"
         className="MainContent"

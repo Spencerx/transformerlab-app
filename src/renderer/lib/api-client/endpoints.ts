@@ -348,6 +348,11 @@ Endpoints.Experiment = {
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_generated_dataset`,
   GetPlotJSON: (experimentId: string, jobId: string) =>
     `${API_URL()}experiment/${experimentId}/jobs/${jobId}/get_figure_json`,
+  GetNotes: (id: string) => `${API_URL()}experiment/${id}/notes`,
+  SaveNotes: (id: string) => `${API_URL()}experiment/${id}/notes`,
+  UploadNoteAsset: (id: string) => `${API_URL()}experiment/${id}/notes/assets`,
+  GetNoteAsset: (id: string, filename: string) =>
+    `${API_URL()}experiment/${id}/notes/assets/${filename}`,
 };
 
 Endpoints.Jobs = {
@@ -410,6 +415,14 @@ Endpoints.Teams = {
 Endpoints.Users = {
   GetSecrets: () => `${API_URL()}users/me/secrets`,
   SetSecrets: () => `${API_URL()}users/me/secrets`,
+};
+
+Endpoints.Upload = {
+  Init: () => `${API_URL()}upload/init`,
+  Chunk: (uploadId: string) => `${API_URL()}upload/${uploadId}/chunk`,
+  Status: (uploadId: string) => `${API_URL()}upload/${uploadId}/status`,
+  Complete: (uploadId: string) => `${API_URL()}upload/${uploadId}/complete`,
+  Delete: (uploadId: string) => `${API_URL()}upload/${uploadId}`,
 };
 
 Endpoints.AssetVersions = {

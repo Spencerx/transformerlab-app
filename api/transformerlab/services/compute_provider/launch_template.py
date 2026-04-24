@@ -254,8 +254,6 @@ async def launch_template_on_provider(
                 if azure_sas:
                     env_vars["AZURE_STORAGE_SAS_TOKEN"] = azure_sas
 
-    if request.file_mounts is True and request.task_id:
-        setup_commands.append(COPY_FILE_MOUNTS_SETUP)
     # Ensure transformerlab SDK is available on remote machines for live_status tracking and other helpers.
     # This runs after AWS credentials are configured so we have access to any remote storage if needed.
     if provider.type != ProviderType.LOCAL.value:
@@ -264,6 +262,8 @@ async def launch_template_on_provider(
         # Install torch as well if torch profiler is enabled
         if request.enable_profiling_torch:
             setup_commands.append("pip install -q torch")
+    if request.file_mounts is True and request.task_id:
+        setup_commands.append(COPY_FILE_MOUNTS_SETUP)
     # For RunPod providers, ensure uv is available and configured to use the
     # system Python. This allows user commands to invoke `uv` directly.
     if provider.type == ProviderType.RUNPOD.value:
@@ -565,6 +565,7 @@ async def launch_template_on_provider(
 
     job_data = {
         "task_name": request.task_name,
+        "description": request.description,
         "run": command_with_secrets,
         "cluster_name": formatted_cluster_name,
         "subtype": request.subtype,

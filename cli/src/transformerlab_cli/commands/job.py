@@ -37,10 +37,8 @@ def _publish_job_asset(
     asset_name: str,
     experiment_id: str,
     group: str | None,
-    registry_asset_name: str | None,
     mode: str,
     tag: str,
-    version_label: str,
     description: str | None,
 ) -> None:
     """Publish a job-produced model/dataset to the registry."""
@@ -54,12 +52,9 @@ def _publish_job_asset(
     params: dict[str, str] = {
         "mode": mode,
         "tag": tag,
-        "version_label": version_label,
     }
     if group:
         params["target_name"] = group
-    if registry_asset_name:
-        params["asset_name"] = registry_asset_name
     if description:
         params["description"] = description
 
@@ -108,11 +103,9 @@ def _prompt_publish_options(
     job_id: str,
     mode: str,
     group: str | None,
-    registry_asset_name: str | None,
     tag: str,
-    version_label: str,
     description: str | None,
-) -> tuple[str, str | None, str | None, str, str, str | None]:
+) -> tuple[str, str | None, str, str | None]:
     """Prompt for publish metadata in pretty mode."""
     console.print(f"\n[bold label]Publish {asset_type} from job {job_id}[/bold label]")
     mode = typer.prompt("Mode (new/existing)", default=mode).strip().lower()
@@ -128,16 +121,7 @@ def _prompt_publish_options(
             raise typer.Exit(1)
         group = group_value
 
-    default_asset_name = registry_asset_name or ""
-    resolved_asset_name = typer.prompt(
-        "Registry asset name (optional)",
-        default=default_asset_name,
-        show_default=bool(default_asset_name),
-    ).strip()
-    registry_asset_name = resolved_asset_name or None
-
     tag = typer.prompt("Tag", default=tag).strip()
-    version_label = typer.prompt("Version label", default=version_label).strip()
 
     default_description = description or ""
     resolved_description = typer.prompt(
@@ -147,7 +131,7 @@ def _prompt_publish_options(
     ).strip()
     description = resolved_description or None
 
-    return mode, group, registry_asset_name, tag, version_label, description
+    return mode, group, tag, description
 
 
 def _prompt_asset_from_job(asset_type: str, endpoint_collection: str, experiment_id: str, job_id: str) -> str:
@@ -275,6 +259,7 @@ def _render_job(job) -> None:
         "ID": job.get("id", "N/A"),
         "Experiment ID": job.get("experiment_id", "N/A"),
         "Task Name": job_data.get("task_name", "N/A"),
+        "Description": job_data.get("description", "N/A"),
         "Command": run_command,
         "Cluster Name": job_data.get("cluster_name", "N/A"),
         "CPUs": job_data.get("cpus", "N/A"),
@@ -802,15 +787,11 @@ def command_job_publish_dataset(
     job_id: str = typer.Argument(..., help="Job ID that contains the dataset"),
     dataset_name: str | None = typer.Argument(None, help="Dataset name in the job's datasets output"),
     group: str | None = typer.Option(None, "--group", "-g", help="Registry group name (target_name)"),
-    registry_asset_name: str | None = typer.Option(
-        None, "--asset-name", help="Unique folder name for this version in the dataset registry"
-    ),
     mode: str = typer.Option("new", "--mode", help="Publish mode: new or existing"),
     tag: str = typer.Option("latest", "--tag", help="Version tag"),
-    version_label: str = typer.Option("v1", "--version-label", help="Version label"),
     description: str | None = typer.Option(None, "--description", "-d", help="Version description"),
 ):
-    """Publish a dataset from a job to the registry."""
+    """Publish a dataset from a job to the registry. Version label is auto-generated (v1, v2, …)."""
     current_experiment = require_current_experiment()
     if not dataset_name:
         if cli_state.output_format == "json":
@@ -823,14 +804,12 @@ def command_job_publish_dataset(
             job_id=job_id,
         )
     if cli_state.output_format != "json":
-        mode, group, registry_asset_name, tag, version_label, description = _prompt_publish_options(
+        mode, group, tag, description = _prompt_publish_options(
             asset_type="dataset",
             job_id=job_id,
             mode=mode,
             group=group,
-            registry_asset_name=registry_asset_name,
             tag=tag,
-            version_label=version_label,
             description=description,
         )
     _publish_job_asset(
@@ -840,10 +819,8 @@ def command_job_publish_dataset(
         asset_name=dataset_name,
         experiment_id=current_experiment,
         group=group,
-        registry_asset_name=registry_asset_name,
         mode=mode,
         tag=tag,
-        version_label=version_label,
         description=description,
     )
 
@@ -853,15 +830,11 @@ def command_job_publish_model(
     job_id: str = typer.Argument(..., help="Job ID that contains the model"),
     model_name: str | None = typer.Argument(None, help="Model name in the job's models output"),
     group: str | None = typer.Option(None, "--group", "-g", help="Registry group name (target_name)"),
-    registry_asset_name: str | None = typer.Option(
-        None, "--asset-name", help="Unique folder name for this version in the model registry"
-    ),
     mode: str = typer.Option("new", "--mode", help="Publish mode: new or existing"),
     tag: str = typer.Option("latest", "--tag", help="Version tag"),
-    version_label: str = typer.Option("v1", "--version-label", help="Version label"),
     description: str | None = typer.Option(None, "--description", "-d", help="Version description"),
 ):
-    """Publish a model from a job to the registry."""
+    """Publish a model from a job to the registry. Version label is auto-generated (v1, v2, …)."""
     current_experiment = require_current_experiment()
     if not model_name:
         if cli_state.output_format == "json":
@@ -874,14 +847,12 @@ def command_job_publish_model(
             job_id=job_id,
         )
     if cli_state.output_format != "json":
-        mode, group, registry_asset_name, tag, version_label, description = _prompt_publish_options(
+        mode, group, tag, description = _prompt_publish_options(
             asset_type="model",
             job_id=job_id,
             mode=mode,
             group=group,
-            registry_asset_name=registry_asset_name,
             tag=tag,
-            version_label=version_label,
             description=description,
         )
     _publish_job_asset(
@@ -891,10 +862,8 @@ def command_job_publish_model(
         asset_name=model_name,
         experiment_id=current_experiment,
         group=group,
-        registry_asset_name=registry_asset_name,
         mode=mode,
         tag=tag,
-        version_label=version_label,
         description=description,
     )
 

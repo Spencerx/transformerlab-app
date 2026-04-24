@@ -23,6 +23,7 @@ import {
   Option,
   Checkbox,
   Chip,
+  Textarea,
 } from '@mui/joy';
 import { Editor } from '@monaco-editor/react';
 import {
@@ -88,6 +89,16 @@ interface ProcessedParameter {
   isShorthand: boolean;
 }
 
+type ProviderResourceGroup = {
+  id: string;
+  name: string;
+  cpus?: string;
+  memory?: string;
+  disk_space?: string;
+  accelerators?: string;
+  num_nodes?: string;
+};
+
 export default function QueueTaskModal({
   open,
   onClose,
@@ -128,8 +139,17 @@ export default function QueueTaskModal({
   const [minutesRequestedInput, setMinutesRequestedInput] = React.useState('');
   const [showResourceOverrides, setShowResourceOverrides] =
     React.useState(false);
+  const [resourceOverrideMode, setResourceOverrideMode] = React.useState<
+    'manual' | 'group'
+  >('manual');
+  const [selectedResourceGroupId, setSelectedResourceGroupId] =
+    React.useState('');
+  const [resourceGroupCustomized, setResourceGroupCustomized] =
+    React.useState(false);
   const [showParameterOverrides, setShowParameterOverrides] =
     React.useState(true);
+  const [jobDescription, setJobDescription] = React.useState('');
+  const [showDescription, setShowDescription] = React.useState(false);
   const resourceOverridesRef = React.useRef<HTMLDivElement | null>(null);
   const loadingMessages = React.useMemo(
     () => [
@@ -222,6 +242,47 @@ export default function QueueTaskModal({
   const isSkypilotProvider = selectedProvider?.type === 'skypilot';
   const isDstackProvider = selectedProvider?.type === 'dstack';
   const isGalleryImported = Boolean((task as any)?.gallery_import);
+  const providerResourceGroups = React.useMemo<ProviderResourceGroup[]>(() => {
+    const groups = (selectedProvider?.config as any)?.resource_groups;
+    if (!Array.isArray(groups)) {
+      return [];
+    }
+    return groups
+      .filter((group: any) => group && typeof group === 'object')
+      .map((group: any) => ({
+        id: String(group.id || ''),
+        name: String(group.name || ''),
+        cpus: group.cpus != null ? String(group.cpus) : undefined,
+        memory: group.memory != null ? String(group.memory) : undefined,
+        disk_space:
+          group.disk_space != null ? String(group.disk_space) : undefined,
+        accelerators:
+          group.accelerators != null ? String(group.accelerators) : undefined,
+        num_nodes:
+          group.num_nodes != null ? String(group.num_nodes) : undefined,
+      }))
+      .filter((group: ProviderResourceGroup) => group.id && group.name);
+  }, [selectedProvider]);
+
+  React.useEffect(() => {
+    if (!selectedResourceGroupId) {
+      return;
+    }
+    const stillExists = providerResourceGroups.some(
+      (group) => group.id === selectedResourceGroupId,
+    );
+    if (!stillExists) {
+      setSelectedResourceGroupId('');
+      setResourceOverrideMode('manual');
+      setResourceGroupCustomized(false);
+    }
+  }, [providerResourceGroups, selectedResourceGroupId]);
+
+  const markCustomResourceOverride = React.useCallback(() => {
+    if (resourceOverrideMode === 'group' && selectedResourceGroupId) {
+      setResourceGroupCustomized(true);
+    }
+  }, [resourceOverrideMode, selectedResourceGroupId]);
 
   const suggestedGalleryResources = React.useMemo(() => {
     if (!isGalleryImported) return null;
@@ -666,6 +727,16 @@ export default function QueueTaskModal({
           ? String(initMinutesRequested)
           : '',
       );
+      setResourceOverrideMode('manual');
+      setSelectedResourceGroupId('');
+      setResourceGroupCustomized(false);
+      const initDescription = cfg.description ?? task.description ?? '';
+      const normalizedDescription =
+        initDescription !== null && initDescription !== undefined
+          ? String(initDescription)
+          : '';
+      setJobDescription(normalizedDescription);
+      setShowDescription(Boolean(normalizedDescription.trim()));
     }
   }, [open, task, providers]);
 
@@ -781,8 +852,19 @@ export default function QueueTaskModal({
 
     // Add provider_name if available
     const provider = providers.find((p) => p.id === selectedProviderId);
+    const selectedResourceGroup = providerResourceGroups.find(
+      (group) => group.id === selectedResourceGroupId,
+    );
     if (provider) {
       config.provider_name = provider.name;
+    }
+
+    if (resourceOverrideMode === 'group' && selectedResourceGroup) {
+      config.resource_group_id = selectedResourceGroup.id;
+      config.resource_group_name = selectedResourceGroup.name;
+      if (resourceGroupCustomized) {
+        config.resource_group_custom_override = true;
+      }
     }
 
     if (cpusInput.trim()) {
@@ -808,6 +890,9 @@ export default function QueueTaskModal({
       if (!Number.isNaN(parsedMinutes) && parsedMinutes > 0) {
         config.minutes_requested = parsedMinutes;
       }
+    }
+    if (jobDescription.trim()) {
+      config.description = jobDescription.trim();
     }
 
     // For SLURM providers, add optional per-job SBATCH flags override
@@ -1322,7 +1407,12 @@ export default function QueueTaskModal({
                       : 'No compute providers configured'
                   }
                   value={selectedProviderId || null}
-                  onChange={(_, value) => setSelectedProviderId(value || '')}
+                  onChange={(_, value) => {
+                    setSelectedProviderId(value || '');
+                    setSelectedResourceGroupId('');
+                    setResourceOverrideMode('manual');
+                    setResourceGroupCustomized(false);
+                  }}
                   disabled={
                     isSubmitting || providersIsLoading || providers.length === 0
                   }
@@ -1654,6 +1744,53 @@ export default function QueueTaskModal({
               disabled={isSubmitting}
             />
 
+            <Divider />
+
+            {/* Optional Description Section */}
+            <Stack spacing={1}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ cursor: isSubmitting ? 'default' : 'pointer' }}
+                onClick={() => {
+                  if (!isSubmitting) {
+                    setShowDescription((prev) => !prev);
+                  }
+                }}
+              >
+                <Typography level="title-sm">
+                  Add description (optional)
+                </Typography>
+                <ChevronDownIcon
+                  size={18}
+                  style={{
+                    transform: showDescription
+                      ? 'rotate(180deg)'
+                      : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </Stack>
+              {showDescription && (
+                <FormControl>
+                  <FormLabel>Run description</FormLabel>
+                  <Textarea
+                    minRows={3}
+                    maxRows={8}
+                    placeholder="Describe what changed, your hypothesis, and what to watch for in this run."
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    disabled={isSubmitting}
+                  />
+                  <FormHelperText>
+                    Stored with the job and shown in job details. Markdown is
+                    supported.
+                  </FormHelperText>
+                </FormControl>
+              )}
+            </Stack>
+
             {/* Optional Resource Overrides Section */}
             <Divider />
             <Stack spacing={1}>
@@ -1683,13 +1820,90 @@ export default function QueueTaskModal({
               </Stack>
               {showResourceOverrides && (
                 <Stack spacing={2} ref={resourceOverridesRef}>
+                  <FormControl>
+                    <FormLabel>Override mode</FormLabel>
+                    <RadioGroup
+                      orientation="horizontal"
+                      value={resourceOverrideMode}
+                      onChange={(event) => {
+                        const nextMode = event.target.value as
+                          | 'manual'
+                          | 'group';
+                        setResourceOverrideMode(nextMode);
+                        if (nextMode === 'manual') {
+                          setSelectedResourceGroupId('');
+                          setResourceGroupCustomized(false);
+                        }
+                      }}
+                    >
+                      <Radio value="manual" label="Manual resources" />
+                      <Radio
+                        value="group"
+                        label="Use saved group"
+                        disabled={providerResourceGroups.length === 0}
+                      />
+                    </RadioGroup>
+                    {resourceOverrideMode === 'group' && (
+                      <FormHelperText>
+                        {providerResourceGroups.length === 0
+                          ? 'No saved groups are defined for this provider yet.'
+                          : 'Select a saved group to prefill resource values.'}
+                      </FormHelperText>
+                    )}
+                  </FormControl>
+
+                  {resourceOverrideMode === 'group' && (
+                    <FormControl>
+                      <FormLabel>Saved resource group</FormLabel>
+                      <Select
+                        placeholder="Select a resource group"
+                        value={selectedResourceGroupId || null}
+                        disabled={
+                          isSubmitting || providerResourceGroups.length === 0
+                        }
+                        onChange={(_, value) => {
+                          const groupId = String(value || '');
+                          setSelectedResourceGroupId(groupId);
+                          setResourceGroupCustomized(false);
+                          const group = providerResourceGroups.find(
+                            (entry) => entry.id === groupId,
+                          );
+                          if (!group) {
+                            return;
+                          }
+                          setCpusInput(group.cpus || '');
+                          setMemoryInput(group.memory || '');
+                          setDiskSpaceInput(group.disk_space || '');
+                          setAcceleratorsInput(group.accelerators || '');
+                          setNumNodesInput(group.num_nodes || '');
+                        }}
+                      >
+                        {providerResourceGroups.map((group) => (
+                          <Option key={group.id} value={group.id}>
+                            {group.name}
+                          </Option>
+                        ))}
+                      </Select>
+                      {selectedResourceGroupId && (
+                        <FormHelperText>
+                          {resourceGroupCustomized
+                            ? 'Custom override active: one or more fields have been edited.'
+                            : 'Using saved group values. Editing any field will switch to custom override.'}
+                        </FormHelperText>
+                      )}
+                    </FormControl>
+                  )}
+
                   <Stack direction="row" spacing={2}>
                     <FormControl sx={{ flex: 1 }}>
                       <FormLabel>CPUs</FormLabel>
                       <Input
                         placeholder="e.g. 4"
                         value={cpusInput}
-                        onChange={(e) => setCpusInput(e.target.value)}
+                        onChange={(e) => {
+                          setCpusInput(e.target.value);
+                          markCustomResourceOverride();
+                        }}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -1698,7 +1912,10 @@ export default function QueueTaskModal({
                       <Input
                         placeholder="e.g. 16GB"
                         value={memoryInput}
-                        onChange={(e) => setMemoryInput(e.target.value)}
+                        onChange={(e) => {
+                          setMemoryInput(e.target.value);
+                          markCustomResourceOverride();
+                        }}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -1709,7 +1926,10 @@ export default function QueueTaskModal({
                       <Input
                         placeholder="e.g. 100 or 100GB"
                         value={diskSpaceInput}
-                        onChange={(e) => setDiskSpaceInput(e.target.value)}
+                        onChange={(e) => {
+                          setDiskSpaceInput(e.target.value);
+                          markCustomResourceOverride();
+                        }}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -1718,7 +1938,10 @@ export default function QueueTaskModal({
                       <Input
                         placeholder="e.g. A100:1, RTX3090:2, 1"
                         value={acceleratorsInput}
-                        onChange={(e) => setAcceleratorsInput(e.target.value)}
+                        onChange={(e) => {
+                          setAcceleratorsInput(e.target.value);
+                          markCustomResourceOverride();
+                        }}
                         disabled={isSubmitting}
                       />
                     </FormControl>
@@ -1729,7 +1952,10 @@ export default function QueueTaskModal({
                       <Input
                         placeholder="e.g. 1"
                         value={numNodesInput}
-                        onChange={(e) => setNumNodesInput(e.target.value)}
+                        onChange={(e) => {
+                          setNumNodesInput(e.target.value);
+                          markCustomResourceOverride();
+                        }}
                         disabled={isSubmitting}
                       />
                     </FormControl>
