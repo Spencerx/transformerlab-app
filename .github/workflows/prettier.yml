@@ -2,19 +2,9 @@ name: Prettier Check
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "transformerlab-docs/**"
-      - "package.json"
-      - ".github/workflows/prettier.yml"
+    branches: [ main ]
   pull_request:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "transformerlab-docs/**"
-      - "package.json"
-      - ".github/workflows/prettier.yml"
+    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
