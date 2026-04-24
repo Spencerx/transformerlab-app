@@ -417,6 +417,14 @@ Endpoints.Users = {
   SetSecrets: () => `${API_URL()}users/me/secrets`,
 };
 
+Endpoints.Upload = {
+  Init: () => `${API_URL()}upload/init`,
+  Chunk: (uploadId: string) => `${API_URL()}upload/${uploadId}/chunk`,
+  Status: (uploadId: string) => `${API_URL()}upload/${uploadId}/status`,
+  Complete: (uploadId: string) => `${API_URL()}upload/${uploadId}/complete`,
+  Delete: (uploadId: string) => `${API_URL()}upload/${uploadId}`,
+};
+
 Endpoints.AssetVersions = {
   ListGroups: (assetType: string) =>
     `${API_URL()}asset_versions/groups?asset_type=${assetType}`,
