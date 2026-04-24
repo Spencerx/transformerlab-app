@@ -6,7 +6,7 @@ resources:
   memory: 2
 setup: |
 run: |
-  python ~/interactive-ssh/run.py
+  python interactive-ssh/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

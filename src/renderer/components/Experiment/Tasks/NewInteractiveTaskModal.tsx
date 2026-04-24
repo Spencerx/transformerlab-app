@@ -26,6 +26,7 @@ import {
   Tab,
   Box,
   Chip,
+  Switch,
 } from '@mui/joy';
 import { ArrowLeftIcon, ArrowRightIcon, XIcon } from 'lucide-react';
 import { useExperimentInfo } from 'renderer/lib/ExperimentInfoContext';
@@ -50,7 +51,7 @@ type ProviderOption = {
 type ConfigField = {
   field_name: string;
   env_var: string;
-  field_type: 'str' | 'integer';
+  field_type: 'str' | 'integer' | 'model';
   required?: boolean;
   placeholder?: string;
   help_text?: string;
@@ -136,6 +137,9 @@ export default function NewInteractiveTaskModal({
   const [selectedProviderId, setSelectedProviderId] = React.useState('');
   const [configFieldValues, setConfigFieldValues] = React.useState<
     Record<string, string>
+  >({});
+  const [modelRegistryToggles, setModelRegistryToggles] = React.useState<
+    Record<string, boolean>
   >({});
   const [activeGalleryTab, setActiveGalleryTab] = React.useState<
     'interactive' | 'team-interactive'
@@ -226,6 +230,27 @@ export default function NewInteractiveTaskModal({
     );
   }, [teamGallery]);
 
+  const { data: installedModelsData } = useSWR(
+    open && step === 'config' ? chatAPI.Endpoints.Models.LocalList() : null,
+    fetcher,
+  );
+  const { data: registryModelsData } = useSWR(
+    open && step === 'config'
+      ? chatAPI.Endpoints.Models.RegistryVersionList()
+      : null,
+    fetcher,
+  );
+
+  const installedModels = React.useMemo(() => {
+    if (!installedModelsData || !Array.isArray(installedModelsData)) return [];
+    return installedModelsData as Array<{ model_id: string; name?: string }>;
+  }, [installedModelsData]);
+
+  const registryModels = React.useMemo(() => {
+    if (!registryModelsData || !Array.isArray(registryModelsData)) return [];
+    return registryModelsData as Array<{ model_id: string; name?: string }>;
+  }, [registryModelsData]);
+
   React.useEffect(() => {
     if (!open) {
       setStep('provider');
@@ -237,6 +262,7 @@ export default function NewInteractiveTaskModal({
       setConfigFieldValues({});
       setSelectedProviderId('');
       setActiveGalleryTab('interactive');
+      setModelRegistryToggles({});
     }
   }, [open]);
 
@@ -328,6 +354,7 @@ export default function NewInteractiveTaskModal({
       setStep('gallery');
       setSelectedTemplate(null);
       setConfigFieldValues({});
+      setModelRegistryToggles({});
     } else if (step === 'gallery') {
       setStep('provider');
     }
@@ -338,6 +365,19 @@ export default function NewInteractiveTaskModal({
       ...prev,
       [envVar]: value,
     }));
+  };
+
+  const handleModelRegistryToggle = (envVar: string, checked: boolean) => {
+    setModelRegistryToggles((prev) => ({ ...prev, [envVar]: checked }));
+    setConfigFieldValues((prev) => {
+      const next = { ...prev, [envVar]: '' };
+      if (checked) {
+        next['MODEL_REGISTRY_TLAB'] = '1';
+      } else {
+        delete next['MODEL_REGISTRY_TLAB'];
+      }
+      return next;
+    });
   };
 
   const handleImportTeamTask = async (galleryIdentifier: string | number) => {
@@ -661,20 +701,83 @@ export default function NewInteractiveTaskModal({
                             }
                           >
                             <FormLabel>{field.field_name}</FormLabel>
-                            {field.env_var === 'MODEL_NAME' ? (
-                              <ModelNameInput
-                                value={configFieldValues[field.env_var] || ''}
-                                onChange={(v) =>
-                                  handleConfigFieldChange(field.env_var, v)
-                                }
-                                taskTypeOrId={
-                                  selectedTemplate?.interactive_type ||
-                                  selectedTemplate?.id
-                                }
-                                placeholder={field.placeholder}
-                                disabled={isSubmitting}
-                                required={!!field.required}
-                              />
+                            {field.field_type === 'model' ? (
+                              <Stack spacing={1}>
+                                <Stack
+                                  direction="row"
+                                  spacing={1}
+                                  alignItems="center"
+                                >
+                                  <Switch
+                                    size="sm"
+                                    checked={
+                                      !!modelRegistryToggles[field.env_var]
+                                    }
+                                    onChange={(e) =>
+                                      handleModelRegistryToggle(
+                                        field.env_var,
+                                        e.target.checked,
+                                      )
+                                    }
+                                    disabled={isSubmitting}
+                                    slotProps={{
+                                      input: {
+                                        'aria-label':
+                                          'Load from TLab model registry',
+                                      },
+                                    }}
+                                  />
+                                  <Typography level="body-sm">
+                                    Load from TLab model registry
+                                  </Typography>
+                                </Stack>
+                                {modelRegistryToggles[field.env_var] ? (
+                                  <Select
+                                    placeholder="Select a model from registry"
+                                    value={
+                                      configFieldValues[field.env_var] || null
+                                    }
+                                    onChange={(_, value) =>
+                                      handleConfigFieldChange(
+                                        field.env_var,
+                                        value || '',
+                                      )
+                                    }
+                                    disabled={isSubmitting}
+                                    slotProps={{
+                                      listbox: { sx: { maxHeight: 240 } },
+                                    }}
+                                  >
+                                    {(registryModels.length > 0
+                                      ? registryModels
+                                      : installedModels
+                                    ).map((m) => (
+                                      <Option
+                                        key={m.model_id}
+                                        value={m.model_id}
+                                      >
+                                        {m.name || m.model_id}
+                                      </Option>
+                                    ))}
+                                  </Select>
+                                ) : (
+                                  <ModelNameInput
+                                    value={
+                                      configFieldValues[field.env_var] || ''
+                                    }
+                                    onChange={(v) =>
+                                      handleConfigFieldChange(field.env_var, v)
+                                    }
+                                    taskTypeOrId={
+                                      selectedTemplate?.interactive_type ||
+                                      selectedTemplate?.id
+                                    }
+                                    placeholder={field.placeholder}
+                                    disabled={isSubmitting}
+                                    required={!!field.required}
+                                  />
+                                )}
+                              </Stack>
                             ) : (
                               <Input
                                 type={
