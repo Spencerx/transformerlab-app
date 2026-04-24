@@ -50,6 +50,7 @@ from transformerlab.routers import (  # noqa: E402
     asset_versions,
     trackio,
     permissions,
+    upload,
 )
 from transformerlab.routers.auth import get_user_and_team  # noqa: E402
 
@@ -147,6 +148,12 @@ async def lifespan(app: FastAPI):
         )
 
         await start_remote_job_queue_worker()
+
+        # Sweep abandoned chunked-upload staging dirs older than 24 h
+        from transformerlab.services.upload_service import sweep_expired_uploads
+
+        swept = await asyncio.to_thread(sweep_expired_uploads)
+        print(f"✅ Upload staging sweep: removed {swept} expired upload(s)")
     print("FastAPI LIFESPAN: 🏁 🏁 🏁 Begin API Server 🏁 🏁 🏁", flush=True)
     yield
     # Do the following at API Shutdown:
@@ -315,6 +322,7 @@ app.include_router(ssh_keys.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(asset_versions.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(trackio.router, dependencies=[Depends(get_user_and_team)])
 app.include_router(permissions.router, dependencies=[Depends(get_user_and_team)])
+app.include_router(upload.router, dependencies=[Depends(get_user_and_team)])
 
 
 # @app.get("/")

@@ -14,10 +14,12 @@ import {
   FormLabel,
   Input,
   Stack,
+  LinearProgress,
 } from '@mui/joy';
 import { PlayIcon } from 'lucide-react';
 import JSZip from 'jszip';
 import * as chatAPI from 'renderer/lib/transformerlab-api-sdk';
+import { chunkedUpload, deleteUpload } from '../../../../lib/chunkedUpload';
 import TaskDirectoryUploader from './TaskDirectoryUploader';
 
 type NewTaskModal2Props = {
@@ -43,6 +45,7 @@ export default function NewTaskModal2({
   const [gitBranch, setGitBranch] = React.useState<string>('');
   const [directoryFiles, setDirectoryFiles] = React.useState<File[]>([]);
   const [submitting, setSubmitting] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState(0);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [showCreateBlank, setShowCreateBlank] = React.useState(false);
   const [creatingBlank, setCreatingBlank] = React.useState(false);
@@ -148,22 +151,38 @@ export default function NewTaskModal2({
         zip.file(path, blob);
       };
       await Promise.all(directoryFiles.map(addFile));
-      const blob = await zip.generateAsync({ type: 'blob' });
-      const formData = new FormData();
-      formData.append('directory_zip', blob, 'directory.zip');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-      const response = await chatAPI.authenticatedFetch(
-        chatAPI.Endpoints.Task.FromDirectory(experimentId),
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
+      setUploadProgress(0);
+      const { upload_id } = await chunkedUpload({
+        file: zipBlob,
+        filename: 'directory.zip',
+        onProgress: setUploadProgress,
+      });
+
+      let response: Response;
+      try {
+        response = await chatAPI.authenticatedFetch(
+          chatAPI.Endpoints.Task.FromDirectory(experimentId) +
+            `?upload_id=${upload_id}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: '{}',
+          },
+        );
+      } catch (e) {
+        await deleteUpload(upload_id).catch(() => {});
+        throw e;
+      }
+
       if (!response.ok) {
+        await deleteUpload(upload_id).catch(() => {});
         const err = await response.json().catch(() => ({}));
         setSubmitError(err.detail || `Request failed: ${response.status}`);
         return;
       }
+      await deleteUpload(upload_id).catch(() => {});
       const data = await response.json();
       onTaskCreated(data.id);
       onClose();
@@ -171,6 +190,7 @@ export default function NewTaskModal2({
       setSubmitError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setSubmitting(false);
+      setUploadProgress(0);
     }
   };
 
@@ -284,6 +304,9 @@ export default function NewTaskModal2({
                   </div>
                 )}
               </div>
+            )}
+            {submitting && selectedOption === 'upload' && (
+              <LinearProgress determinate value={uploadProgress} />
             )}
           </Stack>
         </DialogContent>
