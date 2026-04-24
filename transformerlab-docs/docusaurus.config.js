@@ -21,7 +21,7 @@ const config = {
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'transformerlab', // Usually your GitHub org/user name.
-  projectName: 'transformerlab-app', // Usually your repo name.
+  projectName: 'transfomerlab-docs', // Usually your repo name.
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -80,7 +80,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/transformerlab/transformerlab-app/tree/main/transformerlab-docs/',
+            'https://github.com/transformerlab/transformerlab-docs/tree/main/',
         },
         blog: {
           showReadingTime: true,
@@ -89,7 +89,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/transformerlab/transformerlab-app/tree/main/transformerlab-docs/',
+            'https://github.com/transformerlab/transformerlab-docs/tree/main/',
         },
         theme: {
           customCss: [
@@ -130,7 +130,7 @@ const config = {
         routeBasePath: 'for-teams',
         sidebarPath: require.resolve('./sidebars.js'),
         editUrl:
-          'https://github.com/transformerlab/transformerlab-app/tree/main/transformerlab-docs/',
+          'https://github.com/transformerlab/transformerlab-docs/tree/main/',
       },
     ],
   ],
@@ -143,7 +143,7 @@ const config = {
       announcementBar: {
         id: 'runpod_support',
         content:
-          'Runpod is now supported in Transformer Lab. <a href="/blog/runpod-no-gpu-needed">More details here</a>.',
+          'dstack is now supported in Transformer Lab. <a href="/blog/dstack-launch">More details here</a>.',
         backgroundColor: 'rgb(60, 62, 160)',
         textColor: '#ffffff',
         isCloseable: false,

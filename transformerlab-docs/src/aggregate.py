@@ -1,9 +1,9 @@
-# Use the following script to
-# aggregate all the md files into one giant one
+#Use the following script to 
+# aggregate all the md files into one giant one 
 # that can be fed into a LLM for context.
 
+import os
 from pathlib import Path
-
 
 def aggregate_markdown_files():
     # Get the root directory (parent of src)
@@ -50,7 +50,6 @@ def aggregate_markdown_files():
             f.write("".join(aggregated_content))
 
         print(f"✓ Aggregated {len(markdown_files)} files to {output_file}")
-
 
 if __name__ == "__main__":
     aggregate_markdown_files()
