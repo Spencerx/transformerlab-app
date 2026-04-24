@@ -234,11 +234,22 @@ export default function NewInteractiveTaskModal({
     open && step === 'config' ? chatAPI.Endpoints.Models.LocalList() : null,
     fetcher,
   );
+  const { data: registryModelsData } = useSWR(
+    open && step === 'config'
+      ? chatAPI.Endpoints.Models.RegistryVersionList()
+      : null,
+    fetcher,
+  );
 
   const installedModels = React.useMemo(() => {
     if (!installedModelsData || !Array.isArray(installedModelsData)) return [];
     return installedModelsData as Array<{ model_id: string; name?: string }>;
   }, [installedModelsData]);
+
+  const registryModels = React.useMemo(() => {
+    if (!registryModelsData || !Array.isArray(registryModelsData)) return [];
+    return registryModelsData as Array<{ model_id: string; name?: string }>;
+  }, [registryModelsData]);
 
   React.useEffect(() => {
     if (!open) {
@@ -737,7 +748,10 @@ export default function NewInteractiveTaskModal({
                                       listbox: { sx: { maxHeight: 240 } },
                                     }}
                                   >
-                                    {installedModels.map((m) => (
+                                    {(registryModels.length > 0
+                                      ? registryModels
+                                      : installedModels
+                                    ).map((m) => (
                                       <Option
                                         key={m.model_id}
                                         value={m.model_id}

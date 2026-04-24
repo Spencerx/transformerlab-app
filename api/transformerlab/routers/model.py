@@ -38,6 +38,45 @@ async def model_local_list():
     return models
 
 
+@router.get("/model/registry_versions")
+@cached(key="models:registry_versions", ttl="1h", tags=["models", "models:registry_versions", "asset_versions"])
+async def model_registry_versions():
+    """List model registry versions as selectable model IDs."""
+    from transformerlab.services import asset_version_service
+
+    groups = await asset_version_service.list_groups("model")
+    versions: list[dict] = []
+
+    for group in groups:
+        group_id = group.get("group_id")
+        group_name = group.get("group_name") or group_id
+        if not group_id:
+            continue
+
+        group_versions = await asset_version_service.list_versions("model", group_id)
+        for version in group_versions:
+            model_id = version.get("asset_id")
+            version_label = version.get("version_label")
+            if not model_id or not version_label:
+                continue
+
+            tag = version.get("tag")
+            tag_suffix = f" ({tag})" if tag else ""
+            versions.append(
+                {
+                    "model_id": model_id,
+                    "name": f"{group_name}/{version_label}{tag_suffix}",
+                    "group_id": group_id,
+                    "group_name": group_name,
+                    "version_label": version_label,
+                    "tag": tag,
+                    "created_at": version.get("created_at"),
+                }
+            )
+
+    return versions
+
+
 @router.get("/model/create")
 async def model_local_create(id: str, name: str, json_data={}):
     # Use filesystem instead of database
