@@ -104,7 +104,7 @@
       {
         "field_name": "Model Name",
         "env_var": "MODEL_NAME",
-        "field_type": "str",
+        "field_type": "model",
         "required": true,
         "placeholder": "e.g. meta-llama/Llama-2-7b-chat-hf",
         "help_text": "HuggingFace model identifier"

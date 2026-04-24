@@ -11,7 +11,7 @@ setup: |
   . ~/vllm-venv/bin/activate
   uv pip install "vllm>=0.13.0" "transformers>=4.57.3" qwen-vl-utils==0.0.14 open-webui
 run: |
-  python ~/interactive-vllm/run.py
+  python interactive-vllm/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

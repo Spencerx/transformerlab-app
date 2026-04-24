@@ -10,7 +10,7 @@ setup: |
   if ! command -v ollama >/dev/null 2>&1; then curl -fsSL https://ollama.com/install.sh | sh; fi
   if [ "$(uname)" != "Darwin" ]; then $SUDO apt-get update && $SUDO apt-get install -y pciutils lshw; fi
 run: |
-  python ~/inference-ollama-gradio-chat/run.py
+  python inference-ollama-gradio-chat/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:
