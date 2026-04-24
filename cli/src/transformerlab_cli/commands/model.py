@@ -214,6 +214,7 @@ def command_model_create(
         if cli_state.output_format == "json":
             print(json.dumps(body, indent=2, default=str))
         else:
+            version_label = body.get("version_label", "v?")
             console.print(
                 f"[success]✓[/success] Model group [bold]{group_name}[/bold] created "
                 f"(group_id: {body.get('group_id', '?')}, version: {version_label})."
