@@ -53,7 +53,6 @@ One of the most powerful features of Image History is the ability to convert you
 In the dataset creation dialog:
 
 1. **Dataset Name**: Enter a descriptive name for your dataset
-
    - Use clear, memorable names like "fantasy-landscapes" or "portrait-styles"
    - Avoid special characters and spaces (use hyphens or underscores)
 

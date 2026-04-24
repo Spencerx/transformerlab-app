@@ -28,7 +28,6 @@ Before running a vLLM Server service, ensure you have a Compute Provider set up 
    ![Select vLLM Server](../img/select-service-type.png)
 
 4. Configure the service:
-
    - Enter a name for the service.
    - Select the Compute Provider to use.
    - Specify the resources: CPU, memory, and GPUs.

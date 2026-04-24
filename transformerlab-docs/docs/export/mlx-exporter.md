@@ -22,7 +22,6 @@ The MLX Exporter Plugin allows you to export your model to the MLX format with q
    Choose **MLX Exporter** from the available export options.
 
 4. **Configure Export Settings**:
-
    - **Bits per Weight**: Enter the bits per weight of [quantization](#quantization-footer). Supported values are 2, 4, or 8.
 
 5. **Export the Model**:  

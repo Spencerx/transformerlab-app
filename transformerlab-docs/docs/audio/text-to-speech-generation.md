@@ -11,7 +11,6 @@ Transformer Lab supports **Text-to-Speech (TTS)** on **MLX (Apple Silicon)**, **
 ## How It Works
 
 1. Install the appropriate plugin:
-
    - **Apple Audio MLX Server** (for MLX)
    - **Unsloth Text-to-Speech Server** (for CUDA and ROCm)
 

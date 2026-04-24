@@ -292,6 +292,30 @@ def test_check_configs_missing_keys_json(tmp_config_dir):
         assert "server" in output["error"]
 
 
+def test_check_configs_missing_login_keys_prompts_login(tmp_config_dir):
+    """Pretty output should direct users to lab login for auth-derived keys."""
+    config_dir, config_file = tmp_config_dir
+    with open(config_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"server": "http://localhost:8338"}))
+    with _patch_config_paths(config_dir, config_file):
+        result = runner.invoke(app, ["job", "list"])
+        assert result.exit_code == 1
+        assert "team_id, user_email" in result.output
+        assert "Please run 'lab login'" in result.output
+
+
+def test_check_configs_missing_server_prompts_config_set(tmp_config_dir):
+    """Pretty output should keep config-set guidance for non-login keys."""
+    config_dir, config_file = tmp_config_dir
+    with open(config_file, "w", encoding="utf-8") as f:
+        f.write(json.dumps({"team_id": "abc-123", "user_email": "user@example.com"}))
+    with _patch_config_paths(config_dir, config_file):
+        result = runner.invoke(app, ["job", "list"])
+        assert result.exit_code == 1
+        assert "server" in result.output
+        assert "lab config set <key> <value>" in result.output
+
+
 def test_check_configs_no_banner_in_json_mode(tmp_config_dir):
     """check_configs with all required keys set prints no banner in json mode."""
     from unittest.mock import patch as mock_patch

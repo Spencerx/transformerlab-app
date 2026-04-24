@@ -90,7 +90,6 @@ For detailed evaluation instructions, see our [Text Diffusion Evaluation Documen
 Ready to dive in? Here's how to get started with text diffusion models in Transformer Lab:
 
 1. **Install the plugins**: Head to the Plugins tab and install:
-
    - Diffusion LLM Server
    - Diffusion LLM Trainer
    - Diffusion LLM Evaluator

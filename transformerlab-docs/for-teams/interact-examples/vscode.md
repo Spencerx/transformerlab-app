@@ -28,7 +28,6 @@ Before running a VSCode service, ensure you have a Compute Provider set up and a
    ![Select VSCode](../img/select-service-type.png)
 
 4. Configure the service:
-
    - Enter a name for the service.
    - Select the Compute Provider to use.
    - Specify the resources: CPU, memory, and GPUs.
@@ -39,7 +38,6 @@ Before running a VSCode service, ensure you have a Compute Provider set up and a
 6. Once launched, a card will appear for the service. Click the "Interactive Setup" button on the card.
 
 7. The setup involves a two-step process:
-
    - **Step 1:** A code will be displayed. Go to [github.com/login/device](https://github.com/login/device) to authenticate and tie the tunnel to your GitHub account.
      ![VSCode Setup Step 1](../img/vscode-setup-step1.png)
    - **Step 2:** After authentication, reopen the card to see the URL for accessing VSCode running on the remote machine.
