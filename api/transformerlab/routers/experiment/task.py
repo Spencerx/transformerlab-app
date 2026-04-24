@@ -34,7 +34,6 @@ from transformerlab.shared.github_utils import (
 )
 from transformerlab.routers.auth import get_user_and_team
 from transformerlab.shared.models.user_model import get_async_session
-from lab.task_template import TaskTemplate
 from transformerlab.schemas.task import (
     ExportTaskToTeamGalleryRequest,
     ImportTaskFromGalleryRequest,
@@ -245,20 +244,15 @@ async def task_list_files(experimentId: str, task_id: str) -> TaskFilesResponse:
     "/{task_id}/file/{file_path:path}",
     summary="Serve a file from a task's local workspace directory for preview",
 )
-async def task_get_file(task_id: str, file_path: str):
+async def task_get_file(experimentId: str, task_id: str, file_path: str):
     """
     Serve a file from the per-task workspace directory (used for upload-from-directory tasks).
 
     This mirrors the behavior of the jobs get_job_file endpoint but is scoped to
-    workspace/task/{task_id}. It is primarily intended for lightweight previews in
-    the UI and supports both text and binary content.
+    the task's experiment-scoped directory. It is primarily intended for lightweight
+    previews in the UI and supports both text and binary content.
     """
-    workspace_dir = await get_workspace_dir()
-    if not workspace_dir:
-        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
-
-    # Files for upload-from-directory tasks are materialized under workspace/task/{task_id}
-    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    task_dir = await task_service.get_task_dir(task_id, experiment_id=experimentId)
     safe_rel = posixpath.normpath(file_path).lstrip("/")
     if safe_rel.startswith("..") or "/.." in safe_rel:
         raise HTTPException(status_code=400, detail="Invalid file path")
@@ -365,11 +359,7 @@ async def task_update_file(experimentId: str, task_id: str, file_path: str, requ
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    workspace_dir = await get_workspace_dir()
-    if not workspace_dir:
-        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
-
-    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    task_dir = await task_service.get_task_dir(task_id, experiment_id=experimentId)
     safe_rel = posixpath.normpath(file_path).lstrip("/")
     if safe_rel.startswith("..") or "/.." in safe_rel:
         raise HTTPException(status_code=400, detail="Invalid file path")
@@ -401,11 +391,7 @@ async def task_delete_file(experimentId: str, task_id: str, file_path: str):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    workspace_dir = await get_workspace_dir()
-    if not workspace_dir:
-        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
-
-    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    task_dir = await task_service.get_task_dir(task_id, experiment_id=experimentId)
     safe_rel = posixpath.normpath(file_path).lstrip("/")
     if safe_rel.startswith("..") or "/.." in safe_rel:
         raise HTTPException(status_code=400, detail="Invalid file path")
@@ -436,11 +422,7 @@ async def task_upload_file(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    workspace_dir = await get_workspace_dir()
-    if not workspace_dir:
-        raise HTTPException(status_code=500, detail="Workspace directory is not configured")
-
-    task_dir = storage.join(workspace_dir, "task", str(task_id))
+    task_dir = await task_service.get_task_dir(task_id, experiment_id=experimentId)
     await storage.makedirs(task_dir, exist_ok=True)
 
     saved_files: list[str] = []
@@ -1263,13 +1245,8 @@ async def import_task_from_gallery(
     # Create the task with all fields stored directly (flat structure)
     task_id = await task_service.add_task(task_data)
 
-    # Store task.yaml in task directory
-    task = TaskTemplate(secure_filename(str(task_id)))
-    task_dir = await task.get_dir()
-    await storage.makedirs(task_dir, exist_ok=True)
-    yaml_path = storage.join(task_dir, "task.yaml")
-    async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
-        await f.write(task_yaml_content)
+    # Store task.yaml in the experiment-scoped task directory
+    await task_service.write_task_yaml(task_id, task_yaml_content, experiment_id=experimentId)
 
     # Invalidate cached task lists for this experiment (best-effort).
     await cache.invalidate(f"tasks:{experimentId}")
@@ -1546,11 +1523,10 @@ async def import_task_from_team_gallery(
 
         # Create task + copy full directory into the task workspace dir
         task_id = await task_service.add_task(task_data)
-        task = TaskTemplate(secure_filename(str(task_id)))
-        task_dir = await task.get_dir()
+        task_dir = await task_service.get_task_dir(task_id, experiment_id=experimentId)
         await storage.makedirs(task_dir, exist_ok=True)
 
-        # Copy the entire directory contents (task.yaml + attachments) into workspace/task/{task_id}
+        # Copy the entire directory contents (task.yaml + attachments) into the experiment-scoped task dir
         try:
             await storage.copy_dir(str(local_task_dir), task_dir)
         except Exception as e:
@@ -1626,10 +1602,7 @@ async def import_task_from_team_gallery(
             _clear_interactive_launch_provider(task_data)
         task_id = await task_service.add_task(task_data)
 
-        # Write a task.yaml into the task directory so the editor works
-        task = TaskTemplate(secure_filename(str(task_id)))
-        task_dir = await task.get_dir()
-        await storage.makedirs(task_dir, exist_ok=True)
+        # Write a task.yaml into the experiment-scoped task directory so the editor works
         yaml_obj = {
             "name": task_data["name"],
             "setup": task_data.get("setup"),
@@ -1647,9 +1620,9 @@ async def import_task_from_team_gallery(
         # Remove empty values so YAML stays tidy
         yaml_obj["resources"] = {k: v for k, v in (yaml_obj.get("resources") or {}).items() if v is not None}
         yaml_obj = {k: v for k, v in yaml_obj.items() if v not in (None, {}, [])}
-        yaml_path = storage.join(task_dir, "task.yaml")
-        async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
-            await f.write(yaml.safe_dump(yaml_obj, sort_keys=False))
+        await task_service.write_task_yaml(
+            task_id, yaml.safe_dump(yaml_obj, sort_keys=False), experiment_id=experimentId
+        )
 
         await cache.invalidate(f"tasks:{experimentId}")
         return {
@@ -1726,13 +1699,8 @@ async def import_task_from_team_gallery(
     # Create the task with all fields stored directly (flat structure)
     task_id = await task_service.add_task(task_data)
 
-    # Store task.yaml in task directory
-    task = TaskTemplate(secure_filename(str(task_id)))
-    task_dir = await task.get_dir()
-    await storage.makedirs(task_dir, exist_ok=True)
-    yaml_path = storage.join(task_dir, "task.yaml")
-    async with await storage.open(yaml_path, "w", encoding="utf-8") as f:
-        await f.write(task_yaml_content)
+    # Store task.yaml in the experiment-scoped task directory
+    await task_service.write_task_yaml(task_id, task_yaml_content, experiment_id=experimentId)
 
     # Invalidate cached task lists for this experiment (best-effort).
     await cache.invalidate(f"tasks:{experimentId}")
@@ -1823,9 +1791,8 @@ async def export_task_to_team_gallery(
             short_id = secure_filename(str(request.task_id))[:12]
             dest_dir = storage.join(export_root, f"{safe_title}-{short_id}")
 
-            # Copy from the task's workspace dir (workspace/task/{task_id})
-            src_task = TaskTemplate(secure_filename(str(request.task_id)))
-            src_dir = await src_task.get_dir()
+            # Copy from the task's experiment-scoped workspace directory
+            src_dir = await task_service.get_task_dir(request.task_id, experiment_id=experimentId)
             if await storage.exists(src_dir):
                 # Ensure destination is clean
                 if await storage.exists(dest_dir):
