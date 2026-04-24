@@ -672,6 +672,60 @@ async def get_tunnel_info_for_job(
     }
 
 
+@router.get("/{job_id}/task_logs")
+async def get_job_task_logs(
+    experimentId: str,
+    job_id: str,
+    tail_lines: int = Query(400, ge=100, le=2000),
+    sweeps: bool = False,
+    user_and_team=Depends(get_user_and_team),
+    session: AsyncSession = Depends(get_async_session),
+):
+    """
+    One-shot fetch of a job's task (SDK) output as JSON.
+
+    Returns ``{"logs": "<text>", "tail_lines": N}`` — same envelope as
+    ``/provider_logs``, so scripted/CLI consumers can use the same parsing.
+    The existing ``/stream_output`` endpoint is an open-ended SSE tail
+    intended for the UI; that connection never closes, which makes it
+    unusable from a one-shot HTTP client.
+    """
+    job = await job_service.job_get_cached(job_id, experiment_id=experimentId)
+    if not job or str(job.get("experiment_id")) != str(experimentId):
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    job_data = job.get("job_data") or {}
+    if not isinstance(job_data, dict):
+        try:
+            job_data = json.loads(job_data)
+        except JSONDecodeError:
+            job_data = {}
+
+    output_file_name: Optional[str] = None
+    if sweeps:
+        sweep_file = job_data.get("sweep_output_file")
+        if sweep_file and await storage.exists(sweep_file):
+            output_file_name = sweep_file
+
+    if output_file_name is None:
+        try:
+            output_file_name = await shared.get_job_output_file_name(job_id, experiment_name=experimentId)
+        except (ValueError, FileNotFoundError):
+            return {"logs": "", "tail_lines": tail_lines}
+
+    if not await storage.exists(output_file_name):
+        return {"logs": "", "tail_lines": tail_lines}
+
+    async with await storage.open(output_file_name, "r") as f:
+        logs_text = await f.read()
+
+    if tail_lines is not None:
+        lines = logs_text.splitlines()
+        logs_text = "\n".join(lines[-tail_lines:])
+
+    return {"logs": logs_text, "tail_lines": tail_lines}
+
+
 @router.get("/{job_id}/stream_output")
 async def stream_job_output(job_id: str, experimentId: str, sweeps: bool = False):
     """

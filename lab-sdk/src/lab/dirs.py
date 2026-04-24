@@ -167,6 +167,32 @@ async def get_jobs_dir(experiment_id: str) -> str:
     return path
 
 
+async def get_experiment_tasks_dir(experiment_id: str) -> str:
+    """
+    Return the filesystem directory for all task templates in an experiment.
+
+    Layout:
+        {workspace}/experiments/{experiment_id}/tasks/
+    """
+    experiments_dir = await get_experiments_dir()
+    experiment_id_safe = secure_filename(str(experiment_id))
+    path = storage.join(experiments_dir, experiment_id_safe, "tasks")
+    await storage.makedirs(path, exist_ok=True)
+    return path
+
+
+async def get_experiment_task_dir(experiment_id: str, task_id: str | int) -> str:
+    """
+    Return the filesystem directory for a specific task template in an experiment.
+
+    Layout:
+        {workspace}/experiments/{experiment_id}/tasks/{task_id}/
+    """
+    task_id_safe = secure_filename(str(task_id))
+    tasks_dir = await get_experiment_tasks_dir(experiment_id)
+    return storage.join(tasks_dir, task_id_safe)
+
+
 async def get_global_log_path() -> str:
     workspace = await get_workspace_dir()
     return storage.join(workspace, "transformerlab.log")

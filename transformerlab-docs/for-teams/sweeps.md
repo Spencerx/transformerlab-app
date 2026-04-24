@@ -56,11 +56,9 @@ In the configuration below, we are sweeping over two parameters: learning_rate a
 ## How It Works
 
 1. Parameter combinations: The system generates all combinations using a Cartesian product. In the example above:
-
    - 3 learning rates × 2 batch sizes = 6 total jobs
 
 2. Each job will receive:
-
    - The same `base parameters` (epochs: 10, model_type: "gpt2")
    - One unique combination from `sweep_config` (e.g., learning_rate: "1e-5", batch_size: "4")
 

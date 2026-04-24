@@ -42,7 +42,13 @@ from transformerlab.shared.disk_space_utils import parse_disk_space_gb
 from transformerlab.shared.models.models import ProviderType
 from transformerlab.shared.secret_utils import load_team_secrets, replace_secrets_in_dict, replace_secret_placeholders
 from lab import storage
-from lab.dirs import get_job_dir, get_local_provider_job_dir, get_task_dir, get_workspace_dir
+from lab.dirs import (
+    get_experiment_task_dir,
+    get_job_dir,
+    get_local_provider_job_dir,
+    get_task_dir,
+    get_workspace_dir,
+)
 from lab.job_status import JobStatus
 from lab.storage import STORAGE_PROVIDER
 from werkzeug.utils import secure_filename
@@ -274,7 +280,7 @@ async def launch_template_on_provider(
     # This handles GitHub-sourced interactive tasks where the CLI/TUI doesn't
     # send these fields and relies on the backend to resolve them from the task.
     if not request.github_repo_url and request.task_id:
-        task_data = await task_service.task_get_by_id(request.task_id)
+        task_data = await task_service.task_get_by_id(request.task_id, experiment_id=request.experiment_id)
         if task_data:
             request.github_repo_url = task_data.get("github_repo_url", "") or ""
             request.github_repo_dir = task_data.get("github_repo_dir", "") or ""
@@ -436,7 +442,7 @@ async def launch_template_on_provider(
     # This handles GitHub-sourced interactive tasks where the command/setup
     # are in task.yaml and were stored in the task at import time.
     if not base_command.strip() and request.task_id:
-        fallback_task = await task_service.task_get_by_id(request.task_id)
+        fallback_task = await task_service.task_get_by_id(request.task_id, experiment_id=request.experiment_id)
         if fallback_task:
             base_command = fallback_task.get("run", "") or fallback_task.get("command", "")
             # Also pick up setup from the task if not already added
@@ -557,8 +563,11 @@ async def launch_template_on_provider(
     # for metadata and overwriting it with the task's index.json would break
     # job status tracking.
     if request.task_id:
-        task_dir_root = await get_task_dir()
-        task_src = storage.join(task_dir_root, secure_filename(str(request.task_id)))
+        task_src = await get_experiment_task_dir(request.experiment_id, request.task_id)
+        if not await storage.isdir(task_src):
+            # Legacy fallback for tasks that have not been migrated yet.
+            task_dir_root = await get_task_dir()
+            task_src = storage.join(task_dir_root, secure_filename(str(request.task_id)))
         if await storage.isdir(task_src):
             workspace_job_dir = await get_job_dir(job_id, request.experiment_id)
             await copy_task_files_to_dir(task_src, workspace_job_dir)

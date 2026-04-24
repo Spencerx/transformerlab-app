@@ -22,7 +22,6 @@ The Llama Trainer allows you to create and manage training jobs using Transforme
 1. Navigate to the `Train` tab.
 2. Click on the `New` button.
 3. In the pop-up, complete the following sections:
-
    - **Template/Task Name:**  
      Set a unique name for your training template/task.
 
@@ -40,7 +39,6 @@ The Llama Trainer allows you to create and manage training jobs using Transforme
 
    - **Plugin Config Tab:**  
      Configure the training parameters. Each parameter controls a specific training aspect:
-
      - **Maximum Sequence Length:**  
        Defines the maximum number of tokens allowed per input sequence.
 

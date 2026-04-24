@@ -138,6 +138,65 @@ def test_job_list_json_no_spinner_text(_mock_check, _mock_get_config, _mock_api)
 
 
 # ---------------------------------------------------------------------------
+# Info command tests
+# ---------------------------------------------------------------------------
+
+
+def _info_api_get(jobs, files):
+    """Build a fake api.get that routes /jobs/list → jobs and /files → {'files': files}."""
+
+    def _get(path, *args, **kwargs):
+        if path.endswith("/files"):
+            return _mock_api_response({"files": files})
+        return _mock_api_response(jobs)
+
+    return _get
+
+
+@patch(
+    "transformerlab_cli.commands.job.api.get",
+    side_effect=_info_api_get(SAMPLE_JOBS, [{"name": "out.log", "is_dir": False, "size": 42}]),
+)
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_job_info_json_output(_mock_require, _mock_api):
+    """job info --format json emits the job dict with a files key."""
+    result = runner.invoke(app, ["--format", "json", "job", "info", "1"])
+    assert result.exit_code == 0
+    data = json.loads(result.output.strip())
+    assert data["id"] == 1
+    assert data["status"] == "RUNNING"
+    assert data["files"] == [{"name": "out.log", "is_dir": False, "size": 42}]
+
+
+@patch(
+    "transformerlab_cli.commands.job.api.get",
+    side_effect=_info_api_get(SAMPLE_JOBS, []),
+)
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_job_info_json_not_found(_mock_require, _mock_api):
+    """job info --format json emits an error object when the job is missing."""
+    result = runner.invoke(app, ["--format", "json", "job", "info", "999"])
+    assert result.exit_code == 0
+    data = json.loads(result.output.strip())
+    assert "error" in data
+    assert "999" in data["error"]
+
+
+@patch(
+    "transformerlab_cli.commands.job.api.get",
+    side_effect=_info_api_get(SAMPLE_JOBS, []),
+)
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_job_info_pretty_still_works(_mock_require, _mock_api):
+    """Pretty `job info` still renders the panel and does not regress."""
+    result = runner.invoke(app, ["job", "info", "1"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.output)
+    assert "Job Details for ID 1" in out
+    assert "RUNNING" in out
+
+
+# ---------------------------------------------------------------------------
 # Log command tests
 # ---------------------------------------------------------------------------
 
@@ -206,6 +265,16 @@ def test_task_logs_json(_mock_require, _mock_fetch):
     assert result.exit_code == 0
     data = json.loads(result.output.strip())
     assert "sdk line" in data["logs"]
+
+
+@patch("transformerlab_cli.commands.job.api.get", return_value=_mock_logs_response("sdk line"))
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+def test_task_logs_hits_task_logs_endpoint(_mock_require, mock_get):
+    """`fetch_task_logs` must hit the one-shot /task_logs endpoint, not the SSE /stream_output."""
+    result = runner.invoke(app, ["job", "task-logs", "42"])
+    assert result.exit_code == 0
+    called_url = mock_get.call_args.args[0] if mock_get.call_args.args else mock_get.call_args.kwargs.get("url", "")
+    assert called_url.endswith("/jobs/42/task_logs"), f"expected /task_logs endpoint, got: {called_url}"
 
 
 @patch("transformerlab_cli.commands.job.fetch_task_logs", return_value=_mock_error_response(404))
@@ -283,12 +352,8 @@ def test_job_publish_dataset_success(_mock_require, mock_post):
             "existing",
             "--group",
             "base-dataset",
-            "--asset-name",
-            "my-dataset-v2",
             "--tag",
             "production",
-            "--version-label",
-            "v2",
             "--description",
             "new run",
         ],
@@ -299,9 +364,7 @@ def test_job_publish_dataset_success(_mock_require, mock_post):
     assert "/experiment/exp1/jobs/42/datasets/my%20dataset/save_to_registry?" in called_endpoint
     assert "mode=existing" in called_endpoint
     assert "target_name=base-dataset" in called_endpoint
-    assert "asset_name=my-dataset-v2" in called_endpoint
     assert "tag=production" in called_endpoint
-    assert "version_label=v2" in called_endpoint
     assert "description=new+run" in called_endpoint
 
 
@@ -338,10 +401,11 @@ def test_job_publish_model_interactive_prompts(_mock_require, mock_post):
     mock_resp.json.return_value = {"status": "started"}
     mock_post.return_value = mock_resp
 
+    # Prompts in order: mode (default=new), tag, description
     result = runner.invoke(
         app,
         ["job", "publish", "model", "10", "adapterA"],
-        input="\n\nproduction\nv9\nPromoted build\n",
+        input="\nproduction\nPromoted build\n",
     )
 
     assert result.exit_code == 0
@@ -349,7 +413,6 @@ def test_job_publish_model_interactive_prompts(_mock_require, mock_post):
     assert "/experiment/exp1/jobs/10/models/adapterA/save_to_registry?" in called_endpoint
     assert "mode=new" in called_endpoint
     assert "tag=production" in called_endpoint
-    assert "version_label=v9" in called_endpoint
     assert "description=Promoted+build" in called_endpoint
 
 
@@ -372,7 +435,7 @@ def test_job_publish_model_interactive_selects_model_from_job(_mock_require, moc
     result = runner.invoke(
         app,
         ["job", "publish", "model", "10"],
-        input="2\n\n\nlatest\nv1\n\n",
+        input="2\n\nlatest\n\n",
     )
 
     assert result.exit_code == 0

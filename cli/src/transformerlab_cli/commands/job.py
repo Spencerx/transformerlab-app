@@ -37,10 +37,8 @@ def _publish_job_asset(
     asset_name: str,
     experiment_id: str,
     group: str | None,
-    registry_asset_name: str | None,
     mode: str,
     tag: str,
-    version_label: str,
     description: str | None,
 ) -> None:
     """Publish a job-produced model/dataset to the registry."""
@@ -54,12 +52,9 @@ def _publish_job_asset(
     params: dict[str, str] = {
         "mode": mode,
         "tag": tag,
-        "version_label": version_label,
     }
     if group:
         params["target_name"] = group
-    if registry_asset_name:
-        params["asset_name"] = registry_asset_name
     if description:
         params["description"] = description
 
@@ -108,11 +103,9 @@ def _prompt_publish_options(
     job_id: str,
     mode: str,
     group: str | None,
-    registry_asset_name: str | None,
     tag: str,
-    version_label: str,
     description: str | None,
-) -> tuple[str, str | None, str | None, str, str, str | None]:
+) -> tuple[str, str | None, str, str | None]:
     """Prompt for publish metadata in pretty mode."""
     console.print(f"\n[bold label]Publish {asset_type} from job {job_id}[/bold label]")
     mode = typer.prompt("Mode (new/existing)", default=mode).strip().lower()
@@ -128,16 +121,7 @@ def _prompt_publish_options(
             raise typer.Exit(1)
         group = group_value
 
-    default_asset_name = registry_asset_name or ""
-    resolved_asset_name = typer.prompt(
-        "Registry asset name (optional)",
-        default=default_asset_name,
-        show_default=bool(default_asset_name),
-    ).strip()
-    registry_asset_name = resolved_asset_name or None
-
     tag = typer.prompt("Tag", default=tag).strip()
-    version_label = typer.prompt("Version label", default=version_label).strip()
 
     default_description = description or ""
     resolved_description = typer.prompt(
@@ -147,7 +131,7 @@ def _prompt_publish_options(
     ).strip()
     description = resolved_description or None
 
-    return mode, group, registry_asset_name, tag, version_label, description
+    return mode, group, tag, description
 
 
 def _prompt_asset_from_job(asset_type: str, endpoint_collection: str, experiment_id: str, job_id: str) -> str:
@@ -338,38 +322,50 @@ def list_jobs(experiment_id: str, running_only: bool = False):
 
 def info_job(job_id: str, experiment_id: str):
     """Get details of a specific job."""
-    jobs = []
-    with console.status("[bold success]Fetching jobs[/bold success]", spinner="dots"):
+    output_format = cli_state.output_format
+    if output_format == "json":
         jobs = _fetch_all_jobs(experiment_id)
+    else:
+        with console.status("[bold success]Fetching jobs[/bold success]", spinner="dots"):
+            jobs = _fetch_all_jobs(experiment_id)
 
     # filter the job with the given job_id
     job = next((job for job in jobs if str(job.get("id")) == job_id), None)
-    if job:
-        console.print(f"[bold success]Job Details for ID {job_id}:[/bold success]")
-        _render_job(job)
-
-        # Fetch and display job files
-        with console.status("[bold success]Fetching job files[/bold success]", spinner="dots"):
-            files = _fetch_job_files(experiment_id, job_id)
-        if files:
-            file_table = Table(title="Files", show_header=True, header_style="bold")
-            file_table.add_column("Name")
-            file_table.add_column("Type", width=6)
-            file_table.add_column("Size", justify="right")
-            for f in files:
-                name = f.get("name", "")
-                is_dir = f.get("is_dir", False)
-                size = f.get("size", 0)
-                file_table.add_row(
-                    name,
-                    "dir" if is_dir else "file",
-                    "" if is_dir else _format_size(size),
-                )
-            console.print(file_table)
-        else:
-            console.print("[dim]No files found in job directory.[/dim]")
-    else:
+    if not job:
+        if output_format == "json":
+            print(json.dumps({"error": f"Job with ID {job_id} not found."}))
+            return
         console.print(f"[error]Error:[/error] Job with ID {job_id} not found.")
+        return
+
+    if output_format == "json":
+        files = _fetch_job_files(experiment_id, job_id)
+        print(json.dumps({**job, "files": files}))
+        return
+
+    console.print(f"[bold success]Job Details for ID {job_id}:[/bold success]")
+    _render_job(job)
+
+    # Fetch and display job files
+    with console.status("[bold success]Fetching job files[/bold success]", spinner="dots"):
+        files = _fetch_job_files(experiment_id, job_id)
+    if files:
+        file_table = Table(title="Files", show_header=True, header_style="bold")
+        file_table.add_column("Name")
+        file_table.add_column("Type", width=6)
+        file_table.add_column("Size", justify="right")
+        for f in files:
+            name = f.get("name", "")
+            is_dir = f.get("is_dir", False)
+            size = f.get("size", 0)
+            file_table.add_row(
+                name,
+                "dir" if is_dir else "file",
+                "" if is_dir else _format_size(size),
+            )
+        console.print(file_table)
+    else:
+        console.print("[dim]No files found in job directory.[/dim]")
 
 
 def list_artifacts(job_id: str, experiment_id: str, output_format: str = "pretty") -> list[dict]:
@@ -584,7 +580,7 @@ def fetch_logs(experiment_id: str, job_id: str):
 
 def fetch_task_logs(experiment_id: str, job_id: str):
     """Fetch task (Lab SDK) output for a job."""
-    return api.get(f"/experiment/{experiment_id}/jobs/{job_id}/stream_output", timeout=15.0)
+    return api.get(f"/experiment/{experiment_id}/jobs/{job_id}/task_logs", timeout=15.0)
 
 
 def fetch_request_logs(experiment_id: str, job_id: str):
@@ -791,15 +787,11 @@ def command_job_publish_dataset(
     job_id: str = typer.Argument(..., help="Job ID that contains the dataset"),
     dataset_name: str | None = typer.Argument(None, help="Dataset name in the job's datasets output"),
     group: str | None = typer.Option(None, "--group", "-g", help="Registry group name (target_name)"),
-    registry_asset_name: str | None = typer.Option(
-        None, "--asset-name", help="Unique folder name for this version in the dataset registry"
-    ),
     mode: str = typer.Option("new", "--mode", help="Publish mode: new or existing"),
     tag: str = typer.Option("latest", "--tag", help="Version tag"),
-    version_label: str = typer.Option("v1", "--version-label", help="Version label"),
     description: str | None = typer.Option(None, "--description", "-d", help="Version description"),
 ):
-    """Publish a dataset from a job to the registry."""
+    """Publish a dataset from a job to the registry. Version label is auto-generated (v1, v2, …)."""
     current_experiment = require_current_experiment()
     if not dataset_name:
         if cli_state.output_format == "json":
@@ -812,14 +804,12 @@ def command_job_publish_dataset(
             job_id=job_id,
         )
     if cli_state.output_format != "json":
-        mode, group, registry_asset_name, tag, version_label, description = _prompt_publish_options(
+        mode, group, tag, description = _prompt_publish_options(
             asset_type="dataset",
             job_id=job_id,
             mode=mode,
             group=group,
-            registry_asset_name=registry_asset_name,
             tag=tag,
-            version_label=version_label,
             description=description,
         )
     _publish_job_asset(
@@ -829,10 +819,8 @@ def command_job_publish_dataset(
         asset_name=dataset_name,
         experiment_id=current_experiment,
         group=group,
-        registry_asset_name=registry_asset_name,
         mode=mode,
         tag=tag,
-        version_label=version_label,
         description=description,
     )
 
@@ -842,15 +830,11 @@ def command_job_publish_model(
     job_id: str = typer.Argument(..., help="Job ID that contains the model"),
     model_name: str | None = typer.Argument(None, help="Model name in the job's models output"),
     group: str | None = typer.Option(None, "--group", "-g", help="Registry group name (target_name)"),
-    registry_asset_name: str | None = typer.Option(
-        None, "--asset-name", help="Unique folder name for this version in the model registry"
-    ),
     mode: str = typer.Option("new", "--mode", help="Publish mode: new or existing"),
     tag: str = typer.Option("latest", "--tag", help="Version tag"),
-    version_label: str = typer.Option("v1", "--version-label", help="Version label"),
     description: str | None = typer.Option(None, "--description", "-d", help="Version description"),
 ):
-    """Publish a model from a job to the registry."""
+    """Publish a model from a job to the registry. Version label is auto-generated (v1, v2, …)."""
     current_experiment = require_current_experiment()
     if not model_name:
         if cli_state.output_format == "json":
@@ -863,14 +847,12 @@ def command_job_publish_model(
             job_id=job_id,
         )
     if cli_state.output_format != "json":
-        mode, group, registry_asset_name, tag, version_label, description = _prompt_publish_options(
+        mode, group, tag, description = _prompt_publish_options(
             asset_type="model",
             job_id=job_id,
             mode=mode,
             group=group,
-            registry_asset_name=registry_asset_name,
             tag=tag,
-            version_label=version_label,
             description=description,
         )
     _publish_job_asset(
@@ -880,10 +862,8 @@ def command_job_publish_model(
         asset_name=model_name,
         experiment_id=current_experiment,
         group=group,
-        registry_asset_name=registry_asset_name,
         mode=mode,
         tag=tag,
-        version_label=version_label,
         description=description,
     )
 

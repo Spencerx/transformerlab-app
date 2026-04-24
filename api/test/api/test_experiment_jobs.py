@@ -56,6 +56,22 @@ def test_job_output_endpoints(client):
     # resp = client.get("/experiment/1/jobs/1/stream_output?sweeps=true")
     # assert resp.status_code in (200, 404)
 
+    # One-shot JSON task logs (sibling of SSE /stream_output, used by `lab job task-logs`)
+    resp = client.get("/experiment/1/jobs/1/task_logs")
+    assert resp.status_code in (200, 404)
+    if resp.status_code == 200:
+        body = resp.json()
+        assert "logs" in body
+        assert "tail_lines" in body
+
+    # tail_lines query param respected
+    resp = client.get("/experiment/1/jobs/1/task_logs?tail_lines=200")
+    assert resp.status_code in (200, 404)
+
+    # tail_lines validation: out-of-range should be rejected
+    resp = client.get("/experiment/1/jobs/1/task_logs?tail_lines=10")
+    assert resp.status_code in (400, 422)
+
 
 def test_job_detailed_reports(client):
     """Test detailed job reporting endpoints"""

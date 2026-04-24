@@ -86,11 +86,12 @@ def test_server_install_dry_run_defaults(tmp_path):
     """Test a full dry-run with all defaults accepted."""
     fake_env = os.path.join(str(tmp_path), ".env")
 
-    # Flow: frontend URL -> storage type (aws) -> compute (skip) -> email? (n) -> auth? (n)
+    # Flow: frontend URL -> storage type (aws) -> admin email -> compute (skip) -> email? (n) -> auth? (n)
     user_input = "\n".join(
         [
             "",  # frontend URL (accept default)
             "2",  # storage type: aws
+            "",  # admin email (accept default)
             "5",  # compute: skip
             "n",  # skip email
             "n",  # skip auth
@@ -114,6 +115,7 @@ def test_server_install_writes_file(tmp_path):
         [
             "http://myserver.com:8338",  # frontend URL
             "2",  # storage type: aws
+            "owner@myserver.com",  # admin email
             "5",  # compute: skip
             "n",  # skip email
             "n",  # skip auth
@@ -132,6 +134,7 @@ def test_server_install_writes_file(tmp_path):
     assert 'FRONTEND_URL="http://myserver.com:8338"' in content
     assert 'TL_API_URL="http://myserver.com:8338/"' in content
     assert 'TFL_STORAGE_PROVIDER="aws"' in content
+    assert 'TLAB_DEFAULT_ADMIN_EMAIL="owner@myserver.com"' in content
     assert 'MULTIUSER="true"' in content
     assert "TRANSFORMERLAB_JWT_SECRET=" in content
     assert "TRANSFORMERLAB_REFRESH_SECRET=" in content
@@ -151,6 +154,7 @@ def test_server_install_preserves_jwt_secrets(tmp_path):
         [
             "",  # frontend URL (accept existing default)
             "2",  # storage: aws
+            "",  # admin email
             "5",  # compute: skip
             "n",  # skip email
             "n",  # skip auth
@@ -175,6 +179,7 @@ def test_server_install_storage_localfs(tmp_path):
             "",  # frontend URL
             "1",  # storage type: localfs
             "/mnt/shared",  # storage path
+            "",  # admin email
             "5",  # compute: skip
             "n",  # skip email
             "n",  # skip auth
@@ -198,6 +203,7 @@ def test_server_install_email_configured(tmp_path):
         [
             "",  # frontend URL
             "2",  # storage: aws
+            "",  # admin email
             "5",  # compute: skip
             "y",  # configure email
             "smtp.gmail.com",  # smtp server
@@ -225,6 +231,7 @@ def test_server_install_email_skip(tmp_path):
         [
             "",  # frontend URL
             "2",  # storage: aws
+            "",  # admin email
             "5",  # compute: skip
             "n",  # skip email
             "n",  # skip auth
@@ -246,6 +253,7 @@ def test_server_install_admin_info_displayed(tmp_path):
         [
             "",  # frontend URL
             "2",  # storage: aws
+            "owner@example.com",  # admin email
             "5",  # compute: skip
             "n",  # skip email
             "n",  # skip auth
@@ -256,7 +264,7 @@ def test_server_install_admin_info_displayed(tmp_path):
         result = runner.invoke(app, ["server", "install", "--dry-run"], input=user_input)
 
     assert result.exit_code == 0
-    assert "admin@example.com" in result.output
+    assert "owner@example.com" in result.output
     assert "admin123" in result.output
     assert "Change the default password" in result.output
 

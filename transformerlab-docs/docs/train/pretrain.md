@@ -22,7 +22,6 @@ The Nanotron Pre-training Framework plugin allows you to pre-train models on a s
 1. Navigate to the `Train` tab.
 2. Click on the `New` button.
 3. In the pop-up, complete the following sections:
-
    - **Name:**  
      Set a unique name for your pre-training task. This will be set as the name of your pre-trained model followed by the job id.
 
