@@ -204,14 +204,10 @@ def check_configs(output_format: str = "pretty") -> None:
 
             if missing_login_keys:
                 console.print(
-                    "Missing authentication context ("
-                    + ", ".join(missing_login_keys)
-                    + "). Please run 'lab login'."
+                    "Missing authentication context (" + ", ".join(missing_login_keys) + "). Please run 'lab login'."
                 )
             if missing_other_keys:
-                console.print(
-                    "Use the 'lab config set <key> <value>' command to set: " + ", ".join(missing_other_keys)
-                )
+                console.print("Use the 'lab config set <key> <value>' command to set: " + ", ".join(missing_other_keys))
         raise typer.Exit(1)
 
     set_base_url(config.get("server"))
