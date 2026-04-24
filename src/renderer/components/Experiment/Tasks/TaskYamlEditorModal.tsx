@@ -17,6 +17,7 @@ import {
   Box,
   CircularProgress,
   IconButton,
+  LinearProgress,
 } from '@mui/joy';
 import { FileIcon, Trash2Icon, UploadIcon } from 'lucide-react';
 import { Editor } from '@monaco-editor/react';
@@ -27,6 +28,7 @@ import {
   getFileExtension,
   getMonacoLanguage,
 } from 'renderer/lib/utils';
+import { chunkedUpload, deleteUpload } from 'renderer/lib/chunkedUpload';
 
 type FileSource = 'github' | 'local';
 
@@ -67,6 +69,7 @@ export default function TaskYamlEditorModal({
   const [filesLoading, setFilesLoading] = React.useState(false);
   const [selectedFile, setSelectedFile] = React.useState<string | null>(null);
   const [uploading, setUploading] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState(0);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const isTaskYaml =
@@ -340,34 +343,53 @@ export default function TaskYamlEditorModal({
     const fileArray = Array.from(files);
     if (!fileArray.length) return;
     setUploading(true);
+    setUploadProgress(0);
     setError(null);
     setValidationMessage(null);
+    const allUploaded: string[] = [];
     try {
-      const formData = new FormData();
-      fileArray.forEach((file) => formData.append('files', file));
-      const response = await chatAPI.authenticatedFetch(
-        chatAPI.Endpoints.Task.UploadFile(experimentId, taskId),
-        {
-          method: 'POST',
-          body: formData,
-        },
-      );
-      if (!response.ok) {
-        const text = await response.text();
-        setError(text || `Upload failed: ${response.status}`);
-        return;
+      for (let i = 0; i < fileArray.length; i++) {
+        const file = fileArray[i];
+        const baseProgress = (i / fileArray.length) * 100;
+        let uploadId: string | null = null;
+        try {
+          const result = await chunkedUpload({
+            file,
+            filename: file.name,
+            onProgress: (pct) =>
+              setUploadProgress(
+                Math.round(baseProgress + pct / fileArray.length),
+              ),
+          });
+          uploadId = result.upload_id;
+          const response = await chatAPI.authenticatedFetch(
+            `${chatAPI.Endpoints.Task.UploadFile(experimentId, taskId)}?upload_id=${uploadId}`,
+            { method: 'POST' },
+          );
+          if (!response.ok) {
+            const text = await response.text();
+            setError(text || `Upload failed: ${response.status}`);
+            return;
+          }
+          const data = await response.json();
+          const uploaded: string[] = Array.isArray(data?.files)
+            ? data.files
+            : [];
+          allUploaded.push(...uploaded);
+          uploadId = null; // consumed by endpoint
+        } finally {
+          if (uploadId) await deleteUpload(uploadId);
+        }
       }
-      const data = await response.json();
-      const uploaded: string[] = Array.isArray(data?.files) ? data.files : [];
       await loadFiles();
-      if (uploaded.length > 0) {
-        const first = uploaded[0];
+      if (allUploaded.length > 0) {
+        const first = allUploaded[0];
         setSelectedFile(first);
         await loadFileContent({ name: first, source: 'local' });
       }
       setValidationMessage(
-        uploaded.length > 0
-          ? `Uploaded ${uploaded.length} file${uploaded.length === 1 ? '' : 's'}.`
+        allUploaded.length > 0
+          ? `Uploaded ${allUploaded.length} file${allUploaded.length === 1 ? '' : 's'}.`
           : 'Upload complete.',
       );
       onSaved?.();
@@ -375,6 +397,7 @@ export default function TaskYamlEditorModal({
       setError(e instanceof Error ? e.message : 'Upload failed');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -590,10 +613,17 @@ export default function TaskYamlEditorModal({
                     startDecorator={<UploadIcon size={14} />}
                     loading={uploading}
                     onClick={() => fileInputRef.current?.click()}
-                    sx={{ width: '100%', mb: 1 }}
+                    sx={{ width: '100%', mb: uploading ? 0.5 : 1 }}
                   >
                     Upload Files
                   </Button>
+                  {uploading && (
+                    <LinearProgress
+                      determinate
+                      value={uploadProgress}
+                      sx={{ mb: 1 }}
+                    />
+                  )}
                   <Box
                     onDrop={handleDrop}
                     onDragOver={(event) => event.preventDefault()}

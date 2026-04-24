@@ -6,6 +6,18 @@ from datetime import datetime
 from transformerlab.shared.models.models import ProviderType, AcceleratorType
 
 
+class ProviderResourceGroup(BaseModel):
+    """Schema for provider resource group configuration."""
+
+    id: str = Field(..., min_length=1, max_length=100)
+    name: str = Field(..., min_length=1, max_length=100)
+    cpus: Optional[str] = None
+    memory: Optional[str] = None
+    disk_space: Optional[str] = None
+    accelerators: Optional[str] = None
+    num_nodes: Optional[int] = None
+
+
 class ProviderConfigBase(BaseModel):
     """Base schema for provider configuration."""
 
@@ -34,6 +46,7 @@ class ProviderConfigBase(BaseModel):
 
     # Accelerators supported by this provider
     supported_accelerators: Optional[List[AcceleratorType]] = Field(default=None)
+    resource_groups: Optional[List[ProviderResourceGroup]] = Field(default=None)
 
     # Additional provider-specific config
     extra_config: Dict[str, Any] = Field(default_factory=dict)
