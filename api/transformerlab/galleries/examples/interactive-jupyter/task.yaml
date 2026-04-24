@@ -7,7 +7,7 @@ resources:
 setup: |
   pip install jupyter
 run: |
-  python ~/interactive-jupyter/run.py
+  python interactive-jupyter/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

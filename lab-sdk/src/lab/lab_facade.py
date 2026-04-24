@@ -648,6 +648,18 @@ class Lab:
         # Important: update cached_jobs only when all completion fields are already written.
         _run_async(self._job.update_status(JobStatus.COMPLETE))  # type: ignore[union-attr]
 
+    def download_registry_model(self, model_id: str) -> str:
+        """Download a TLab registry model to ~/tmp/<model_id> and return the local path."""
+        return _run_async(self.async_download_registry_model(model_id))
+
+    async def async_download_registry_model(self, model_id: str) -> str:
+        """Download model from TLab registry storage to ~/tmp/<model_id> and return the local path."""
+        model = await ModelService.get(model_id)
+        remote_dir = await model.get_dir()
+        local_path = os.path.expanduser(f"~/tmp/{model_id}")
+        await storage.copy_dir(remote_dir, local_path)
+        return local_path
+
     def save_artifact(
         self,
         source_path: Union[str, Any],

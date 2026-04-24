@@ -18,7 +18,7 @@ setup: |
   pip install comfy-cli
   yes | comfy install --$ACCEL
 run: |
-  python ~/interactive-comfyui/run.py
+  python interactive-comfyui/run.py
 envs:
   PYTHONUNBUFFERED: "1"
 parameters:

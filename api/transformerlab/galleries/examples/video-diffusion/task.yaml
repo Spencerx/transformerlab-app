@@ -16,4 +16,4 @@ parameters:
   num_frames: 81
   guidance_scale: 5.0
   fps: 15
-run: "python ~/video-diffusion/main.py"
+run: "python video-diffusion/main.py"
