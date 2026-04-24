@@ -64,7 +64,6 @@ This structure ensures your dataset is compatible and supports advanced features
 1. Navigate to the `Train` tab.
 2. Click on the `New` button.
 3. In the pop-up, you can leave most settings to their defaults. Click here to see detailed descriptions of all the advanced settings
-
    - **Template/Task Name:**  
      Set a unique name for your training template/task.
 

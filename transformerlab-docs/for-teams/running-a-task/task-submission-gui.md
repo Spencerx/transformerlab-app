@@ -55,24 +55,19 @@ The schema keys the UI uses are:
 The UI chooses the right control for each parameter:
 
 - **Model selection** (`ui_widget: lab_model_select`)
-
   - A dropdown of models from your registry, with an option to type a custom model ID.
   - Option to type a custom value instead of picking from the list (“Enter any string”).
 
 - **Dataset selection** (`ui_widget: lab_dataset_select`)
-
   - A dropdown of datasets from your registry, with an option to type a custom dataset ID.
 
 - **Numeric sliders** (`type` numeric + `ui_widget: slider` / `range`)
-
   - A slider plus numeric input, respecting min, max, and step.
 
 - **Booleans** (`type: bool` / `boolean`)
-
   - A switch.
 
 - **Enums / options** (`type: enum` or `options` / `enum` present)
-
   - Radio buttons or a dropdown.
 
 - **Fallbacks**

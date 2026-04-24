@@ -72,10 +72,8 @@ For complete YAML field documentation, see [Task YAML Structure](task-yaml-struc
 There are three main ways to submit tasks; they share the same underlying task metadata and providers:
 
 - **GUI (recommended if you prefer a visual workflow)**
-
   - In an experiment’s **Tasks** tab, click **New** to open the **Add New Task** dialog.
   - Choose one of three options:
-
     - **From GitHub**: point at a repo (and optional subdirectory/branch) that contains a `task.yaml`.
     - **Upload from your Computer**: drag‑and‑drop or pick a folder that contains a `task.yaml`.
     - **Start with a blank task template**: create a new, minimal task and edit its YAML later.
@@ -93,7 +91,6 @@ There are three main ways to submit tasks; they share the same underlying task m
   - See [this link](task-submission-gui.md) for a step‑by‑step walkthrough of this flow.
 
 - **CLI (`lab` command, for terminal and automation use)**
-
   - Define a task in a directory with `task.yaml`.
   - Register it to the current experiment with:
 
@@ -113,7 +110,6 @@ There are three main ways to submit tasks; they share the same underlying task m
   - See [this link](task-submission-cli.md) for concrete examples.
 
 - **AI Agent (let Claude Code or another coding agent drive the CLI)**
-
   - Install the Transformer Lab agent skill so your coding agent knows how to use `lab`:
 
     ```bash

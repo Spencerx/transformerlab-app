@@ -95,7 +95,6 @@ To use Google Cloud Storage instead of AWS S3:
    When Transformer Lab dispatches jobs to remote workers (RunPod, SkyPilot on non-GCP clouds, etc.), those machines run non-interactively and cannot complete a browser-based OAuth flow. Instead, Transformer Lab injects a service account key into the worker at launch time.
 
    #### Create a Service Account Key
-
    1. Go to **Google Cloud Console → IAM & Admin → Service Accounts**.
    2. Create or select a service account with **Storage Object Admin** (or equivalent) permissions on your GCS bucket.
    3. Generate a JSON key and download it to your server.

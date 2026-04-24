@@ -30,7 +30,6 @@ This plugin allows you to perform common evaluation checks, such as string match
 
 - **Tab:** _Plugin Config_
 - **Predefined Metrics:**
-
   - `Is Valid JSON`: Checks if the output is a valid JSON.
   - `Word Count`: Counts the number of words in the output.
   - `Contains bulleted lists`: Verifies if the output includes bulleted lists.

@@ -56,7 +56,6 @@ After generation completes, you can preview the dataset in two places:
 <img src={require('./gifs/synthetic_dataset_kit/fail.gif').default} alt="Failing generation" width="500" />
 
 - **Model not responding?**
-
   - Check that your selected **local model is compatible with vLLM** and that the vLLM server is running at the configured `vllm_api_base`.
 
 - **Want more creative generations?**
