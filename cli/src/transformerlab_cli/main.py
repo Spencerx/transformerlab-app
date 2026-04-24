@@ -18,6 +18,8 @@ from transformerlab_cli.commands.provider import app as provider_app
 from transformerlab_cli.commands.server import app as server_app
 from transformerlab_cli.commands.experiment import app as experiment_app
 from transformerlab_cli.commands.notes import app as notes_app
+from transformerlab_cli.commands.dataset import app as dataset_app
+from transformerlab_cli.commands.model import app as model_app
 
 
 # Create custom Help screen so we can show the logo
@@ -46,6 +48,8 @@ app.add_typer(job_app, name="job", help="Job management commands", no_args_is_he
 app.add_typer(notes_app, name="notes", help="Experiment notes commands", no_args_is_help=True)
 app.add_typer(provider_app, name="provider", help="Compute provider management commands", no_args_is_help=True)
 app.add_typer(server_app, name="server", help="Server installation and configuration commands", no_args_is_help=True)
+app.add_typer(dataset_app, name="dataset", help="Dataset management commands", no_args_is_help=True)
+app.add_typer(model_app, name="model", help="Model management commands", no_args_is_help=True)
 app.add_typer(experiment_app, name="experiment", help="Experiment management commands", no_args_is_help=True)
 
 
