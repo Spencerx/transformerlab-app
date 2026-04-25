@@ -16,7 +16,7 @@ import json
 import logging
 
 logger = logging.getLogger(__name__)
-DEFAULT_ADMIN_EMAIL_ENV = "TRANSFORMERLAB_DEFAULT_ADMIN_EMAIL"
+DEFAULT_ADMIN_EMAIL_ENV = "TLAB_DEFAULT_ADMIN_EMAIL"
 DEFAULT_ADMIN_EMAIL_FALLBACK = "admin@example.com"
 
 
