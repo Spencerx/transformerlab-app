@@ -2,6 +2,7 @@ import io
 import json
 import os
 import zipfile
+from datetime import datetime
 from fnmatch import fnmatch
 from urllib.parse import quote, urlencode, urlparse
 
@@ -187,6 +188,33 @@ def _fetch_all_jobs(experiment_id: str) -> list[dict]:
         return []
 
 
+def _compute_duration(job_data: dict) -> str:
+    """Compute human-readable duration from start_time and end_time in job_data."""
+    start = job_data.get("start_time")
+    end = job_data.get("end_time")
+    if not start:
+        return ""
+    try:
+        start_dt = datetime.strptime(start, "%Y-%m-%d %H:%M:%S")
+        if end:
+            end_dt = datetime.strptime(end, "%Y-%m-%d %H:%M:%S")
+        else:
+            end_dt = datetime.utcnow()
+        delta = end_dt - start_dt
+        total_secs = int(delta.total_seconds())
+        if total_secs < 0:
+            return ""
+        if total_secs < 60:
+            return f"{total_secs}s"
+        if total_secs < 3600:
+            return f"{total_secs // 60}m {total_secs % 60}s"
+        hours = total_secs // 3600
+        mins = (total_secs % 3600) // 60
+        return f"{hours}h {mins}m"
+    except (ValueError, TypeError):
+        return ""
+
+
 def _format_score(score: dict) -> str:
     """Format a score dict into a compact string for the table view."""
     if not score or not isinstance(score, dict):
@@ -210,6 +238,7 @@ def _render_jobs(jobs) -> Table:
     table.add_column("Completion Status", style="red")
     table.add_column("Description", style="dim", max_width=40)
     table.add_column("Score", style="dim", max_width=32)
+    table.add_column("Duration", justify="right", style="dim", no_wrap=True)
 
     for job in jobs:
         job_data = job.get("job_data", {})
@@ -226,6 +255,7 @@ def _render_jobs(jobs) -> Table:
             job_data.get("completion_status", "N/A"),
             description or "",
             _format_score(job_data.get("score", {})),
+            _compute_duration(job_data),
         )
 
     return table
@@ -297,6 +327,9 @@ def _render_job(job) -> None:
         "Generated Datasets": job_data.get("generated_datasets", []),
         "Evaluation Results": "\n".join(job_data.get("eval_results", [])),
         "Artifacts": _render_artifacts(job_data.get("artifacts", [])),
+        "Start Time": job_data.get("start_time", "N/A"),
+        "End Time": job_data.get("end_time", "N/A"),
+        "Duration": _compute_duration(job_data) or "N/A",
         "Completion Status": job_data.get("completion_status", "N/A"),
         "Completion Details": job_data.get("completion_details", "N/A"),
         "Error": job_data.get("error_msg", ""),
