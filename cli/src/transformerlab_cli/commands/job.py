@@ -197,9 +197,14 @@ def _render_jobs(jobs) -> Table:
     table.add_column("Status", style="yellow")
     table.add_column("Progress", justify="right", style="blue")
     table.add_column("Completion Status", style="red")
+    table.add_column("Description", style="dim", max_width=40)
 
     for job in jobs:
         job_data = job.get("job_data", {})
+        description = job_data.get("description", "")
+        # Truncate long descriptions for the table view
+        if description and len(description) > 40:
+            description = description[:37] + "…"
         table.add_row(
             str(job.get("id", "N/A")),
             job.get("experiment_id", "N/A"),
@@ -207,6 +212,7 @@ def _render_jobs(jobs) -> Table:
             job.get("status", "N/A"),
             f"{job.get('progress', 0)}%",
             job_data.get("completion_status", "N/A"),
+            description or "",
         )
 
     return table

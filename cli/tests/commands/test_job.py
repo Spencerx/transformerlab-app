@@ -13,14 +13,14 @@ SAMPLE_JOBS = [
         "experiment_id": "exp1",
         "status": "RUNNING",
         "progress": 50,
-        "job_data": {"task_name": "train", "completion_status": "N/A"},
+        "job_data": {"task_name": "train", "completion_status": "N/A", "description": "Bumped lr to 3e-5"},
     },
     {
         "id": 2,
         "experiment_id": "exp1",
         "status": "COMPLETE",
         "progress": 100,
-        "job_data": {"task_name": "eval", "completion_status": "SUCCESS"},
+        "job_data": {"task_name": "eval", "completion_status": "SUCCESS", "description": "Eval on test split"},
     },
     {
         "id": 3,
@@ -75,6 +75,19 @@ def test_job_list_all(_mock_check, _mock_require, _mock_api):
     assert "generate" in result.output
     assert "export" in result.output
     assert "chat" in result.output
+
+
+@patch("transformerlab_cli.commands.job.api.get", return_value=_mock_api_response(SAMPLE_JOBS))
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+@patch("transformerlab_cli.commands.job.check_configs")
+def test_job_list_shows_description(_mock_check, _mock_require, _mock_api):
+    """Test that job list table includes the Description column with values."""
+    result = runner.invoke(app, ["job", "list"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.output)
+    assert "Descript" in out
+    assert "Bumped lr" in out
+    assert "Eval on" in out
 
 
 @patch("transformerlab_cli.commands.job.api.get", return_value=_mock_api_response(SAMPLE_JOBS))
