@@ -327,10 +327,9 @@ async def launch_template_on_provider(
                     "apt-get update -qq && "
                     "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server >/dev/null 2>&1 && "
                     "mkdir -p ~/.ssh && "
-                    "cd ~/.ssh && "
                     "chmod 700 ~/.ssh && "
-                    'echo "$SSH_PUBLIC_KEY" >> authorized_keys && '
-                    "chmod 600 authorized_keys && "
+                    'echo "$SSH_PUBLIC_KEY" >> ~/.ssh/authorized_keys && '
+                    "chmod 600 ~/.ssh/authorized_keys && "
                     "service ssh start"
                 )
             else:
