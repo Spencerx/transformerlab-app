@@ -20,7 +20,12 @@ SAMPLE_JOBS = [
         "experiment_id": "exp1",
         "status": "COMPLETE",
         "progress": 100,
-        "job_data": {"task_name": "eval", "completion_status": "SUCCESS", "description": "Eval on test split"},
+        "job_data": {
+            "task_name": "eval",
+            "completion_status": "SUCCESS",
+            "description": "Eval on test split",
+            "score": {"eval/loss": 2.1, "accuracy": 0.95},
+        },
     },
     {
         "id": 3,
@@ -34,7 +39,7 @@ SAMPLE_JOBS = [
         "experiment_id": "exp1",
         "status": "FAILED",
         "progress": 0,
-        "job_data": {"task_name": "export", "completion_status": "FAILED"},
+        "job_data": {"task_name": "export", "completion_status": "FAILED", "score": {"eval/loss": 3.5}},
     },
     {
         "id": 5,
@@ -85,8 +90,8 @@ def test_job_list_shows_description(_mock_check, _mock_require, _mock_api):
     result = runner.invoke(app, ["job", "list"])
     assert result.exit_code == 0
     out = strip_ansi(result.output)
-    assert "Descript" in out
-    assert "Bumped lr" in out
+    assert "Descrip" in out
+    assert "Bumped" in out
     assert "Eval on" in out
 
 
@@ -148,6 +153,37 @@ def test_job_list_json_no_spinner_text(_mock_check, _mock_get_config, _mock_api)
     result = runner.invoke(app, ["--format", "json", "job", "list"])
     assert result.exit_code == 0
     json.loads(result.output.strip())
+
+
+@patch("transformerlab_cli.commands.job.api.get", return_value=_mock_api_response(SAMPLE_JOBS))
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+@patch("transformerlab_cli.commands.job.check_configs")
+def test_job_list_shows_score(_mock_check, _mock_require, _mock_api):
+    """Test that job list table shows score values for jobs that have them."""
+    result = runner.invoke(app, ["job", "list"])
+    assert result.exit_code == 0
+    out = strip_ansi(result.output)
+    # Job 2 has score with eval/loss=2.1 (may be truncated by Rich table)
+    assert "eval/l" in out
+    # Job 1 (no score) should have empty score column — just verify Score header is present
+    assert "Score" in out
+
+
+@patch("transformerlab_cli.commands.job.api.get", return_value=_mock_api_response(SAMPLE_JOBS))
+@patch("transformerlab_cli.commands.job.require_current_experiment", return_value="exp1")
+@patch("transformerlab_cli.commands.job.check_configs")
+def test_job_list_sort_by_metric(_mock_check, _mock_require, _mock_api):
+    """Test that --sort-by sorts jobs by a score metric key in ascending order."""
+    result = runner.invoke(app, ["--format", "json", "job", "list", "--sort-by", "eval/loss"])
+    assert result.exit_code == 0
+    data = json.loads(result.output.strip())
+    # Job 2 (eval/loss=2.1) should come before Job 4 (eval/loss=3.5),
+    # and jobs without the metric should be at the end.
+    ids = [j["id"] for j in data]
+    assert ids.index(2) < ids.index(4)
+    # Jobs without eval/loss (1, 3, 5) should be after jobs with it
+    assert ids.index(2) < ids.index(1)
+    assert ids.index(4) < ids.index(1)
 
 
 # ---------------------------------------------------------------------------
