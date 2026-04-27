@@ -569,7 +569,7 @@ export default function UserLoginTest(): JSX.Element {
     }
   }
 
-  async function handleSetDefaultProvider(id: string) {
+  async function handleSetDefaultProvider(id: string, isDefault: boolean) {
     try {
       const res = await authContext.fetchWithAuth(
         chatAPI.getAPIFullPath('compute_provider', ['update'], {
@@ -578,7 +578,7 @@ export default function UserLoginTest(): JSX.Element {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ is_default: true }),
+          body: JSON.stringify({ is_default: isDefault }),
         },
       );
       if (!res.ok) {
@@ -594,7 +594,7 @@ export default function UserLoginTest(): JSX.Element {
       if (providersMutate) providersMutate();
     } catch (e: any) {
       // eslint-disable-next-line no-alert
-      alert(`Error setting default provider: ${e?.message ?? String(e)}`);
+      alert(`Error updating default provider: ${e?.message ?? String(e)}`);
     }
   }
 
@@ -1488,34 +1488,36 @@ export default function UserLoginTest(): JSX.Element {
                             !iAmOwner
                               ? 'Only owners can change the default provider'
                               : provider.is_default
-                                ? 'This provider is used when a task does not specify one'
+                                ? 'This provider is used when a task does not specify one. Click to clear default.'
                                 : 'Use this provider by default when a task does not specify one'
                           }
                         >
                           <span>
                             <IconButton
                               size="sm"
-                              variant={
-                                provider.is_default ? 'solid' : 'outlined'
-                              }
+                              variant="plain"
                               color={
                                 provider.is_default ? 'primary' : 'neutral'
                               }
-                              disabled={
-                                !iAmOwner ||
-                                provider.disabled ||
-                                provider.is_default
-                              }
+                              disabled={!iAmOwner || provider.disabled}
                               onClick={() =>
-                                handleSetDefaultProvider(provider.id)
+                                handleSetDefaultProvider(
+                                  provider.id,
+                                  !provider.is_default,
+                                )
                               }
                               aria-label={
                                 provider.is_default
-                                  ? 'Default provider'
+                                  ? 'Unset default provider'
                                   : 'Set as default provider'
                               }
                             >
-                              <StarIcon size={16} />
+                              <StarIcon
+                                size={16}
+                                fill={
+                                  provider.is_default ? 'currentColor' : 'none'
+                                }
+                              />
                             </IconButton>
                           </span>
                         </Tooltip>
