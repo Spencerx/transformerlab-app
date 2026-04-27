@@ -29,6 +29,7 @@ import JobsList from '../Tasks/JobsList';
 import FileBrowserModal from '../Tasks/FileBrowserModal';
 import { API_URL } from 'renderer/lib/api-client/urls';
 import { isJobStopPending } from 'renderer/lib/utils';
+import { getPreferredProviderId } from '../Tasks/providerCompatibility';
 
 const duration = require('dayjs/plugin/duration');
 
@@ -50,13 +51,12 @@ type SpecialSecretStatus = {
   exists?: boolean;
 };
 
-/** Interactive tasks may have no stored provider_id; prefer a remote provider over local. */
+/** Interactive tasks may have no stored provider_id; prefer default provider, then first provider. */
 function defaultLaunchProviderId(
-  providers: { id?: string; type?: string }[],
+  providers: { id?: string; type?: string; is_default?: boolean }[],
 ): string | null {
-  if (!providers?.length) return null;
-  const remote = providers.find((p) => p.type !== 'local');
-  return remote?.id ?? providers[0]?.id ?? null;
+  const preferred = getPreferredProviderId(providers);
+  return preferred || null;
 }
 
 /** Local interactive runs do not use ngrok; never send token placeholder or secret to the provider. */

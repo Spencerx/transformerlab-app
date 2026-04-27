@@ -35,7 +35,10 @@ import { useSWRWithAuth as useSWR } from 'renderer/lib/authContext';
 import { fetcher } from 'renderer/lib/transformerlab-api-sdk';
 import { useNotification } from 'renderer/components/Shared/NotificationSystem';
 import { generateFriendlyName } from 'renderer/lib/utils';
-import { isProviderCompatibleWithAccelerators } from './providerCompatibility';
+import {
+  getPreferredProviderId,
+  isProviderCompatibleWithAccelerators,
+} from './providerCompatibility';
 import ModelNameInput, {
   getModelHistoryKey,
   saveModelToHistory,
@@ -273,14 +276,14 @@ export default function NewInteractiveTaskModal({
       return;
     }
     if (!selectedProviderId) {
-      // Auto-select the first provider by default for a smoother experience
-      setSelectedProviderId(providers[0].id);
+      // Auto-select default provider (or first available if none is marked default).
+      setSelectedProviderId(getPreferredProviderId(providers));
       return;
     }
     if (!providers.find((p) => p.id === selectedProviderId)) {
       // If the previously selected provider is no longer available,
-      // fall back to the first available provider.
-      setSelectedProviderId(providers[0].id);
+      // fall back to default provider, then first available provider.
+      setSelectedProviderId(getPreferredProviderId(providers));
     }
   }, [open, providers, selectedProviderId]);
 

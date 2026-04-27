@@ -93,7 +93,7 @@ def command_provider_list(
 
     if response.status_code == 200:
         providers = response.json()
-        table_columns = ["id", "name", "type", "disabled", "created_at", "updated_at"]
+        table_columns = ["id", "name", "type", "disabled", "is_default", "created_at", "updated_at"]
         render_table(
             data=providers, format_type=cli_state.output_format, table_columns=table_columns, title="Providers"
         )
@@ -185,6 +185,11 @@ def command_provider_update(
     name: str = typer.Option(None, "--name", help="New provider name"),
     config: str = typer.Option(None, "--config", help="Config fields as JSON string (merged with existing)"),
     disabled: bool = typer.Option(None, "--disabled/--enabled", help="Disable or enable the provider"),
+    is_default: bool = typer.Option(
+        None,
+        "--default/--no-default",
+        help="Mark this provider as the team default (used when a task does not specify one)",
+    ),
 ):
     """Update a compute provider."""
     check_configs(output_format=cli_state.output_format)
@@ -200,10 +205,13 @@ def command_provider_update(
             raise typer.Exit(1)
     if disabled is not None:
         payload["disabled"] = disabled
+    if is_default is not None:
+        payload["is_default"] = is_default
 
     if not payload:
         console.print(
-            "[warning]Nothing to update.[/warning] Provide at least one of --name, --config, --disabled/--enabled."
+            "[warning]Nothing to update.[/warning] "
+            "Provide at least one of --name, --config, --disabled/--enabled, --default/--no-default."
         )
         raise typer.Exit(0)
 
@@ -302,4 +310,54 @@ def command_provider_disable(
         raise typer.Exit(1)
     else:
         console.print(f"[error]Error:[/error] Failed to disable provider. {_extract_error_detail(response)}")
+        raise typer.Exit(1)
+
+
+@app.command("set-default")
+def command_provider_set_default(
+    provider_id: str = typer.Argument(..., help="Provider ID to mark as the team's default"),
+):
+    """Mark a compute provider as the team default.
+
+    The default provider is used when a task is dispatched without specifying one.
+    Marking a provider as default automatically clears the flag from any other
+    provider in the team.
+    """
+    check_configs(output_format=cli_state.output_format)
+
+    with console.status(f"[bold success]Setting provider {provider_id} as default...[/bold success]", spinner="dots"):
+        response = api.patch(f"/compute_provider/providers/{provider_id}", json_data={"is_default": True})
+
+    if response.status_code == 200:
+        console.print(f"[success]✓[/success] Provider [bold]{provider_id}[/bold] is now the team default.")
+    elif response.status_code == 404:
+        console.print(f"[error]Error:[/error] Provider {provider_id} not found.")
+        raise typer.Exit(1)
+    else:
+        console.print(f"[error]Error:[/error] Failed to set default provider. {_extract_error_detail(response)}")
+        raise typer.Exit(1)
+
+
+@app.command("clear-default")
+def command_provider_clear_default(
+    provider_id: str = typer.Argument(..., help="Provider ID to clear default flag from"),
+):
+    """Clear the default flag on a compute provider.
+
+    With no default set, dispatch falls back to the first available provider.
+    """
+    check_configs(output_format=cli_state.output_format)
+
+    with console.status(
+        f"[bold success]Clearing default flag on provider {provider_id}...[/bold success]", spinner="dots"
+    ):
+        response = api.patch(f"/compute_provider/providers/{provider_id}", json_data={"is_default": False})
+
+    if response.status_code == 200:
+        console.print(f"[success]✓[/success] Provider [bold]{provider_id}[/bold] is no longer the default.")
+    elif response.status_code == 404:
+        console.print(f"[error]Error:[/error] Provider {provider_id} not found.")
+        raise typer.Exit(1)
+    else:
+        console.print(f"[error]Error:[/error] Failed to clear default provider. {_extract_error_detail(response)}")
         raise typer.Exit(1)

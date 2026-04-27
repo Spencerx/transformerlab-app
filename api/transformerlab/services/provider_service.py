@@ -458,6 +458,7 @@ async def update_team_provider(
     name: Optional[str] = None,
     config: Optional[dict] = None,
     disabled: Optional[bool] = None,
+    is_default: Optional[bool] = None,
 ) -> TeamComputeProvider:
     """Update an existing team provider record."""
     if name is not None:
@@ -466,9 +467,40 @@ async def update_team_provider(
         provider.config = config
     if disabled is not None:
         provider.disabled = disabled
+    if is_default is not None:
+        if is_default:
+            await _clear_default_for_team(session, provider.team_id, exclude_provider_id=provider.id)
+        provider.is_default = is_default
     await session.commit()
     await session.refresh(provider)
     return provider
+
+
+async def _clear_default_for_team(
+    session: AsyncSession, team_id: str, exclude_provider_id: Optional[str] = None
+) -> None:
+    """Clear is_default on all providers for a team (optionally excluding one)."""
+    stmt = select(TeamComputeProvider).where(
+        TeamComputeProvider.team_id == team_id,
+        TeamComputeProvider.is_default,  # noqa: E712 -- truthy check works for boolean column
+    )
+    if exclude_provider_id is not None:
+        stmt = stmt.where(TeamComputeProvider.id != exclude_provider_id)
+    result = await session.execute(stmt)
+    for other in result.scalars().all():
+        other.is_default = False
+
+
+async def get_default_team_provider(session: AsyncSession, team_id: str) -> Optional[TeamComputeProvider]:
+    """Return the default enabled provider for a team, if one is marked as default."""
+    stmt = (
+        select(TeamComputeProvider)
+        .where(TeamComputeProvider.team_id == team_id)
+        .where(~TeamComputeProvider.disabled)
+        .where(TeamComputeProvider.is_default)
+    )
+    result = await session.execute(stmt)
+    return result.scalars().first()
 
 
 async def delete_team_provider(session: AsyncSession, provider: TeamComputeProvider) -> None:
