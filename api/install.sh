@@ -599,10 +599,6 @@ multiuser_setup() {
   echo "Installing Sentry SDK..."
   uv pip install --python "${GENERAL_UV_ENV_DIR}/bin/python" sentry-sdk
 
-  # The webapp is downloaded in download_transformer_lab().
-  # Keep multiuser setup on the same single published web build.
-  ohai "Using standard webapp build; no separate multiuser web build required."
-
   echo "Multiuser setup complete."
 
 }
