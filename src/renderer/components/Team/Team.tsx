@@ -33,6 +33,7 @@ import {
   BarChart3Icon,
   GithubIcon,
   Trash2Icon,
+  StarIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -565,6 +566,35 @@ export default function UserLoginTest(): JSX.Element {
     } catch (e: any) {
       // eslint-disable-next-line no-alert
       alert(`Error deleting provider: ${e?.message ?? String(e)}`);
+    }
+  }
+
+  async function handleSetDefaultProvider(id: string, isDefault: boolean) {
+    try {
+      const res = await authContext.fetchWithAuth(
+        chatAPI.getAPIFullPath('compute_provider', ['update'], {
+          providerId: id,
+        }),
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_default: isDefault }),
+        },
+      );
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({
+          detail: 'Failed to set default provider',
+        }));
+        // eslint-disable-next-line no-alert
+        alert(
+          `Failed to set default provider: ${errorData.detail || 'Unknown error'}`,
+        );
+        return;
+      }
+      if (providersMutate) providersMutate();
+    } catch (e: any) {
+      // eslint-disable-next-line no-alert
+      alert(`Error updating default provider: ${e?.message ?? String(e)}`);
     }
   }
 
@@ -1374,6 +1404,7 @@ export default function UserLoginTest(): JSX.Element {
                 <th style={{ width: 'auto' }}>Name</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Type</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Enabled</th>
+                <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Default</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>Status</th>
                 <th style={{ width: 'auto', whiteSpace: 'nowrap' }}>
                   Lifecycle
@@ -1408,6 +1439,17 @@ export default function UserLoginTest(): JSX.Element {
                           <Typography fontWeight="md" level="body-sm">
                             {provider?.name ?? '—'}
                           </Typography>
+                          {provider?.is_default && (
+                            <Chip
+                              variant="soft"
+                              color="primary"
+                              size="sm"
+                              startDecorator={<StarIcon size={12} />}
+                              sx={{ fontSize: '0.7rem', px: 0.5 }}
+                            >
+                              Default
+                            </Chip>
+                          )}
                         </Stack>
                       </td>
                       <td>
@@ -1437,6 +1479,46 @@ export default function UserLoginTest(): JSX.Element {
                                 )
                               }
                             />
+                          </span>
+                        </Tooltip>
+                      </td>
+                      <td>
+                        <Tooltip
+                          title={
+                            !iAmOwner
+                              ? 'Only owners can change the default provider'
+                              : provider.is_default
+                                ? 'This provider is used when a task does not specify one. Click to clear default.'
+                                : 'Use this provider by default when a task does not specify one'
+                          }
+                        >
+                          <span>
+                            <IconButton
+                              size="sm"
+                              variant="plain"
+                              color={
+                                provider.is_default ? 'primary' : 'neutral'
+                              }
+                              disabled={!iAmOwner || provider.disabled}
+                              onClick={() =>
+                                handleSetDefaultProvider(
+                                  provider.id,
+                                  !provider.is_default,
+                                )
+                              }
+                              aria-label={
+                                provider.is_default
+                                  ? 'Unset default provider'
+                                  : 'Set as default provider'
+                              }
+                            >
+                              <StarIcon
+                                size={16}
+                                fill={
+                                  provider.is_default ? 'currentColor' : 'none'
+                                }
+                              />
+                            </IconButton>
                           </span>
                         </Tooltip>
                       </td>

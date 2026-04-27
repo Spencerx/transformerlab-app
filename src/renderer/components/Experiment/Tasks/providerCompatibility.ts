@@ -1,4 +1,6 @@
 type ProviderWithAccelerators = {
+  id?: string;
+  is_default?: boolean;
   type?: string;
   config?: {
     supported_accelerators?: string[] | string;
@@ -67,4 +69,15 @@ export const isProviderCompatibleWithAccelerators = (
   return requiredCanonical.some((accelerator) =>
     supportedCanonical.has(accelerator),
   );
+};
+
+export const getPreferredProviderId = (
+  providers: ProviderWithAccelerators[],
+): string => {
+  if (!providers?.length) {
+    return '';
+  }
+
+  const defaultProvider = providers.find((provider) => provider?.is_default);
+  return defaultProvider?.id ?? providers[0]?.id ?? '';
 };
