@@ -684,15 +684,15 @@ async def _resolve_provider(
                     matched_provider = provider
                     break
 
-        # Use matched provider if found, otherwise use first available as fallback
+        # Use matched provider if found, otherwise prefer the team's default
+        # provider (is_default=True), falling back to the first available.
         if matched_provider:
             task_data["provider_id"] = str(matched_provider.id)
             task_data["provider_name"] = matched_provider.name
         else:
-            # No provider specified or no match found, use first available
-            first_provider = providers[0]
-            task_data["provider_id"] = str(first_provider.id)
-            task_data["provider_name"] = first_provider.name
+            chosen_provider = next((p for p in providers if getattr(p, "is_default", False)), providers[0])
+            task_data["provider_id"] = str(chosen_provider.id)
+            task_data["provider_name"] = chosen_provider.name
     except Exception:
         # If provider resolution fails, continue without it
         # The task can still be created, provider selection can happen later
