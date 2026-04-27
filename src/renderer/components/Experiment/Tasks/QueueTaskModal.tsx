@@ -39,6 +39,7 @@ import { fetcher, getAPIFullPath } from 'renderer/lib/transformerlab-api-sdk';
 import { useAuth } from 'renderer/lib/authContext';
 import SweepConfigSection from './SweepConfigSection';
 import SafeJSONParse from 'renderer/components/Shared/SafeJSONParse';
+import { getPreferredProviderId } from './providerCompatibility';
 
 type QueueTaskModalProps = {
   open: boolean;
@@ -659,13 +660,13 @@ export default function QueueTaskModal({
         setParameters([]);
       }
 
-      // Set provider: use task's provider if it exists in current list, else first provider
+      // Set provider: use task's provider if it exists, otherwise default provider, then first provider.
       const taskProviderId = cfg.provider_id ?? task.provider_id ?? '';
       const taskProviderInList = providers.some(
         (p: { id: string }) => p.id === taskProviderId,
       );
       setSelectedProviderId(
-        taskProviderInList ? taskProviderId : (providers[0]?.id ?? ''),
+        taskProviderInList ? taskProviderId : getPreferredProviderId(providers),
       );
 
       // Initialize sweep configuration from task

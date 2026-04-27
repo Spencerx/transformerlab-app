@@ -36,6 +36,23 @@ async def detect_local_accelerators() -> Dict[str, Any]:
     return {"supported_accelerators": supported_accelerators}
 
 
+def _provider_to_read(provider: Any) -> ProviderRead:
+    """Build a ProviderRead with sensitive config masked."""
+    masked_config = mask_sensitive_config(provider.config or {}, provider.type)
+    return ProviderRead(
+        id=provider.id,
+        team_id=provider.team_id,
+        name=provider.name,
+        type=provider.type,
+        config=masked_config,
+        created_by_user_id=provider.created_by_user_id,
+        created_at=provider.created_at,
+        updated_at=provider.updated_at,
+        disabled=provider.disabled,
+        is_default=provider.is_default,
+    )
+
+
 async def list_providers_for_team(
     session: AsyncSession,
     team_id: str,
@@ -49,24 +66,7 @@ async def list_providers_for_team(
     else:
         providers = await list_enabled_team_providers(session, team_id)
 
-    result = []
-    for provider in providers:
-        masked_config = mask_sensitive_config(provider.config or {}, provider.type)
-        result.append(
-            ProviderRead(
-                id=provider.id,
-                team_id=provider.team_id,
-                name=provider.name,
-                type=provider.type,
-                config=masked_config,
-                created_by_user_id=provider.created_by_user_id,
-                created_at=provider.created_at,
-                updated_at=provider.updated_at,
-                disabled=provider.disabled,
-            )
-        )
-
-    return result
+    return [_provider_to_read(provider) for provider in providers]
 
 
 async def create_provider_for_team(
@@ -150,18 +150,7 @@ async def create_provider_for_team(
         except Exception:
             logger.exception("Failed to auto-start setup for newly created local provider %s", provider.id)
 
-    masked_config = mask_sensitive_config(provider.config or {}, provider.type)
-    return ProviderRead(
-        id=provider.id,
-        team_id=provider.team_id,
-        name=provider.name,
-        type=provider.type,
-        config=masked_config,
-        created_by_user_id=provider.created_by_user_id,
-        created_at=provider.created_at,
-        updated_at=provider.updated_at,
-        disabled=provider.disabled,
-    )
+    return _provider_to_read(provider)
 
 
 async def get_provider_read(session: AsyncSession, team_id: str, provider_id: str) -> ProviderRead:
@@ -169,18 +158,7 @@ async def get_provider_read(session: AsyncSession, team_id: str, provider_id: st
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
 
-    masked_config = mask_sensitive_config(provider.config or {}, provider.type)
-    return ProviderRead(
-        id=provider.id,
-        team_id=provider.team_id,
-        name=provider.name,
-        type=provider.type,
-        config=masked_config,
-        created_by_user_id=provider.created_by_user_id,
-        created_at=provider.created_at,
-        updated_at=provider.updated_at,
-        disabled=provider.disabled,
-    )
+    return _provider_to_read(provider)
 
 
 async def update_provider_for_team(
@@ -215,25 +193,20 @@ async def update_provider_for_team(
         update_config = {**existing_config, **new_config}
 
     update_disabled = provider_data.disabled if provider_data.disabled is not None else None
+    update_is_default = provider_data.is_default if provider_data.is_default is not None else None
 
     provider = await update_team_provider(
-        session=session, provider=provider, name=update_name, config=update_config, disabled=update_disabled
+        session=session,
+        provider=provider,
+        name=update_name,
+        config=update_config,
+        disabled=update_disabled,
+        is_default=update_is_default,
     )
 
     await cache.invalidate("providers")
 
-    masked_config = mask_sensitive_config(provider.config or {}, provider.type)
-    return ProviderRead(
-        id=provider.id,
-        team_id=provider.team_id,
-        name=provider.name,
-        type=provider.type,
-        config=masked_config,
-        created_by_user_id=provider.created_by_user_id,
-        created_at=provider.created_at,
-        updated_at=provider.updated_at,
-        disabled=provider.disabled,
-    )
+    return _provider_to_read(provider)
 
 
 async def delete_provider_for_team(session: AsyncSession, team_id: str, provider_id: str) -> Dict[str, str]:

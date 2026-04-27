@@ -117,3 +117,45 @@ def test_provider_disable(_mock_check, _mock_api):
     result = runner.invoke(app, ["provider", "disable", "p1"])
     assert result.exit_code == 0
     assert "disabled" in result.output
+
+
+@patch("transformerlab_cli.commands.provider.api.patch", return_value=_mock_response(200))
+@patch("transformerlab_cli.commands.provider.check_configs")
+def test_provider_set_default(_mock_check, mock_patch):
+    """Test marking a provider as the team default."""
+    result = runner.invoke(app, ["provider", "set-default", "p1"])
+    assert result.exit_code == 0
+    assert "default" in result.output.lower()
+    # Verify the API was called with is_default=True
+    call_kwargs = mock_patch.call_args.kwargs
+    assert call_kwargs.get("json_data") == {"is_default": True}
+
+
+@patch("transformerlab_cli.commands.provider.api.patch", return_value=_mock_response(200))
+@patch("transformerlab_cli.commands.provider.check_configs")
+def test_provider_clear_default(_mock_check, mock_patch):
+    """Test clearing the default flag on a provider."""
+    result = runner.invoke(app, ["provider", "clear-default", "p1"])
+    assert result.exit_code == 0
+    assert "no longer the default" in result.output
+    call_kwargs = mock_patch.call_args.kwargs
+    assert call_kwargs.get("json_data") == {"is_default": False}
+
+
+@patch("transformerlab_cli.commands.provider.api.patch", return_value=_mock_response(200))
+@patch("transformerlab_cli.commands.provider.check_configs")
+def test_provider_update_default_flag(_mock_check, mock_patch):
+    """Test --default flag on `provider update`."""
+    result = runner.invoke(app, ["provider", "update", "p1", "--default"])
+    assert result.exit_code == 0
+    call_kwargs = mock_patch.call_args.kwargs
+    assert call_kwargs.get("json_data") == {"is_default": True}
+
+
+@patch("transformerlab_cli.commands.provider.api.patch", return_value=_mock_response(404))
+@patch("transformerlab_cli.commands.provider.check_configs")
+def test_provider_set_default_not_found(_mock_check, _mock_api):
+    """Test set-default on a non-existent provider."""
+    result = runner.invoke(app, ["provider", "set-default", "nonexistent"])
+    assert result.exit_code == 1
+    assert "not found" in result.output
